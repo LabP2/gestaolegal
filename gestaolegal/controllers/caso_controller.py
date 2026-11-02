@@ -68,9 +68,11 @@ def get():
     )
     user = request.args.get("user", default=None, type=str)
     criado_por = request.args.get("criado_por", default=None, type=str)
+    participante = request.args.get("participante", default=None, type=str)
 
     responsible_user = _resolve_user_param(user, current_user)
     criado_por_id = _resolve_user_param(criado_por, current_user)
+    participante_id = _resolve_user_param(participante, current_user)
 
     caso_service = CasoService()
     result = caso_service.search(
@@ -80,6 +82,7 @@ def get():
         situacao_deferimento=situacao_deferimento,
         responsible_user=responsible_user,
         criado_por=criado_por_id,
+        participante=participante_id,
         numero_caso=numero_caso,
     )
 

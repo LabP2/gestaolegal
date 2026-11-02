@@ -25,7 +25,7 @@
 	// Os papéis repetem os da sidebar: quem não acessa a tela não vê o atalho.
 	const atalhos: Atalho[] = [
 		{ href: '/casos', icon: BriefcaseIcon, label: 'Casos' },
-		{ href: '/casos?user=me', icon: UserIcon, label: 'Meus Casos' },
+		{ href: '/casos?participante=me', icon: UserIcon, label: 'Meus Casos' },
 		{ href: '/plantao/escala', icon: CalendarDaysIcon, label: 'Plantão' },
 		{ href: '/plantao/fila-atendimento', icon: ClockIcon, label: 'Atendimento' },
 		{ href: '/plantao/atendidos-assistidos', icon: UsersIcon, label: 'Atendidos/Assistidos' },
