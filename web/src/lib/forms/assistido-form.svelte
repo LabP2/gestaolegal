@@ -1,8 +1,12 @@
 <script lang="ts">
+	import DadosJuridicosForm from './dados-juridicos-form.svelte';
 	import { mensagemDeErro } from '$lib/utils/erros';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { assistidoCreateFormSchema } from './schemas/assistido-schema';
+	import {
+		assistidoCreateFormSchema,
+		type AssistidoCreateFormData
+	} from './schemas/assistido-schema';
 	import { SimpleInput, SimpleSelect, SimpleTextArea } from '$lib/components/forms';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -16,17 +20,20 @@
 		atendidoId,
 		onError,
 		onUpdate,
-		isAssistido = false
+		isAssistido = false,
+		pessoaJuridica = false
 	}: {
 		data: any;
 		atendidoId?: number;
 		onError?: (error: any) => void;
 		onUpdate?: (responseData: any) => void;
 		isAssistido?: boolean;
+		pessoaJuridica?: boolean;
 	} = $props();
 
-	const form = superForm(data, {
+	const form = superForm<AssistidoCreateFormData>(data, {
 		SPA: true,
+		dataType: 'json',
 		validators: zod4Client(assistidoCreateFormSchema),
 		onUpdate: async ({ form, result }) => {
 			try {
@@ -69,6 +76,9 @@
 </script>
 
 <form method="POST" use:enhance class="space-y-6">
+	{#if pessoaJuridica && $formData.assistido_pessoa_juridica}
+		<DadosJuridicosForm {form} bind:dados={$formData.assistido_pessoa_juridica} />
+	{/if}
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Dados Pessoais</Card.Title>

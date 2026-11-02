@@ -44,5 +44,15 @@ export interface Atendido {
 	// used by the create/edit form schema.
 	endereco?: Endereco;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	assistido?: any;
+	assistido?: {
+		assistido_pessoa_juridica?: AssistidoPessoaJuridica | null;
+		[key: string]: any;
+	};
+}
+
+export interface AssistidoPessoaJuridica {
+	enquadramento: 'mei' | 'microempresa' | 'pequeno_porte' | 'outros';
+	especificacao_enquadramento?: string | null;
+	socios: string[];
+	situacao_receita?: 'Ativa' | 'Baixada' | 'Outras' | null;
 }

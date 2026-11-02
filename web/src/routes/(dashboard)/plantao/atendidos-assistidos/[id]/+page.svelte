@@ -425,6 +425,48 @@
 				</Card.Root>
 			</div>
 
+			{#if atendido.pj_constituida === 'sim' && atendido.assistido?.assistido_pessoa_juridica}
+				{@const pj = atendido.assistido.assistido_pessoa_juridica}
+				<Card.Root>
+					<Card.Header><Card.Title>Dados Jurídicos</Card.Title></Card.Header>
+					<Card.Content class="grid gap-4 md:grid-cols-2">
+						<div>
+							<p class="text-sm text-muted-foreground">Enquadramento</p>
+							<p class="font-medium">
+								{(
+									{
+										mei: 'Microempreendedor Individual',
+										microempresa: 'Microempresa',
+										pequeno_porte: 'Empresa de pequeno porte',
+										outros: 'Outros'
+									} as Record<string, string>
+								)[pj.enquadramento] ?? pj.enquadramento}
+							</p>
+						</div>
+						{#if pj.enquadramento === 'outros' && pj.especificacao_enquadramento}
+							<div>
+								<p class="text-sm text-muted-foreground">Especifique o enquadramento da PJ</p>
+								<p class="font-medium">{pj.especificacao_enquadramento}</p>
+							</div>
+						{/if}
+						{#if pj.enquadramento !== 'mei'}
+							<div>
+								<p class="text-sm text-muted-foreground">
+									Sócios da Pessoa Jurídica ({pj.socios.length})
+								</p>
+								<ol class="list-inside list-decimal">
+									{#each pj.socios as nome}<li>{nome}</li>{/each}
+								</ol>
+							</div>
+						{/if}
+						<div>
+							<p class="text-sm text-muted-foreground">Situação perante a Receita Federal</p>
+							<p class="font-medium">{pj.situacao_receita ?? 'Não informada'}</p>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
 			{#if atendido.assistido}
 				<div class="border-t pt-6">
 					<h2 class="mb-6 text-2xl font-bold">Informações de Assistido</h2>

@@ -45,6 +45,7 @@
 				<div class="border-t pt-6">
 					<h2 class="mb-6 text-2xl font-bold">Informações de Assistido</h2>
 					<AssistidoForm
+						pessoaJuridica={data.atendido.pj_constituida === 'sim'}
 						data={data.assistidoForm}
 						atendidoId={data.atendido.id}
 						{onError}

@@ -38,7 +38,20 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 		let assistidoForm = null;
 		if (atendido.assistido) {
-			assistidoForm = await superValidate(atendido.assistido, zod4(assistidoUpdateFormSchema));
+			assistidoForm = await superValidate(
+				{
+					...atendido.assistido,
+					assistido_pessoa_juridica:
+						atendido.pj_constituida === 'sim'
+							? (atendido.assistido.assistido_pessoa_juridica ?? {
+									enquadramento: '' as const,
+									socios: ['']
+								})
+							: null
+				},
+				zod4(assistidoUpdateFormSchema),
+				{ errors: false }
+			);
 		}
 
 		return {
