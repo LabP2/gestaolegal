@@ -13,6 +13,7 @@
 	import { api } from '$lib/api-client';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { page } from '$app/state';
+	import { afterNavigate } from '$app/navigation';
 	import * as Select from '$lib/components/ui/select';
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import { usePaginatedFilters } from '$lib';
@@ -39,18 +40,21 @@
 		criado_por: string;
 	};
 
-	const { filters, applyFilters, setFilters } = usePaginatedFilters<CasoFilters>({
-		initialFilters: {
-			search: page.url.searchParams.get('search') ?? '',
-			numero_caso: page.url.searchParams.get('numero_caso') ?? '',
-			show_inactive: page.url.searchParams.get('show_inactive') === 'true',
-			situacao_deferimento: page.url.searchParams.get('situacao_deferimento') ?? 'todos',
+	function filtrosDaUrl(url: URL): CasoFilters {
+		const q = url.searchParams;
+		return {
+			search: q.get('search') ?? '',
+			numero_caso: q.get('numero_caso') ?? '',
+			show_inactive: q.get('show_inactive') === 'true',
+			situacao_deferimento: q.get('situacao_deferimento') ?? 'todos',
 			// Links antigos usavam ?user=me (só o responsável).
-			participante:
-				page.url.searchParams.get('participante') ??
-				(page.url.searchParams.get('user') === 'me' ? 'me' : ''),
-			criado_por: page.url.searchParams.get('criado_por') ?? ''
-		},
+			participante: q.get('participante') ?? (q.get('user') === 'me' ? 'me' : ''),
+			criado_por: q.get('criado_por') ?? ''
+		};
+	}
+
+	const { filters, applyFilters, setFilters } = usePaginatedFilters<CasoFilters>({
+		initialFilters: filtrosDaUrl(page.url),
 		buildParams: (f) => ({
 			search: f.search,
 			numero_caso: f.numero_caso,
@@ -59,6 +63,13 @@
 			participante: f.participante,
 			criado_por: f.criado_por
 		})
+	});
+
+	// Clicar em "Gestão de casos" estando em "Meus casos" (ou voltar no navegador)
+	// mantém o mesmo componente; os filtros precisam seguir a nova URL. As
+	// navegações do próprio applyFilters (goto) já partem dos filtros atuais.
+	afterNavigate((nav) => {
+		if (nav.type !== 'goto') setFilters(filtrosDaUrl(page.url));
 	});
 
 	const isAdmin = $derived(me.urole === 'admin');
