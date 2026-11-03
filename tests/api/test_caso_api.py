@@ -1578,6 +1578,64 @@ def test_filter_casos_by_criado_por_me(
     assert criado_pelo_outro not in ids
 
 
+def _ids_listados(client: FlaskClient, headers: dict[str, str], query: str) -> list[int]:
+    data = get_success_data(client.get(f"/api/caso/?{query}", headers=headers))
+    return [c["id"] for c in data["items"]]
+
+
+@pytest.mark.parametrize(
+    "papel", ["id_usuario_responsavel", "id_estagiario", "id_orientador", "id_colaborador"]
+)
+def test_filter_casos_by_participante_me_inclui_qualquer_papel(
+    client: FlaskClient,
+    auth_headers: dict[str, str],
+    non_admin_auth_headers: dict[str, str],
+    sample_caso_data: dict[str, Any],
+    papel: str,
+) -> None:
+    # O admin cadastra os dois casos (e é o responsável, salvo no caso do papel
+    # testado). O usuário 2 participa só do primeiro.
+    com_usuario = get_success_data(
+        client.post(
+            "/api/caso/",
+            json={**sample_caso_data, "id_usuario_responsavel": 1, papel: 2},
+            headers=auth_headers,
+        )
+    )["id"]
+    sem_usuario = get_success_data(
+        client.post("/api/caso/", json=sample_caso_data, headers=auth_headers)
+    )["id"]
+
+    ids = _ids_listados(client, non_admin_auth_headers, "participante=me")
+    assert com_usuario in ids
+    assert sem_usuario not in ids
+
+
+def test_filter_user_continua_so_responsavel_e_lista_traz_estagiario(
+    client: FlaskClient,
+    auth_headers: dict[str, str],
+    non_admin_auth_headers: dict[str, str],
+    sample_caso_data: dict[str, Any],
+) -> None:
+    caso_id = get_success_data(
+        client.post(
+            "/api/caso/",
+            json={**sample_caso_data, "id_usuario_responsavel": 1, "id_estagiario": 2},
+            headers=auth_headers,
+        )
+    )["id"]
+
+    # "user" segue filtrando só pelo responsável; "participante" inclui o estagiário.
+    assert caso_id not in _ids_listados(client, non_admin_auth_headers, "user=me")
+    assert caso_id in _ids_listados(client, non_admin_auth_headers, "participante=me")
+
+    # A lista de casos devolve o estagiário, exibido na coluna "Estagiário".
+    items = get_success_data(client.get("/api/caso/", headers=auth_headers))["items"]
+    caso = next(c for c in items if c["id"] == caso_id)
+    assert caso["estagiario"]["id"] == 2
+    assert caso["estagiario"]["nome"]
+
+
 def test_upload_arquivo_too_large_returns_portuguese_message(
     client: FlaskClient,
     auth_headers: dict[str, str],

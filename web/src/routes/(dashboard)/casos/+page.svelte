@@ -19,6 +19,11 @@
 
 	let { data }: PageProps = $props();
 	const { data: casos, me } = $derived(data);
+	// A coluna "Assistido" usa os nomes das partes; o DataTable formata a lista.
+	const casosListados = $derived({
+		...casos,
+		items: casos.items.map((c) => ({ ...c, nomes_assistidos: c.clientes.map((a) => a.nome) }))
+	});
 
 	const situacaoFilterOptions = [
 		{ value: 'todos', label: 'Todos' },
@@ -30,7 +35,7 @@
 		numero_caso: string;
 		show_inactive: boolean;
 		situacao_deferimento: string;
-		user: string;
+		participante: string;
 		criado_por: string;
 	};
 
@@ -40,7 +45,10 @@
 			numero_caso: page.url.searchParams.get('numero_caso') ?? '',
 			show_inactive: page.url.searchParams.get('show_inactive') === 'true',
 			situacao_deferimento: page.url.searchParams.get('situacao_deferimento') ?? 'todos',
-			user: page.url.searchParams.get('user') ?? '',
+			// Links antigos usavam ?user=me (só o responsável).
+			participante:
+				page.url.searchParams.get('participante') ??
+				(page.url.searchParams.get('user') === 'me' ? 'me' : ''),
 			criado_por: page.url.searchParams.get('criado_por') ?? ''
 		},
 		buildParams: (f) => ({
@@ -48,7 +56,7 @@
 			numero_caso: f.numero_caso,
 			show_inactive: f.show_inactive ? 'true' : 'false',
 			situacao_deferimento: f.situacao_deferimento,
-			user: f.user,
+			participante: f.participante,
 			criado_por: f.criado_por
 		})
 	});
@@ -67,7 +75,7 @@
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-3xl font-bold tracking-tight">
-			{filters.user === 'me' ? 'Meus Casos' : 'Casos'}
+			{filters.participante === 'me' ? 'Meus Casos' : 'Casos'}
 		</h1>
 		<Button variant="default" href="/casos/cadastrar-novo-caso">Novo Caso</Button>
 	</div>
@@ -107,30 +115,36 @@
 								placeholder="Buscar descrição ou nome..."
 							/>
 						</div>
-						<Select.Root
-							bind:value={filters.situacao_deferimento}
-							name="situacao_deferimento"
-							type="single"
-							onValueChange={() => applyFilters()}
-						>
-							<Select.Trigger class="w-[200px] data-[placeholder]:text-foreground">
-								{situacaoFilterOptions.find(
-									(option) => option.value === filters.situacao_deferimento
-								)?.label}
-							</Select.Trigger>
-							<Select.Content>
-								{#each situacaoFilterOptions as option}
-									<Select.Item value={option.value}>{option.label}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
+						<div>
+							<span class="mb-1 block text-sm font-medium">Deferimento</span>
+							<Select.Root
+								bind:value={filters.situacao_deferimento}
+								name="situacao_deferimento"
+								type="single"
+								onValueChange={() => applyFilters()}
+							>
+								<Select.Trigger
+									class="w-[200px] data-[placeholder]:text-foreground"
+									aria-label="Deferimento"
+								>
+									{situacaoFilterOptions.find(
+										(option) => option.value === filters.situacao_deferimento
+									)?.label}
+								</Select.Trigger>
+								<Select.Content>
+									{#each situacaoFilterOptions as option}
+										<Select.Item value={option.value}>{option.label}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
 					</div>
 					<div class="flex flex-wrap items-center gap-4">
 						<label class="flex cursor-pointer items-center gap-2">
 							<Checkbox
-								checked={filters.user === 'me'}
+								checked={filters.participante === 'me'}
 								onCheckedChange={(checked) => {
-									setFilters({ user: checked ? 'me' : '' });
+									setFilters({ participante: checked ? 'me' : '' });
 									applyFilters();
 								}}
 							/>
@@ -158,7 +172,7 @@
 			</div>
 
 			<DataTable
-				data={casos}
+				data={casosListados}
 				onPageChange={(page) => applyFilters({ page })}
 				columns={[
 					{ header: 'ID', key: 'id', class: 'w-[100px]' },
@@ -169,16 +183,17 @@
 						class: 'w-[200px]',
 						badgeMap: AREA_BADGE_MAP
 					},
-					{ header: 'Responsável', key: 'usuario_responsavel.nome', class: 'w-[200px]' },
+					{ header: 'Estagiário', key: 'estagiario.nome', class: 'w-[200px]' },
+					{ header: 'Assistido', key: 'nomes_assistidos', type: 'array', class: 'w-[220px]' },
 					{
-						header: 'Situação',
+						header: 'Deferimento',
 						key: 'situacao_deferimento',
 						class: 'w-[150px]',
 						badgeMap: SITUACAO_DEFERIMENTO_BADGE_MAP,
 						type: 'badge'
 					},
 					{ header: 'Data', key: 'data_criacao', type: 'datetime', class: 'w-[150px]' },
-					{ header: 'Status', key: 'status', type: 'status', class: 'w-[100px]' }
+					{ header: 'Ativo', key: 'status', type: 'status', class: 'w-[100px]' }
 				]}
 				actions={{
 					class: 'w-[180px] text-right',

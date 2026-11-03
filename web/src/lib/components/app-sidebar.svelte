@@ -75,7 +75,7 @@
 				},
 				{
 					title: 'Meus Casos',
-					url: '/casos?user=me'
+					url: '/casos?participante=me'
 				},
 				{
 					title: 'Gestão de Casos',

@@ -40,6 +40,7 @@ export interface ListCaso {
 	descricao: string | null;
 	data_criacao: string;
 	usuario_responsavel: User;
+	estagiario: User | null;
 	clientes: Atendido[];
 }
 

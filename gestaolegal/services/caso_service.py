@@ -37,6 +37,14 @@ from gestaolegal.utils.request_context import RequestContext
 
 logger = logging.getLogger(__name__)
 
+# Colunas em que um usuário participa do caso (filtro "participante").
+PAPEIS_NO_CASO = (
+    "id_usuario_responsavel",
+    "id_estagiario",
+    "id_orientador",
+    "id_colaborador",
+)
+
 CASO_CATEGORIA = "casos"
 
 
@@ -83,6 +91,7 @@ class CasoService:
         atendido_id: int | None = None,
         criado_por: int | None = None,
         numero_caso: int | None = None,
+        participante: int | None = None,
     ) -> PaginatedResult[Caso]:
         logger.info(
             f"Searching casos with search: '{search}', situacao_deferimento: {situacao_deferimento}, responsible_user: {responsible_user}, show_inactive: {show_inactive}, atendido_id: {atendido_id}, page: {page_params['page']}, per_page: {page_params['per_page']}"
@@ -128,6 +137,18 @@ class CasoService:
         if criado_por is not None:
             clauses.append(
                 WhereClause(column="id_criado_por", operator="==", value=criado_por)
+            )
+
+        if participante is not None:
+            # "Meus casos": o usuário em qualquer papel do caso, não só como
+            # responsável (que no cadastro é sempre quem cadastrou).
+            clauses.append(
+                or_clauses(
+                    *(
+                        WhereClause(column=coluna, operator="==", value=participante)
+                        for coluna in PAPEIS_NO_CASO
+                    )
+                )
             )
 
         if search:
