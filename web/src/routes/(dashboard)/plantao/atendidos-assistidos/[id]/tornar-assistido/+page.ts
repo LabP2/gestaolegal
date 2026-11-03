@@ -15,7 +15,13 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			error(400, 'Este atendido já é um assistido');
 		}
 
-		const form = await superValidate(zod4(assistidoCreateFormSchema));
+		const form = await superValidate(
+			atendido.pj_constituida === 'sim'
+				? { assistido_pessoa_juridica: { enquadramento: '' as const, socios: [''] } }
+				: {},
+			zod4(assistidoCreateFormSchema),
+			{ errors: false }
+		);
 
 		return { form, atendido };
 	} catch (err) {

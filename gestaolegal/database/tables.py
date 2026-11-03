@@ -146,6 +146,29 @@ assistidos = Table(
     Column("obs", String(1000), nullable=True),
 )
 
+# O vínculo com assistidos delimita a unidade; não há unidade independente da PJ.
+assistidos_pessoa_juridica = Table(
+    "assistidos_pessoa_juridica",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_assistido", Integer, ForeignKey("assistidos.id"), nullable=True),
+    Column("enquadramento", String(100), nullable=False),
+    Column("especificacao_enquadramento", String(200), nullable=True),
+    Column("socios", String(1000), nullable=True),
+    Column("situacao_receita", String(100), nullable=True),
+    Column("sede_bh", Boolean, nullable=True),
+    Column("regiao_sede_bh", String(50), nullable=True),
+    Column("regiao_sede_outros", String(100), nullable=True),
+    Column("area_atuacao", String(50), nullable=True),
+    Column("negocio_nascente", Boolean, nullable=True),
+    Column("orgao_registro", String(100), nullable=True),
+    Column("faturamento_anual", Numeric(10, 2), nullable=True),
+    Column("ultimo_balanco_neg", String(50), nullable=True),
+    Column("resultado_econ_neg", String(50), nullable=True),
+    Column("tem_funcionarios", String(20), nullable=True),
+    Column("qtd_funcionarios", String(7), nullable=True),
+)
+
 orientacao_juridica = Table(
     "orientacao_juridica",
     metadata,

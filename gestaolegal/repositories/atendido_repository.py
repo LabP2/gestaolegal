@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from typing import Any
@@ -8,10 +9,12 @@ from sqlalchemy import update as sql_update
 from gestaolegal.common import PaginatedResult
 from gestaolegal.database.tables import (
     assistidos,
+    assistidos_pessoa_juridica,
     atendido_xOrientacaoJuridica,
     atendidos,
 )
 from gestaolegal.models.assistido import Assistido
+from gestaolegal.models.assistido_pessoa_juridica import AssistidoPessoaJuridica
 from gestaolegal.models.atendido import Atendido
 from gestaolegal.repositories.repository import (
     BaseRepository,
@@ -187,7 +190,38 @@ class AtendidoRepository(BaseRepository):
     def find_assistido_by_atendido_id(self, atendido_id: int) -> Assistido | None:
         stmt = select(assistidos).where(assistidos.c.id_atendido == atendido_id)
         result = self.session.execute(stmt).one_or_none()
-        return from_dict(Assistido, dict(result._mapping)) if result else None
+        if not result:
+            return None
+        assistido = from_dict(Assistido, dict(result._mapping))
+        pj = (
+            self.session.execute(
+                select(assistidos_pessoa_juridica)
+                .where(assistidos_pessoa_juridica.c.id_assistido == assistido.id)
+                .order_by(assistidos_pessoa_juridica.c.id.desc())
+                .limit(1)
+            )
+            .mappings()
+            .first()
+        )
+        if pj:
+            dados = dict(pj)
+            texto = dados.pop("socios") or ""
+            try:
+                nomes = json.loads(texto)
+            except (ValueError, TypeError):
+                nomes = None
+            # Texto livre legado é preservado como um único campo, sem adivinhar separadores.
+            dados["socios"] = (
+                nomes
+                if isinstance(nomes, list) and all(isinstance(n, str) for n in nomes)
+                else ([texto] if texto else [])
+            )
+            if dados["enquadramento"] == "mei":
+                dados["socios"] = []
+            assistido.assistido_pessoa_juridica = from_dict(
+                AssistidoPessoaJuridica, dados
+            )
+        return assistido
 
     def get_assistidos_by_atendido_ids(
         self, atendido_ids: list[int]
@@ -217,3 +251,26 @@ class AtendidoRepository(BaseRepository):
             .values(**data)
         )
         self.session.execute(stmt)
+
+    def salvar_pessoa_juridica(self, id_assistido: int, dados: dict[str, Any]) -> None:
+        dados = dict(dados)
+        dados["socios"] = json.dumps(dados["socios"], ensure_ascii=False)
+        # Atualiza apenas os campos deste formulário, preservando o restante do legado.
+        existente = self.session.execute(
+            select(assistidos_pessoa_juridica.c.id).where(
+                assistidos_pessoa_juridica.c.id_assistido == id_assistido
+            )
+        ).first()
+        if existente:
+            self.session.execute(
+                sql_update(assistidos_pessoa_juridica)
+                .where(assistidos_pessoa_juridica.c.id_assistido == id_assistido)
+                .values(**dados)
+            )
+        else:
+            self.session.execute(
+                insert(assistidos_pessoa_juridica).values(
+                    id_assistido=id_assistido, **dados
+                )
+            )
+        self.session.flush()

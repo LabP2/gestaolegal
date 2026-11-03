@@ -1,7 +1,55 @@
 import { z } from 'zod/v4';
 
+export const pessoaJuridicaSchema = z
+	.object({
+		enquadramento: z
+			.enum(['', 'mei', 'microempresa', 'pequeno_porte', 'outros'], {
+				error: 'Selecione o enquadramento'
+			})
+			.refine((value) => value !== '', 'Selecione o enquadramento'),
+		especificacao_enquadramento: z
+			.string()
+			.trim()
+			.max(200, 'Especificação deve ter no máximo 200 caracteres')
+			.nullish(),
+		socios: z
+			.array(z.string().trim().max(80, 'Nome deve ter no máximo 80 caracteres'))
+			.max(20, 'Informe no máximo 20 sócios'),
+		situacao_receita: z.enum(['Ativa', 'Baixada', 'Outras']).nullish()
+	})
+	.superRefine((data, ctx) => {
+		if (data.enquadramento === 'outros' && !data.especificacao_enquadramento) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'Especifique o enquadramento da PJ',
+				path: ['especificacao_enquadramento']
+			});
+		}
+		if (data.enquadramento !== 'mei') {
+			if (!data.socios.length)
+				ctx.addIssue({ code: 'custom', message: 'Informe ao menos um sócio', path: ['socios'] });
+			data.socios.forEach((nome, index) => {
+				if (!nome)
+					ctx.addIssue({
+						code: 'custom',
+						message: 'Informe o nome do sócio',
+						path: ['socios', index]
+					});
+			});
+			// Python usa espaços após as vírgulas na serialização para a coluna legada.
+			if (JSON.stringify(data.socios).length + Math.max(0, data.socios.length - 1) > 1000) {
+				ctx.addIssue({
+					code: 'custom',
+					message: 'Os nomes dos sócios excedem o limite de 1000 caracteres',
+					path: ['socios']
+				});
+			}
+		}
+	});
+
 const assistidoFieldsSchema = z
 	.object({
+		assistido_pessoa_juridica: pessoaJuridicaSchema.nullish(),
 		sexo: z.enum(['M', 'F', 'O'], {
 			error: 'Selecione o sexo'
 		}),

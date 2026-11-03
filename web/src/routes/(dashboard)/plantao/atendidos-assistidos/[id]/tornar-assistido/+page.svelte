@@ -52,6 +52,11 @@
 			</Card.Content>
 		</Card.Root>
 
-		<AssistidoForm data={data.form} atendidoId={data.atendido.id} {onError} />
+		<AssistidoForm
+			pessoaJuridica={data.atendido.pj_constituida === 'sim'}
+			data={data.form}
+			atendidoId={data.atendido.id}
+			{onError}
+		/>
 	</div>
 </div>

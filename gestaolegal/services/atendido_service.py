@@ -174,14 +174,28 @@ class AtendidoService:
             )
             raise NotFoundException(resource="Atendido", resource_id=id_atendido)
 
-        assistido_data = assistido_input.model_dump()
+        pj = assistido_input.assistido_pessoa_juridica
+        if pj is not None and atendido.pj_constituida != "sim":
+            raise ValidationException(
+                "Dados jurídicos exigem pessoa jurídica constituída",
+                field="assistido_pessoa_juridica",
+            )
+        assistido_data = assistido_input.model_dump(
+            exclude={"assistido_pessoa_juridica"}
+        )
         assistido_data["id_atendido"] = id_atendido
 
-        assistido_id = self.repository.create_assistido(assistido_data)
-        logger.info(
-            f"Assistido created successfully with id: {assistido_id} for atendido: {id_atendido}"
-        )
-        return self.repository.find_assistido_by_atendido_id(id_atendido)
+        try:
+            assistido_id = self.repository.create_assistido(assistido_data)
+            if pj is not None:
+                self.repository.salvar_pessoa_juridica(assistido_id, pj.model_dump())
+            logger.info(
+                f"Assistido created successfully with id: {assistido_id} for atendido: {id_atendido}"
+            )
+            return self.repository.find_assistido_by_atendido_id(id_atendido)
+        except Exception:
+            self.repository.session.rollback()
+            raise
 
     def update_assistido(
         self,
@@ -199,17 +213,17 @@ class AtendidoService:
             )
             raise NotFoundException(resource="Atendido", resource_id=id_atendido)
 
-        if atendido_input:
-            update_data = atendido_input.model_dump(exclude_none=True)
-
-            endereco_data = self.__extract_endereco_data_for_update(update_data)
-            if endereco_data and atendido.endereco_id:
-                self.endereco_repository.update(atendido.endereco_id, endereco_data)
-                logger.info(f"Updated address for atendido id: {id_atendido}")
-
-            if update_data:
-                self.repository.update(id_atendido, update_data)
-            logger.info(f"Updated atendido data for id: {id_atendido}")
+        pj = assistido_input.assistido_pessoa_juridica
+        pj_constituida = (
+            atendido_input.pj_constituida
+            if atendido_input and atendido_input.pj_constituida is not None
+            else atendido.pj_constituida
+        )
+        if pj is not None and pj_constituida != "sim":
+            raise ValidationException(
+                "Dados jurídicos exigem pessoa jurídica constituída",
+                field="assistido_pessoa_juridica",
+            )
 
         assistido = self.repository.find_assistido_by_atendido_id(id_atendido)
         if not assistido:
@@ -220,10 +234,33 @@ class AtendidoService:
                 "Atendido não possui registro de assistido", field="assistido"
             )
 
-        assistido_update_data = assistido_input.model_dump(exclude_none=True)
-        self.repository.update_assistido(id_atendido, assistido_update_data)
-        logger.info(f"Assistido updated successfully for atendido id: {id_atendido}")
-        return self.repository.find_assistido_by_atendido_id(id_atendido)
+        try:
+            if atendido_input:
+                update_data = atendido_input.model_dump(exclude_none=True)
+
+                endereco_data = self.__extract_endereco_data_for_update(update_data)
+                if endereco_data and atendido.endereco_id:
+                    self.endereco_repository.update(atendido.endereco_id, endereco_data)
+                    logger.info(f"Updated address for atendido id: {id_atendido}")
+
+                if update_data:
+                    self.repository.update(id_atendido, update_data)
+                logger.info(f"Updated atendido data for id: {id_atendido}")
+
+            assistido_update_data = assistido_input.model_dump(
+                exclude_none=True, exclude={"assistido_pessoa_juridica"}
+            )
+            if assistido_update_data:
+                self.repository.update_assistido(id_atendido, assistido_update_data)
+            if pj is not None:
+                self.repository.salvar_pessoa_juridica(assistido.id, pj.model_dump())
+            logger.info(
+                f"Assistido updated successfully for atendido id: {id_atendido}"
+            )
+            return self.repository.find_assistido_by_atendido_id(id_atendido)
+        except Exception:
+            self.repository.session.rollback()
+            raise
 
     def soft_delete(self, atendido_id: int):
         logger.info(f"Soft deleting atendido with id: {atendido_id}")

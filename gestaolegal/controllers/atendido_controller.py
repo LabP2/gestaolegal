@@ -143,6 +143,7 @@ def update_assistido(id: int):
     json_data = cast(dict[str, Any], request.get_json(force=True))
 
     assistido_fields = [
+        "assistido_pessoa_juridica",
         "sexo",
         "profissao",
         "raca",

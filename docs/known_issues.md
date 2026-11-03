@@ -33,24 +33,25 @@ mas consome recursos do servidor e do MTA.
 do gunicorn — Flask-Limiter com Redis, ou `limit_req` no nginx à frente da
 API. A segunda opção não acrescenta dependência à aplicação.
 
-## Legado: cadastro de pessoa jurídica sem uso
+## Pessoa jurídica: campos complementares legados
 
-**O que acontece.** A tabela `assistidos_pessoa_juridica` (sócios, situação na
-receita, enquadramento, sede, área de atuação, faturamento, funcionários e mais)
-continua no banco, e a 3.0 tem o dataclass `AssistidoPessoaJuridica`
-(`gestaolegal/models/assistido_pessoa_juridica.py`, exportado em
-`models/__init__.py`) e o campo `assistido_pessoa_juridica` em `Assistido`.
-Nenhum repository, service ou controller lê ou grava qualquer um dos dois.
+A ficha de assistido coleta enquadramento, especificação de “Outros”, nomes dos
+sócios e situação perante a Receita Federal, conforme a issue #114. Conversão,
+edição e perfil usam os mesmos dados. MEI não possui sócios; salvar como MEI
+remove os nomes anteriores. Os nomes são armazenados como uma lista JSON na
+coluna legada `socios` (até 1000 caracteres); texto livre antigo é apresentado
+como um único nome, sem inferir separadores. A ficha aceita até 20 nomes de até
+80 caracteres cada, respeitado o limite total da coluna.
 
-**De onde vem.** Na versão 2.0 examinada na revisão de paridade, esse fluxo estava desabilitado: os campos do
-formulário estão comentados e nenhuma view gravava a tabela (ver seção 1.1 de
-`paridade-v2-v3.md`). A 3.0 herdou o esqueleto junto com o resto do esquema.
+A migration `e2f3a4b5c6d7` acrescenta `especificacao_enquadramento` e torna
+opcionais os campos legados que não eram coletados. Não altera respostas
+existentes. O downgrade exige que esses campos estejam preenchidos; caso
+contrário, é recusado antes de alterar o esquema.
 
-**Como resolver.** Se a coleta desses dados voltar a ser desejada, é
-funcionalidade nova — repository, service, rotas e formulário. Se não, o model
-e a tabela podem ser removidos por migração. Antes de remover, conferir os dados existentes em cada instalação; a análise
-do código não comprova que a tabela esteja vazia. O pedido de enquadramento
-e sócios continua em [#114](https://github.com/gestaolegalufmg/gestaolegal/issues/114).
+Continuam sem formulário os campos complementares da tabela
+`assistidos_pessoa_juridica`: sede, área de atuação, negócio nascente, órgão de
+registro, faturamento, balanço, resultado e funcionários. As gravações da ficha
+preservam esses campos. Não remover a tabela nem inferir que esteja vazia.
 
 ## Usuários: o cadastro novo nasce sem senha utilizável
 

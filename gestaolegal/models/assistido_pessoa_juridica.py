@@ -1,25 +1,20 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from gestaolegal.models.assistido import Assistido
+from dataclasses import dataclass, field
 
 
 @dataclass
 class AssistidoPessoaJuridica:
     id_assistido: int
-    assistido: "Assistido"
-    situacao_receita: str
     enquadramento: str
-    sede_bh: bool
-    area_atuacao: str
-    negocio_nascente: bool
-    orgao_registro: str
-    faturamento_anual: float
-    tem_funcionarios: str
-
     id: int | None = None
-    socios: str | None = None
+    especificacao_enquadramento: str | None = None
+    socios: list[str] = field(default_factory=list)
+    situacao_receita: str | None = None
+    sede_bh: bool | None = None
+    area_atuacao: str | None = None
+    negocio_nascente: bool | None = None
+    orgao_registro: str | None = None
+    faturamento_anual: float | None = None
+    tem_funcionarios: str | None = None
     regiao_sede_bh: str | None = None
     regiao_sede_outros: str | None = None
     ultimo_balanco_neg: str | None = None
