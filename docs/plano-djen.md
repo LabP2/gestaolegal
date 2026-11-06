@@ -3,6 +3,13 @@
 Base: `master` em `b8f2f8d`, branch `feat/djen`. Este documento só traz o
 planejamento: nada foi implementado nem migrado.
 
+**Depende do multitenant.** A implementação começa depois que a
+multitenancy (plano em `feat/multitenant`) entrar no `master`. Tabelas novas
+deste plano (`djen_oabs`, `djen_comunicacoes`, `djen_sincronizacoes`)
+recebem a chave de tenant pelo mecanismo que aquele plano definir. A rotina
+agendada roda sem request e percorre os tenants um por um, sempre com tenant e
+unidade explícitos.
+
 ## Resultado esperado
 
 O sistema captura do Diário de Justiça Eletrônico Nacional (DJEN) as
@@ -102,6 +109,23 @@ heads` antes do PR).
 - `djen_pendente BOOLEAN NOT NULL DEFAULT 0` e `djen_consultado_em DATETIME
   NULL`.
 
+### `djen_oabs` (nova)
+
+Lista das OABs monitoradas, mantida pelo admin.
+
+| Coluna | Observação |
+|---|---|
+| `id` | PK |
+| `numero_oab` | Só dígitos |
+| `uf_oab` | `CHAR(2)` |
+| `id_usuario` | FK nula; dono da OAB, quando for alguém do sistema |
+| `unidade_id` | `coluna_unidade()`: unidade das publicações que chegarem sem caso |
+| `ativo` | Boolean |
+| `criado_em`, `id_criado_por` | Controle |
+
+Unicidade: (`numero_oab`, `uf_oab`). Na tela de cadastro, o `usuarios.oab` dos
+orientadores aparece só como sugestão, porque é texto livre.
+
 ### `djen_comunicacoes` (nova)
 
 | Coluna | Observação |
@@ -124,9 +148,8 @@ heads` antes do PR).
 | `capturada_em`, `atualizada_em` | Datas de controle |
 | `id_vinculado_por` | Quem vinculou ou descartou à mão |
 
-A unidade vem do caso. Sem caso, vem da unidade do dono da OAB, quando ele
-tiver uma só. Se tiver várias, a publicação fica em `pendente` na primeira
-unidade dele e o admin pode mudar.
+A unidade vem do caso. Sem caso, vem da `unidade_id` da OAB em `djen_oabs`
+por onde a publicação chegou.
 
 ### `djen_sincronizacoes` (nova)
 
@@ -161,7 +184,7 @@ rotina parou.
 - devolve dataclasses e nunca toca no banco.
 
 **Service** (`gestaolegal/services/djen_service.py`):
-- `sincronizar(janela_dias=3, max_processos=15)`: busca por OAB, depois os
+- `sincronizar(janela_dias=3, max_processos=15)`: busca pelas OABs ativas de `djen_oabs`, depois os
   processos pendentes, e grava em `djen_sincronizacoes`;
 - `registrar(item)`: faz upsert por `id_djen`. Se a publicação já existe,
   atualiza `ativo` e o cancelamento;
@@ -203,7 +226,8 @@ Pontos que diferem do fluxo de requisição:
 - Criar o comando `flask djen sincronizar`, que também pode ser chamado por
   `scripts/sincronizar_djen.py`.
 - Ele roda com `docker compose run --rm api ...`, por cron no host, em dias
-  úteis às 8h e às 14h, com `flock` para não sobrepor execuções.
+  úteis (segunda a sexta) às 8h e às 14h, com `flock` para não sobrepor
+  execuções. Feriados não são tratados: a execução só não encontra nada.
 - O cron não é instalado por script; fica documentado no README, como no reset
   de demo.
 
@@ -248,7 +272,7 @@ não há proxy.
 - **Processo:** botão "Buscar publicações agora" e a data da última consulta.
 - **Notificações:** o tipo `djen` leva ao evento no caso.
 
-## 7. Permissões (decisão pendente; proposta)
+## 7. Permissões (decidido em 2026-11-06)
 
 | Papel | Lista geral | Sem caso | Vincular/descartar | Eventos DJEN no caso |
 |---|---|---|---|---|
@@ -262,7 +286,8 @@ não há proxy.
 - Só gravamos o que chega pelas OABs monitoradas ou pelos processos
   cadastrados. Nada de busca ampla por tribunal ou por parte.
 - Publicações `descartadas`, e as `pendentes` sem vínculo há mais de 90 dias,
-  são apagadas pela própria rotina (prazo a confirmar).
+  são apagadas pela própria rotina. O prazo conta a partir de `capturada_em`
+  (pendentes) ou da data do descarte (descartadas).
 - As vinculadas seguem a vida do caso.
 
 ## 9. Testes
@@ -295,7 +320,7 @@ sintéticas, montadas a partir da estrutura real, com nomes fictícios.
    - Rotas de leitura e menu DJEN só com a lista e o detalhe.
 2. **Eventos e notificações.** Colunas novas em `eventos`, vínculo automático
    e manual, selo no caso, tipo de notificação `djen` e campos travados.
-3. **Captura por OAB.** Cadastro das OABs monitoradas, caixa "Sem caso",
+3. **Captura por OAB.** Tela de cadastro de `djen_oabs` (admin), caixa "Sem caso",
    descarte, retenção e cron documentado no README.
 4. **Extras, se decidirem:**
    - sugestão de prazo, com calendário de feriados por tribunal;
@@ -303,16 +328,19 @@ sintéticas, montadas a partir da estrutura real, com nomes fictícios.
    - movimentações via DataJud (API do CNJ, com chave pública);
    - busca manual por parte.
 
-## Decisões em aberto
+## Decisões
 
-1. **Quais OABs monitorar.** As dos orientadores, lidas de `usuarios.oab`
-   (texto livre, `String(30)`, com preenchimento a conferir), ou uma lista
-   institucional própria?
-   - Proposta: tabela `djen_oabs` (número, UF, usuário dono opcional,
-     unidade, ativo), administrada pelo admin. O `usuarios.oab` serve só para
-     sugerir o cadastro inicial.
-2. **Permissões** da seção 7.
-3. **Horários da rotina** e se ela roda em fim de semana.
-4. **Prazo de retenção** das publicações descartadas e das pendentes.
-5. **Dependências novas:** `nh3` para limpar HTML; `httpx` ou `urllib` para o
-   cliente.
+Tomadas em 2026-11-06:
+
+1. **OABs monitoradas:** lista própria (`djen_oabs`), mantida pelo admin.
+   O `usuarios.oab` serve só como sugestão.
+2. **Permissões:** a tabela da seção 7.
+3. **Rotina:** dias úteis, às 8h e às 14h, com janela de 3 dias.
+4. **Retenção:** 90 dias para publicações descartadas e para pendentes sem
+   caso.
+
+Em aberto:
+
+5. **Dependências novas.** Recomendação: `nh3` para limpar o HTML (não há
+   alternativa segura na biblioteca padrão) e `urllib` da biblioteca padrão
+   no cliente, evitando adicionar `httpx` só para isso.
