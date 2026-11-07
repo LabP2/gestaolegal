@@ -22,6 +22,10 @@ tabelas de negócio**, e a imposição em quatro camadas independentes:
 4. Testes estruturais (varredura do `metadata`) e testes de vazamento entre dois
    tenants em todas as rotas.
 
+Para o usuário, a multitenancy é **transparente**: todos os NPJs usam o mesmo
+endereço, e o login pelo e-mail já leva cada pessoa ao seu NPJ. Para isso, o
+e-mail é único em toda a plataforma (decisões em §14).
+
 O pedido do usuário ("toda entidade herda de uma base com tenant e toda consulta
 força o tenant") é o caminho certo, mas precisa ser adaptado: o código não tem
 entidades ORM. A "base" vira o helper de coluna, e o "forçar" vira a guarda.
@@ -157,7 +161,7 @@ Ver §10.
 | id | int PK | 1 = DAJ/UFMG |
 | nome | varchar(150) | "Divisão de Assistência Judiciária" |
 | sigla | varchar(20) unique | "DAJ" |
-| slug | varchar(40) unique | `[a-z0-9-]`, usado no subdomínio; imutável depois de criado (D3) |
+| slug | varchar(40) unique | `[a-z0-9-]`, identificador para CLI e scripts (`--tenant daj-ufmg`); não aparece em URL; imutável depois de criado |
 | instituicao | varchar(150) | "Faculdade de Direito da UFMG" |
 | ativo | bool not null default true | inativo: login recusado, rotina do DJEN pula |
 | criado_em | datetime not null | |
@@ -187,11 +191,12 @@ nenhuma tabela atual é global de verdade. Os casos que parecem exceção:
 
 | Hoje | Depois | Atenção |
 |---|---|---|
-| `usuarios.email` UNIQUE (`tables.py:54`) | `(tenant_id, email)` | o mesmo e-mail pode existir em dois tenants, como contas distintas (D2) |
+| `usuarios.email` UNIQUE (`tables.py:54`) | **mantém global** | o e-mail identifica o tenant no login (D2/D3). Quem atua em dois NPJs usa um e-mail diferente em cada um |
 | `processos.numero` UNIQUE (`:234`) | `(tenant_id, numero)` | `_tratar_numero_duplicado` (`processo_repository.py:21-35`) casa o nome da chave `numero` por regex. **Renomear a constraint quebra a tradução para 400 e devolve 500.** Ajustar regex e teste no mesmo PR |
-| `assistencias_judiciarias.email` (`:332`) | `(tenant_id, email)` | a colisão BH × NL de `docs/unidades.md` §5.3 continua dentro do tenant 1 |
+| `assistencias_judiciarias.email` (`:332`) | `(tenant_id, email)` | a importação de Nova Lima já rodou em produção, então os dados atuais já respeitam a unicidade; M2 só a estende com o tenant (D12) |
 | `unidades.nome`, `unidades.sigla` (`:466-467`) | `(tenant_id, nome)`, `(tenant_id, sigla)` | a checagem prévia em `unidade_repository.py:47` precisa do tenant |
 | `password_reset_tokens.token_hash` (`:486`) | mantém global | |
+| `plataforma_admins.email` | global, na própria tabela | é outra identidade, com login próprio: pode repetir um e-mail de `usuarios` |
 | *(nova)* `UNIQUE (tenant_id, id)` em toda tabela-pai | alvo das FKs compostas | |
 | unicidades lógicas no código (senha da fila por unidade e dia, plantão singleton por unidade) | já são por unidade, e unidade ⊂ tenant | nada a mudar |
 
@@ -237,38 +242,39 @@ tenant (NPJ) ──< unidades ──< registros raiz (unidade_id)
 
 ## 5. Resolução do tenant por requisição
 
-**Recomendação: o JWT é a autoridade. O slug (do subdomínio) só escolhe o
-tenant antes do login.**
+**Decisão: um só endereço para todos os NPJs. O tenant sai do e-mail no login e,
+depois dele, do JWT, que é a única autoridade.** O usuário não escolhe nem vê o
+tenant: ele já cai no seu NPJ (D3).
 
-1. **Antes de autenticar** (`/api/auth/login`, `/forgot-password`,
-   `/reset-password*`, `/needs-setup` e o novo `GET /api/tenant/publico`, que dá
-   o nome e a sigla para a tela de login), o tenant vem do cabeçalho
-   `X-Tenant: <slug>`. O front deriva o slug de `window.location.hostname`
-   (`npj-x.gestaolegal...` → `npj-x`) ou, em dev, de `PUBLIC_TENANT_SLUG`. O
-   cabeçalho, e não o `Host`, porque em dev o front chama a API direto em
-   `localhost:5000` (`docker-compose.dev.yml:14`) e o `Host` não carrega o
-   subdomínio. Em produção o nginx repassa o `Host` (`web/nginx.conf`), e a API
-   pode conferir os dois. Tenant inexistente ou inativo: a mesma resposta
-   genérica de login inválido.
-2. **No login**, `UsuarioService.authenticate(email, senha)` busca
-   `(tenant_id, email)`. `JWTAuth.generate_token` (`jwt_auth.py:13-25`) passa a
-   incluir `tenant_id` e `aud="tenant"`.
-3. **Em cada request autenticado**, o `@authenticated` lê `tenant_id` do token,
-   confere que o tenant está ativo, grava em `RequestContext.set_tenant()`
+1. **No login** (`POST /api/auth/login`), `UsuarioService.authenticate(email,
+   senha)` busca o usuário pelo e-mail, que é único em toda a plataforma (§3.3).
+   Essa é **a única leitura de `usuarios` sem tenant** feita durante uma
+   requisição: roda em `sem_tenant("login")`, devolve o `tenant_id` do usuário e
+   fica numa lista explícita da guarda. Em seguida a senha é conferida, e o
+   tenant precisa estar ativo. Usuário inexistente, senha errada e tenant
+   inativo devolvem a mesma resposta genérica de login inválido.
+   `JWTAuth.generate_token` (`jwt_auth.py:13-25`) passa a incluir `tenant_id` e
+   `aud="tenant"`.
+2. **Em cada request autenticado**, o `@authenticated` lê `tenant_id` do token,
+   confere que o tenant está ativo e grava em `RequestContext.set_tenant()`
    **antes** de carregar o usuário (`jwt_auth.py:42-53` faz `find_by_id`, que já
-   passa pela guarda) e, se veio `X-Tenant`, exige que o slug bata com o do
-   token. Se não bater, 401 e o front volta ao login. Token antigo sem
-   `tenant_id` é recusado: no deploy todo mundo faz login de novo, e o token já
-   expira em 12 h.
-4. **O mesmo e-mail em dois tenants** são duas contas independentes, com senhas
-   e papéis próprios. Não há seletor de tenant no login: o subdomínio já é a
-   escolha. O cookie `auth_token` é gravado sem `Domain`
-   (`web/src/routes/login/+page.svelte:40`), então fica preso ao host e um subdomínio não
-   herda o token do outro.
-5. **Recuperação de senha**: a busca do e-mail (`password_reset_service.py:44`)
-   vai para dentro do tenant, e o link (`:73`, `Config.FRONTEND_URL`) precisa
-   apontar para o host do tenant. `FRONTEND_URL` vira um padrão com
-   `{slug}` (ex.: `https://{slug}.gestaolegal.ufmg.br`).
+   passa pela guarda). Não há cabeçalho de tenant: o cliente não tem como pedir
+   outro tenant. Token antigo sem `tenant_id` é recusado: no deploy todo mundo
+   faz login de novo, e o token já expira em 12 h.
+3. **Rotas públicas antes do login** (`/forgot-password`, `/reset-password*`):
+   - a busca do e-mail (`password_reset_service.py:44`) também roda em
+     `sem_tenant`, está na lista da guarda e grava o token já com o `tenant_id`
+     do usuário;
+   - ao usar o token, o tenant vem da linha do token;
+   - `FRONTEND_URL` continua um endereço só;
+   - `/needs-setup` sai junto com o setup-admin (D4).
+4. **Unicidade do e-mail entre NPJs.** Ao criar ou editar um usuário, a checagem
+   de e-mail repetido olha a plataforma inteira (em `sem_tenant`, devolvendo
+   só sim ou não). A mensagem é genérica ("e-mail já está em uso"), sem dizer em
+   qual NPJ.
+5. **Tela de login** genérica, sem o nome do NPJ. Depois do login, o nome e a
+   sigla do tenant aparecem no cabeçalho, vindos de `/api/auth/me` ou de um
+   campo novo no token.
 6. **Sem request** (scripts, seed, reset, CLI e rotina do DJEN):
    `with contexto_tenant(tenant_id):` define e restaura o ContextVar. Laço
    padrão:
@@ -279,9 +285,9 @@ tenant antes do login.**
    ```
    `RequestContext.clear()` (`handlers.py:11`) passa a limpar o tenant também.
 
-Alternativa ao subdomínio: prefixo de caminho (`/t/<slug>/...`). Ela dispensa DNS
-e certificado curinga, mas exige reescrever todas as rotas do SvelteKit. Fica
-como decisão D3, junto com a infraestrutura da UFMG (DNS `*.` e certificado).
+Descartados: subdomínio por NPJ e prefixo de caminho. Os dois exigiriam
+DNS/certificado ou reescrever as rotas do SvelteKit, e o usuário pediu que o
+tenant fosse invisível.
 
 ## 6. Administrador da plataforma
 
@@ -315,7 +321,6 @@ como decisão D3, junto com a infraestrutura da UFMG (DNS `*.` e certificado).
 | GET | `/api/plataforma/tenants/<id>` | detalhe |
 | PUT | `/api/plataforma/tenants/<id>` | nome, sigla, instituição (slug imutável) |
 | PATCH | `/api/plataforma/tenants/<id>/ativo` | ativa/desativa (sem DELETE) |
-| GET | `/api/tenant/publico` | nome/sigla do tenant do `X-Tenant`, sem auth |
 
 Todas as rotas da plataforma rodam em `sem_tenant("plataforma")`, exceto o
 passo de criação dos registros iniciais, que roda em `contexto_tenant(novo.id)`.
@@ -324,7 +329,8 @@ passo de criação dos registros iniciais, que roda em `contexto_tenant(novo.id)
 
 1. a linha em `tenants`;
 2. a **unidade inicial** (nome e sigla informados no formulário, ex.: "Sede"/"SD");
-3. o **primeiro admin do NPJ** (nome e e-mail). Reaproveita
+3. o **primeiro admin do NPJ** (nome e e-mail, que não pode existir em nenhum
+   outro NPJ). Reaproveita
    `UsuarioService.create_admin` (`usuario_service.py:361`), que passa a receber
    tenant e unidade, e o vincula à unidade inicial;
 4. um token de definição de senha (infraestrutura de `password_reset_service`)
@@ -340,11 +346,11 @@ vazio.
 
 - Grupo de rotas `web/src/routes/(plataforma)/plataforma/...`, com layout
   próprio, cookie próprio (`plataforma_token`) e telas de login, lista, criação
-  e edição de tenants. Servido em `admin.<domínio>` (ou `/plataforma` no host
-  principal).
-- O `api-client.ts` envia `X-Tenant` (derivado do host) ao lado do
-  `X-Unidade-Id` (`:57`). A tela de login mostra o nome do NPJ vindo de
-  `/api/tenant/publico`.
+  e edição de tenants. Servido em `/plataforma`, no mesmo endereço do
+  sistema.
+- O `api-client.ts` não muda o envio de cabeçalhos: continua só com o
+  `X-Unidade-Id` (`:57`). O nome do NPJ aparece no cabeçalho do sistema depois
+  do login.
 - Tipos novos em `web/src/lib/types/tenant.ts`. Muda o contrato consumido pelo
   front (revisão humana).
 - Marca fixa "DAJ/UFMG" no front (`app-footer.svelte`, `termos-de-uso`,
@@ -385,17 +391,16 @@ Ordem, em **três migrations encadeadas** (uma por PR, cada uma com `downgrade`)
   `create_all`) **não** pegam dois heads nem erro de DDL do MySQL. Acrescentar
   ao `make test` um teste que carrega o `ScriptDirectory` e exige
   `len(get_heads()) == 1` (estende a verificação; não afrouxa nada).
-- **Importação de Nova Lima** (`docs/unidades.md`, Fase B, ainda aberta): se for
-  feita **antes** de M2 chegar à produção, o script fica como está e M2 marca
-  tudo como tenant 1. Se for depois, o script passa a receber `--tenant` (§9).
-  Ver D7.
+- **Nova Lima já foi importada e roda em produção** (D7). M2 marca tudo, BH e
+  NL, como tenant 1. O `importar_unidade.py` só ganha `--tenant` quando houver
+  uma nova importação.
 
 ## 8. Arquivos privados
 
 Proposta: `PRIVATE_FILES_ROOT/<tenant_id>/<categoria>/<ref>`
 (`private_file_storage.py:57`, `categoria_dir`).
 
-- Usar o **id**, não o slug: o slug pode mudar, e o id não.
+- Usar o **id**, não o slug: o id é o que as FKs usam e não depende de texto.
 - `caminho`/`link_arquivo` continuam relativos à categoria, então **o banco não
   muda**. Só o diretório base passa a incluir o tenant do contexto.
 - Os arquivos existentes vão para `<raiz>/1/` com um script de uma vez (um
@@ -410,11 +415,11 @@ Proposta: `PRIVATE_FILES_ROOT/<tenant_id>/<categoria>/<ref>`
 
 | Item | Muda |
 |---|---|
-| `scripts/seed_database.py` | `--tenant SLUG` (padrão `daj-ufmg`); cria o tenant se faltar e roda dentro de `contexto_tenant`. Hoje escolhe unidades por `ativa` (`:97-103`): passa a filtrar pelo tenant. **Proposta**: semear também um segundo tenant `npj-demo` com os mesmos e-mails, para demonstrar e testar o isolamento |
+| `scripts/seed_database.py` | `--tenant SLUG` (padrão `daj-ufmg`); cria o tenant se faltar e roda dentro de `contexto_tenant`. Hoje escolhe unidades por `ativa` (`:97-103`): passa a filtrar pelo tenant. Semeia também um segundo tenant `npj-demo`, com e-mails próprios (`admin@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_ext@npjdemo.br`, mesma senha padrão), para demonstrar o isolamento (D11) |
 | `scripts/reset_demo_database.py` | Hoje faz `DROP DATABASE` (`:61-62`), o que apagaria **todos os tenants**. O `--check` passa a recusar se `tenants` tiver slug fora de `DEMO_TENANT_SLUGS`. Reset de um tenant só (DELETE por `tenant_id` em ordem topológica) fica fora deste plano. Executar continua exigindo autorização explícita |
-| `scripts/importar_unidade.py` | `--tenant SLUG` obrigatório; `--sigla` resolvida dentro do tenant; todo INSERT com `tenant_id`; a salvaguarda "tabela não coberta pelo `PLANO`" já recusa as tabelas novas, e `tenants`/`plataforma_admins` entram como ignoradas |
+| `scripts/importar_unidade.py` | Nova Lima já foi importada; o script só precisa mudar numa próxima importação: `--tenant SLUG` obrigatório, `--sigla` dentro do tenant, INSERT com `tenant_id`. Até lá, a salvaguarda "tabela não coberta pelo `PLANO`" recusa rodar depois de M2, o que basta |
 | `scripts/migrar_arquivos_privados.py` | destino com `<tenant_id>/` |
-| `scripts/seed_local.py` (esteira Helton, via API) | envia `X-Tenant` |
+| `scripts/seed_local.py` (esteira Helton, via API) | sem mudança: o tenant vem do login |
 | `tests/api/conftest.py` | `ensure_tenants()` (tenants 1 e 2) antes de `ensure_unidades()` (`:117`); unidades 1 e 2 no tenant 1, unidade 3 no tenant 2; os 26 `text(...)` de INSERT passam `tenant_id`; fixtures de header (`:376, 392, 416, 490`) passam a gerar token com `tenant_id`; nova fixture `headers_outro_tenant` |
 | CLI | `flask plataforma criar-admin`, `flask tenant listar` |
 
@@ -441,8 +446,8 @@ explícita (hoje, `plantao_service.py`).
 
 **Vazamento entre tenants** (`tests/api/test_tenant_isolamento.py`), a peça
 central:
-1. A fixture cria os tenants A e B, cada um com uma unidade, um admin com **o
-   mesmo e-mail**, e um conjunto completo de dados: atendido, assistido, caso,
+1. A fixture cria os tenants A e B, cada um com uma unidade, um admin com
+   e-mail próprio, e um conjunto completo de dados: atendido, assistido, caso,
    processo, evento, lembrete, orientação, assistência, fila, plantão, presença,
    arquivo, notificação geral e roteiro. Todo texto de B leva a marca
    `VAZOU-B-<tabela>`.
@@ -452,9 +457,12 @@ central:
    DELETE com ids de B, espera 404, e os dados de B ficam iguais depois.
 3. Uma rota nova sem caso de teste falha o teste: a lista de rotas cobertas é
    comparada ao `url_map`, como a salvaguarda do `PLANO` em `importar_unidade.py`.
-4. Login com o mesmo e-mail em A e B devolve tokens com `tenant_id` distintos.
-   O token de A com `X-Tenant: b` dá 401. O token de plataforma numa rota de
-   tenant dá 401, e o inverso também.
+4. Login: o e-mail de A devolve token com o tenant de A, e o de B, com o de B.
+   Criar em B um usuário com o e-mail de A dá 400, com mensagem que não cita A.
+   Tenant inativo dá a mesma resposta de login inválido. Token sem `tenant_id`
+   dá 401. Token de plataforma numa rota de tenant dá 401, e o inverso também.
+   As únicas consultas `sem_tenant` durante uma requisição são as do login e as
+   da recuperação de senha (teste sobre a lista da guarda).
 5. FK composta: o INSERT direto de um caso de A apontando para um usuário de B
    falha com `IntegrityError`. O conftest **não** liga `PRAGMA foreign_keys`
    hoje, e o SQLite ignora FKs sem ele. Ligar só neste teste, numa engine
@@ -486,13 +494,13 @@ Nenhuma asserção existente é removida.
 | 1 | `tenants`, `plataforma_admins`, `coluna_tenant()`, `TABELAS_GLOBAIS`, `RequestContext.get_tenant/set_tenant`, `contexto_tenant`/`sem_tenant`; **M1** | migration |
 | 2 | `tenant_id` nas 28 tabelas, unicidades compostas, `BaseRepository.escopo/valores` aplicados nos 21 repositories, conftest com tenants, regex de `processos.numero`; **M2**; testes estruturais (exceto FK composta) | migration, filtro |
 | 3 | Guarda de execução + testes da guarda + lint; liga a guarda em todos os testes | |
-| 4 | JWT com `tenant_id`/`aud`, `X-Tenant`, login por tenant, recuperação de senha por tenant, `FRONTEND_URL` com `{slug}`, `/api/tenant/publico`; front envia `X-Tenant` | contrato API/front, permissões |
+| 4 | JWT com `tenant_id`/`aud`; login e recuperação de senha resolvendo o tenant pelo e-mail; checagem de e-mail único na plataforma; nome do NPJ no cabeçalho; remoção de `/setup-admin` e `/needs-setup` | contrato API/front, permissões |
 | 5 | **M3** (FKs compostas) + teste estrutural de FK + teste de `IntegrityError` | migration |
 | 6 | Testes de vazamento varrendo `url_map` (podem começar no PR 4 e endurecer aqui) | |
 | 7 | Plataforma: login, CRUD de tenants, criação com unidade + admin + link de senha, CLI `criar-admin`, telas `(plataforma)` | contrato, permissões |
 | 8 | Arquivos privados por tenant + script de movimentação | |
-| 9 | Scripts: seed com dois tenants, `--check` do reset, `importar_unidade --tenant` | |
-| 10 | Implantação: ensaio M1–M3 em cópia local, QA, janela de produção, DNS/certificado | **gate humano** (produção/QA) |
+| 9 | Scripts: seed com dois tenants, `--check` do reset | |
+| 10 | Implantação: ensaio M1–M3 em cópia local, QA, janela de produção | **gate humano** (produção/QA) |
 | — | DJEN começa aqui | |
 
 PRs 1–3 podem ir para o `master` sem mudar o comportamento visível: só existe o
@@ -514,22 +522,22 @@ para a plataforma.
 | M3 falhando no MySQL por nome de FK ou dado órfão | ler nomes com `inspect()`; checar órfãos antes e abortar com relatório; ensaio em cópia |
 | Dois heads com o DJEN | ordem fixa (multitenant antes); teste de head único no `make test` |
 | `reset_demo` apagando um tenant real | `--check` com lista de slugs permitidos; continua exigindo autorização |
-| Infra: DNS e certificado curinga na UFMG | decidir cedo (D3); caminho por prefixo como plano B |
+| Consulta de login sem tenant virar porta de vazamento | é só a busca por e-mail, numa lista fechada da guarda, coberta por teste; devolve só id e tenant |
 | Desempenho dos índices | `tenant_id` lidera os índices compostos novos; volume atual pequeno |
 
-## 14. Decisões em aberto
+## 14. Decisões (tomadas em 2026-11-07)
 
-| # | Questão | Recomendação |
+| # | Questão | Decisão |
 |---|---|---|
-| D1 | Esquema compartilhado com `tenant_id` ou banco por tenant? | **Compartilhado** (pedido do usuário; criação de tenant pela interface sem DDL em tempo de execução). Reavaliar se algum NPJ exigir separação física por contrato |
-| D2 | Usuário pode pertencer a mais de um tenant? | **Não como identidade única**: o mesmo e-mail em dois tenants são duas contas, `UNIQUE (tenant_id, email)`. Identidade global com vínculos por tenant exigiria tirar `urole` de `usuarios` e muda demais agora |
-| D3 | Como o tenant é escolhido antes do login: subdomínio ou prefixo de caminho? | **Subdomínio** (`<slug>.<domínio>`), se a UFMG der DNS e certificado curinga; slug imutável. JWT é a autoridade depois do login |
-| D4 | O que fazer com `/api/auth/setup-admin` e `ADMIN_SETUP_TOKEN`? | **Remover**; bootstrap da plataforma por `flask plataforma criar-admin`; primeiro admin do NPJ criado pela plataforma |
-| D5 | O admin da plataforma pode entrar num tenant (impersonação)? | **Não** nesta fase; suporte via conta de admin criada no NPJ, visível a ele |
-| D6 | A guarda recusa ou só registra em produção? | **Recusa** (500 > vazamento); medir o custo no PR 3 |
-| D7 | Importação de Nova Lima antes ou depois de M2 em produção? | **Antes**, se a virada de NL estiver próxima: o script atual serve sem mudança. Senão, adaptar com `--tenant` (PR 9) |
-| D8 | FKs compostas em todas as FKs ou só nas principais? | **Todas** as FKs declaradas entre tabelas de tenant, em PR próprio (M3) |
-| D9 | Layout dos arquivos privados | **`<raiz>/<tenant_id>/<categoria>`**, mover os atuais para `1/`, sem fallback |
-| D10 | Criar tenant envia e-mail ao primeiro admin? | **Não por enquanto**: a tela mostra o link de definição de senha; convite por e-mail junto com a pendência de convite já registrada |
-| D11 | Seed de demo com dois tenants? | **Sim** (`daj-ufmg` + `npj-demo`, mesmos e-mails), para que o isolamento seja visível em QA |
-| D12 | `assistencias_judiciarias.email`: único por tenant ou por unidade? | **Por tenant** agora; a colisão BH × NL continua decidida na virada de NL (`--reusar-assistencia-por-email`) |
+| D1 | Esquema compartilhado ou banco por tenant? | **Compartilhado**, com `tenant_id` em todas as tabelas. Reavaliar se algum NPJ exigir separação física por contrato |
+| D2 | Mesma pessoa em mais de um NPJ? | **Contas separadas.** Como o e-mail é único na plataforma (D3), quem atua em dois NPJs usa um e-mail diferente em cada |
+| D3 | Como o tenant é escolhido? | **Mesmo endereço para todos, multitenancy invisível.** O tenant sai do e-mail no login, que é único em toda a plataforma, e depois vem só do JWT (§5) |
+| D4 | `/api/auth/setup-admin` e `ADMIN_SETUP_TOKEN` | **Remover.** Bootstrap por `flask plataforma criar-admin`; o primeiro admin do NPJ é criado pela plataforma |
+| D5 | Admin da plataforma entra num tenant? | **Não** nesta fase. Suporte por uma conta de admin criada no NPJ, visível a ele |
+| D6 | A guarda recusa ou só registra em produção? | **Recusa** (500 é melhor que vazamento); medir o custo no PR 3 |
+| D7 | Importação de Nova Lima | **Já executada e em produção.** M2 marca BH e NL como tenant 1 |
+| D8 | FKs compostas | **Todas** as FKs entre tabelas de tenant, em PR próprio (M3) |
+| D9 | Arquivos privados | **`<raiz>/<tenant_id>/<categoria>`**, movendo os atuais para `1/`, sem fallback |
+| D10 | Acesso do primeiro admin do NPJ | **Link de definição de senha na tela da plataforma.** Convite por e-mail fica para depois |
+| D11 | Seed de demo | **Dois tenants:** `daj-ufmg` com as contas atuais e `npj-demo` com e-mails `@npjdemo.br` |
+| D12 | `assistencias_judiciarias.email` | **Único por tenant.** Com Nova Lima já importada, não há colisão pendente |
