@@ -56,6 +56,8 @@ IGNORADAS = {
     "unidades": "criadas pela migration da Fase A no destino",
     "usuarios_unidades": "reconstruída a partir dos usuários importados",
     "documentos_roteiro": "conteúdo institucional compartilhado (§4.5)",
+    "tenants": "globais da plataforma; o destino já tem os seus (docs/plano-multitenant.md)",
+    "plataforma_admins": "globais da plataforma; o destino já tem os seus (docs/plano-multitenant.md)",
 }
 
 

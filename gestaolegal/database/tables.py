@@ -34,6 +34,60 @@ def coluna_unidade() -> Column:
         index=True,
     )
 
+
+# Tenant = um NPJ (Núcleo de Prática Jurídica). A DAJ/UFMG é o tenant 1, que a
+# migration de tenants cria e ao qual os registros existentes vão pertencer.
+# Como UNIDADE_PADRAO_ID, nomeia o tenant inicial; NÃO é default de coluna.
+TENANT_PADRAO_ID = 1
+
+# Únicas tabelas sem `tenant_id`. Todas as outras pertencem a um tenant
+# (plano: docs/plano-multitenant.md, §3). Testes estruturais e a guarda de
+# execução leem esta lista; não há outro lugar que defina exceções.
+TABELAS_GLOBAIS = frozenset({"tenants", "plataforma_admins"})
+
+
+def coluna_tenant() -> Column:
+    # Sem default, de propósito: quem preenche é o repositório (ou a guarda),
+    # sempre a partir do tenant do contexto. Esquecer deve quebrar na hora.
+    return Column(
+        "tenant_id",
+        Integer,
+        ForeignKey("tenants.id"),
+        nullable=False,
+        index=True,
+    )
+
+
+# Administradores da plataforma: identidade separada de `usuarios`, com login
+# próprio. Não pertencem a nenhum tenant e não leem dados dos tenants.
+plataforma_admins = Table(
+    "plataforma_admins",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("nome", String(60), nullable=False),
+    Column("email", String(80), nullable=False, unique=True),
+    Column("senha", String(60), nullable=False),  # hash bcrypt
+    Column("ativo", Boolean, nullable=False, default=True),
+    Column("criado_em", DateTime, nullable=False),
+    Column("ultimo_login_em", DateTime, nullable=True),
+)
+
+tenants = Table(
+    "tenants",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("nome", String(150), nullable=False),
+    Column("sigla", String(20), nullable=False, unique=True),
+    # Identificador para CLI e scripts (`--tenant daj-ufmg`). Não aparece em
+    # URL e não muda depois de criado.
+    Column("slug", String(40), nullable=False, unique=True),
+    Column("instituicao", String(150), nullable=True),
+    # False = login recusado e rotinas agendadas pulam o tenant.
+    Column("ativo", Boolean, nullable=False, default=True),
+    Column("criado_em", DateTime, nullable=False),
+    Column("id_criado_por", Integer, ForeignKey("plataforma_admins.id"), nullable=True),
+)
+
 enderecos = Table(
     "enderecos",
     metadata,
