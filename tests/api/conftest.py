@@ -27,6 +27,8 @@ from sqlalchemy.engine import Engine
 from werkzeug.test import TestResponse
 
 import gestaolegal.database.session as db_session_module
+from gestaolegal.database.guarda_tenant import instalar_guarda
+from gestaolegal.utils.request_context import sem_tenant
 from gestaolegal import create_app, mail
 from gestaolegal.database.tables import metadata
 
@@ -65,6 +67,9 @@ test_engine: Engine = create_engine("sqlite:///:memory:", echo=False)
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup_db_session_module() -> None:
+    # A guarda de tenant vale em todos os testes, como em produção. Só o SQL
+    # textual fica liberado: é como as fixtures gravam os dados de partida.
+    instalar_guarda(test_engine, permitir_texto=True)
     db_session_module.engine = test_engine
     db_session_module.SessionLocal = orm.sessionmaker(
         autocommit=False, autoflush=False, bind=test_engine
@@ -100,11 +105,12 @@ def clean_tables(*table_names: str) -> None:
 
     session = db_session_module.get_session()
     try:
-        for table_name in table_names:
-            if table_name in metadata.tables:
-                table = metadata.tables[table_name]
-                session.execute(table.delete())
-        session.commit()
+        with sem_tenant("fixture de teste: limpeza de tabelas"):
+            for table_name in table_names:
+                if table_name in metadata.tables:
+                    table = metadata.tables[table_name]
+                    session.execute(table.delete())
+            session.commit()
     finally:
         session.close()
 

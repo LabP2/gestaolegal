@@ -6,10 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from gestaolegal.config import Config
+from gestaolegal.database.guarda_tenant import instalar_guarda
 
 engine = create_engine(
     Config.SQLALCHEMY_DATABASE_URI, **Config.SQLALCHEMY_ENGINE_OPTIONS, echo=False
 )
+# Recusa statements que escapem do tenant ativo (docs/plano-multitenant.md §2.3).
+instalar_guarda(engine)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

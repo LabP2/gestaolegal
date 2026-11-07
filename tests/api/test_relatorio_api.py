@@ -4,6 +4,7 @@ import pytest
 from flask.testing import FlaskClient
 
 from tests.api.conftest import clean_tables, get_success_data
+from gestaolegal.utils.request_context import sem_tenant
 
 TABELAS = (
     "registro_entrada",
@@ -30,7 +31,7 @@ def _inserir_presenca(app, id_usuario: int, dia: date, entrada: str, saida: str,
 
     h_e, m_e = (int(x) for x in entrada.split(":"))
     h_s, m_s = (int(x) for x in saida.split(":"))
-    with app.app_context():
+    with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         session.execute(
             insert(registro_entrada).values(tenant_id=1, 
@@ -51,7 +52,7 @@ def _inserir_plantao(app, id_usuario: int, dia: date, status=True, confirmacao="
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import dias_marcados_plantao, plantao
 
-    with app.app_context():
+    with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         session.execute(
             insert(dias_marcados_plantao).values(tenant_id=1, 

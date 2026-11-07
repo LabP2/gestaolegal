@@ -13,6 +13,7 @@ from gestaolegal.services import private_file_storage
 from gestaolegal.utils.request_context import contexto_tenant
 from gestaolegal.services.evento_service import EventoService
 from tests.api.conftest import TENANT_DAJ, clean_tables, get_success_data
+from gestaolegal.utils.request_context import sem_tenant
 
 
 @pytest.fixture(autouse=True)
@@ -943,7 +944,7 @@ def _referencia_anexo(arquivo_id):
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import arquivos_evento
     from sqlalchemy import select
-    with get_session() as session:
+    with get_session() as session, sem_tenant("teste: acesso direto ao banco"):
         return session.execute(select(arquivos_evento.c.link_arquivo).where(
             arquivos_evento.c.id == arquivo_id)).scalar_one()
 
@@ -1011,7 +1012,7 @@ def test_falha_no_segundo_anexo_reverte_evento_e_arquivos(app, client, auth_head
     }, headers=auth_headers, content_type="multipart/form-data")
     assert response.status_code >= 400
     assert set(Path(app.config["PRIVATE_FILES_ROOT"]).rglob("*.pdf")) == before
-    with get_session() as session:
+    with get_session() as session, sem_tenant("teste: acesso direto ao banco"):
         assert session.execute(select(func.count()).select_from(eventos).where(eventos.c.id_caso == caso_id)).scalar() == 0
         assert session.execute(select(func.count()).select_from(arquivos_evento).where(arquivos_evento.c.id_caso == caso_id)).scalar() == 0
 
@@ -1024,7 +1025,7 @@ def test_anexo_indisponivel_origem_e_listado_mas_download_bloqueado(app, client,
     evento = _criar_evento_com_anexo(client, auth_headers, caso_id)
     aid = evento["arquivos"][0]["id"]
     assert evento["arquivos"][0]["indisponivel_origem"] is False
-    with get_session() as session:
+    with get_session() as session, sem_tenant("teste: acesso direto ao banco"):
         session.execute(update(arquivos_evento).where(arquivos_evento.c.id == aid).values(indisponivel_origem=True))
         session.commit()
     rota = f"/api/caso/{caso_id}/eventos/{evento['id']}"

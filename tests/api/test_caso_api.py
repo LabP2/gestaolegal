@@ -7,7 +7,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from gestaolegal.services import private_file_storage
-from gestaolegal.utils.request_context import contexto_tenant
+from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
 from tests.api.conftest import (
     TENANT_DAJ,
     assert_success_response,
@@ -1799,7 +1799,7 @@ def test_anexo_indisponivel_origem_pode_ser_recuperado_por_substituicao(app, cli
                                           headers=auth_headers, content_type="multipart/form-data"))
     assert arquivo["indisponivel_origem"] is False
     os.remove(caminho_do_anexo(app, arquivo["link_arquivo"]))
-    with get_session() as session:
+    with get_session() as session, sem_tenant("teste: acesso direto ao banco"):
         session.execute(update(arquivos_caso).where(arquivos_caso.c.id == arquivo["id"]).values(indisponivel_origem=True))
         session.commit()
     listed = get_success_data(client.get(rota, headers=auth_headers))["arquivos"][0]

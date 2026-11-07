@@ -146,6 +146,23 @@ scripts, com a função `instalar_guarda(engine)` reutilizável.
   melhor que um vazamento. O custo de inspecionar a árvore é desprezível perto
   do round-trip ao MySQL. Medir no PR da guarda (D6).
 
+**Como ficou no PR 3** (`gestaolegal/database/guarda_tenant.py`):
+
+- INSERT sem `tenant_id` é **recusado**, e não preenchido: `valores()` já
+  preenche, e um INSERT sem tenant indica código que não passou por ele.
+- A travessia não usa `find_tables`, que devolve a tabela base de um alias como
+  se estivesse no FROM. Cada alias precisa do seu próprio critério; o da tabela
+  base não o cobre. Comparar `tenant_id` com outra coluna não conta.
+- Sem contexto, a guarda recusa também as tabelas globais. Com tenant ativo,
+  tabelas globais (`tenants`) podem ser lidas.
+- Os testes instalam a guarda com `permitir_texto=True`, porque as fixtures
+  gravam com `text()`. O acesso direto das fixtures em Core fica dentro de
+  `sem_tenant("teste: ...")`.
+- Medido: de 12 µs (SELECT por id) a 50 µs (casos com dois outer joins e
+  EXISTS) por statement.
+- Os scripts (`seed_database`, `importar_unidade`) usam engine próprio e ainda
+  não instalam a guarda (PR 9).
+
 ### 2.4 Camada 4: testes estruturais e de vazamento
 
 Ver §10.

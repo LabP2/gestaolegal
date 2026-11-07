@@ -2,6 +2,15 @@ import pytest
 
 from gestaolegal.database.session import get_session, transaction
 from gestaolegal.database.tables import UNIDADE_PADRAO_ID, orientacao_juridica
+from gestaolegal.utils.request_context import sem_tenant
+
+
+@pytest.fixture(autouse=True)
+def _sem_tenant():
+    # O que se testa aqui é o commit e o rollback de transaction(), não o
+    # filtro de tenant (coberto em tests/api/test_tenant_guarda.py).
+    with sem_tenant("teste da mecânica de transação"):
+        yield
 
 
 class TestTransactionContextManager:

@@ -145,14 +145,15 @@ class UsuarioService:
         """
         with sem_tenant("login: localizar o NPJ pelo e-mail"):
             tenant_id = self.repository.tenant_por_email(email)
-        if tenant_id is None or not TenantRepository().ativo(tenant_id):
-            return None
+            if tenant_id is None or not TenantRepository().ativo(tenant_id):
+                return None
         return tenant_id
 
     def entrar_no_tenant(self, tenant_id: int) -> bool:
         """Ativa o NPJ do token. False se o NPJ não existe ou está inativo."""
-        if not TenantRepository().ativo(tenant_id):
-            return False
+        with sem_tenant("autenticação: conferir se o NPJ do token está ativo"):
+            if not TenantRepository().ativo(tenant_id):
+                return False
         RequestContext.set_tenant(tenant_id)
         return True
 
