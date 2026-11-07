@@ -70,7 +70,7 @@ combine os dois arquivos. O Compose da fusão fica no
 git clone https://github.com/gestaolegalufmg/gestaolegal.git
 cd gestaolegal
 cp .env.example .env
-# Edite credenciais, JWT_SECRET_KEY e ADMIN_SETUP_TOKEN.
+# Edite credenciais e JWT_SECRET_KEY.
 # Para executar seed pelo host, configure FLASK_ENV=development no .env.
 make up
 # Equivale a:
@@ -81,7 +81,9 @@ Frontend: <http://localhost:5001>; API: <http://localhost:5000>;
 Mailpit: <http://localhost:8025>. As portas são configuradas por `WEB_PORT`,
 `APP_PORT`, `DB_PORT` e `MAILPIT_UI_PORT`. Para manter o frontend em 5002,
 use `WEB_PORT=5002 make up` e a mesma variável nos próximos comandos.
-Crie o administrador em `/setup-admin` com `ADMIN_SETUP_TOKEN`.
+Numa instalação nova, as primeiras contas vêm de `make seed`. O antigo
+`/setup-admin` saiu com o multitenant: o primeiro admin de cada NPJ é criado
+pela administração da plataforma (`docs/plano-multitenant.md`, §6).
 
 O desenvolvimento força o uso do Mailpit e monta os anexos em `./uploads`
 (ou `DEV_UPLOADS_PATH`). O banco fica no volume `<projeto>_mysql_data`.

@@ -42,3 +42,14 @@ export type User = {
 };
 
 export type UserOption = Pick<User, 'id' | 'nome' | 'urole'>;
+
+/** NPJ (tenant) da conta. Vem do token; o usuário só o vê, não o escolhe. */
+export type TenantIdentificacao = {
+	nome: string;
+	sigla: string;
+};
+
+/** Resposta de `GET /api/user/me`: o usuário e o NPJ em que ele está. */
+export type Me = User & {
+	tenant: TenantIdentificacao | null;
+};

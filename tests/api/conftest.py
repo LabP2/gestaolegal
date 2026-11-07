@@ -8,7 +8,6 @@ TEST_PRIVATE_FILES_ROOT = tempfile.mkdtemp(prefix="gl-private-uploads-")
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-for-testing-only"
 os.environ["ADMIN_EMAIL"] = "admin@test.com"
 os.environ["ADMIN_PASSWORD"] = "123456"
-os.environ["ADMIN_SETUP_TOKEN"] = "test-setup-token-12345"
 os.environ["DB_HOST"] = "localhost"
 os.environ["DB_NAME"] = "test_db"
 os.environ["DB_USER"] = "test_user"

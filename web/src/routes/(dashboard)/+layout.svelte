@@ -68,6 +68,13 @@
 				/>
 			</div>
 			<div class="ml-auto flex items-center gap-3">
+				{#if user.tenant}
+					<!-- O NPJ da conta, para quem atua em mais de um com e-mails diferentes. -->
+					<span class="text-sm text-muted-foreground" title={user.tenant.nome}>
+						<span class="font-semibold text-foreground">{user.tenant.sigla}</span>
+						<span class="hidden lg:inline">· {user.tenant.nome}</span>
+					</span>
+				{/if}
 				<UnidadeSelector unidades={unidadesAtivas(user.unidades)} />
 				<NotificacaoBell />
 			</div>

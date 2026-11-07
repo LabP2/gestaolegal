@@ -149,14 +149,16 @@ class UsuarioService:
             return None
         return tenant_id
 
-    def entrar_no_tenant_do_usuario(self, user_id: int) -> bool:
-        """Ativa o NPJ do usuário do token. False se o usuário ou o NPJ não valem."""
-        with sem_tenant("autenticação: localizar o NPJ do usuário do token"):
-            tenant_id = self.repository.tenant_do_usuario(user_id)
-        if tenant_id is None or not TenantRepository().ativo(tenant_id):
+    def entrar_no_tenant(self, tenant_id: int) -> bool:
+        """Ativa o NPJ do token. False se o NPJ não existe ou está inativo."""
+        if not TenantRepository().ativo(tenant_id):
             return False
         RequestContext.set_tenant(tenant_id)
         return True
+
+    def tenant_atual(self) -> dict[str, str] | None:
+        """Nome e sigla do NPJ da requisição, mostrados no cabeçalho do front."""
+        return TenantRepository().identificacao(RequestContext.get_tenant())
 
     def email_em_uso(self, email: str, ignorar_id: int | None = None) -> bool:
         with sem_tenant("cadastro: e-mail é único na plataforma"):
@@ -392,11 +394,6 @@ class UsuarioService:
         """
         if user.id:
             user.unidades = self.unidade_repository.unidades_do_usuario(user.id)
-
-    def has_any_users(self) -> bool:
-        """Há alguma conta na plataforma (o setup inicial só vale sem nenhuma)."""
-        with sem_tenant("setup: verificar se a plataforma já tem usuários"):
-            return self.repository.existe_algum_usuario()
 
     def create_admin(self, email: str, password: str) -> UserInfo:
         logger.info(f"Creating initial admin user with email: {email}")

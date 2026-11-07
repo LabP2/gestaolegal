@@ -144,18 +144,3 @@ class DatabaseException(GestaoLegalException):
     def __init__(self, message: str = "Erro ao acessar o banco de dados"):
         super().__init__(message=message, error_code="DATABASE_ERROR")
 
-
-class SetupException(GestaoLegalException):
-    """
-    Raised when setup operations fail or are misconfigured.
-
-    This should be used for initial system setup errors, such as admin creation
-    or configuration issues.
-
-    Example:
-        raise SetupException("Configuração de administrador não disponível")
-        raise SetupException("Usuário administrador já existe")
-    """
-
-    def __init__(self, message: str):
-        super().__init__(message=message, error_code="SETUP_ERROR")

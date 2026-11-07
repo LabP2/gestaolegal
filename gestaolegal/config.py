@@ -113,7 +113,6 @@ class Config:
     FLASK_ENV: ClassVar[Environment] = _get_flask_env()
     COMPANY_NAME: ClassVar[str] = os.environ.get("COMPANY_NAME", "Gestão Legal")
     JWT_SECRET_KEY: ClassVar[str] = _get_or_generate_jwt_secret_key(FLASK_ENV)
-    ADMIN_SETUP_TOKEN: ClassVar[str] = os.environ["ADMIN_SETUP_TOKEN"]
     # Raiz do volume privado dos anexos. Precisa ficar FORA de app.static_folder:
     # o Flask serve a pasta estática em /static/<path> sem autenticação (#190).
     # A validação da subida está em gestaolegal/__init__.py.

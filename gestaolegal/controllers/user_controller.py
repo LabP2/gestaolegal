@@ -22,7 +22,10 @@ user_controller = Blueprint("user", __name__)
 @authenticated(unidade=False)
 def get_me():
     current_user = RequestContext.get_current_user()
-    return success_response(data=asdict(current_user))
+    # O NPJ vem do token; o usuário não o escolhe, só o vê no cabeçalho.
+    return success_response(
+        data={**asdict(current_user), "tenant": UsuarioService().tenant_atual()}
+    )
 
 
 @user_controller.route("/opcoes", methods=["GET"])

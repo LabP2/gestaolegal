@@ -45,21 +45,12 @@ class UserRepository(BaseRepository):
         stmt = select(usuarios.c.tenant_id).where(usuarios.c.email == email)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def tenant_do_usuario(self, id: int) -> int | None:
-        self.exigir_sem_tenant()
-        stmt = select(usuarios.c.tenant_id).where(usuarios.c.id == id)
-        return self.session.execute(stmt).scalar_one_or_none()
-
     def email_em_uso(self, email: str, ignorar_id: int | None = None) -> bool:
         self.exigir_sem_tenant()
         stmt = select(usuarios.c.id).where(usuarios.c.email == email)
         if ignorar_id is not None:
             stmt = stmt.where(usuarios.c.id != ignorar_id)
         return self.session.execute(stmt.limit(1)).first() is not None
-
-    def existe_algum_usuario(self) -> bool:
-        self.exigir_sem_tenant()
-        return self.session.execute(select(usuarios.c.id).limit(1)).first() is not None
 
     def opcoes_ativos(self) -> list[dict[str, Any]]:
         """Usuários ativos (id, nome, urole) em ordem alfabética, para seletores."""
