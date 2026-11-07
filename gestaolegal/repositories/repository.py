@@ -1,4 +1,4 @@
-from typing import Literal, Protocol, TypedDict, TypeVar
+from typing import Any, Literal, Protocol, TypedDict, TypeVar
 
 from sqlalchemy import ColumnElement, Select, Table, and_, or_
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from gestaolegal.common import PageParams, PaginatedResult
 from gestaolegal.database.session import get_session
 from gestaolegal.models.base_model import BaseModel
+from gestaolegal.utils.request_context import RequestContext
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -64,6 +65,50 @@ class BaseRepository:
 
     def __init__(self):
         self.session = get_session()
+
+    # --- tenant ---------------------------------------------------------------
+    # O tenant nunca é parâmetro: vem do contexto (RequestContext), que levanta
+    # erro quando não há tenant. Assim, esquecer o tenant quebra em vez de
+    # devolver dados de todos os NPJs, ao contrário do filtro opcional de
+    # unidade (docs/plano-multitenant.md, §2.2).
+
+    @staticmethod
+    def tenant_id() -> int:
+        return RequestContext.get_tenant()
+
+    def no_tenant(self, tabela: Table) -> ColumnElement[bool]:
+        """Critério do tenant para uma tabela.
+
+        Use direto no ON de um OUTER JOIN: no WHERE, ele descartaria as linhas
+        sem par e transformaria o OUTER JOIN em INNER JOIN.
+        """
+        return tabela.c.tenant_id == self.tenant_id()
+
+    def escopo(self, stmt, *tabelas: Table):
+        """Restringe SELECT, UPDATE ou DELETE ao tenant ativo.
+
+        Passe todas as tabelas de tenant do FROM e dos JOINs internos.
+        """
+        if not tabelas:
+            raise ValueError("escopo exige ao menos uma tabela")
+        return stmt.where(*(self.no_tenant(tabela) for tabela in tabelas))
+
+    @staticmethod
+    def exigir_sem_tenant() -> None:
+        """Para as poucas consultas globais (login, token de senha).
+
+        Elas só rodam dentro de `sem_tenant(motivo)`, declarado por quem chama.
+        Uma chamada fora dele é erro de programação, não um atalho.
+        """
+        if RequestContext.motivo_sem_tenant() is None:
+            raise RuntimeError("Consulta global fora de sem_tenant()")
+
+    def valores(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Dados de INSERT com o tenant ativo. Recusa tenant divergente."""
+        tenant_id = self.tenant_id()
+        if data.get("tenant_id", tenant_id) != tenant_id:
+            raise ValueError("tenant_id diferente do tenant ativo")
+        return {**data, "tenant_id": tenant_id}
 
     def _apply_where_clause(
         self,

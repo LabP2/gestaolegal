@@ -262,6 +262,8 @@ def conferir_schema(
             col = destino[spec.nome].columns[coluna]
             if coluna == "unidade_id" and spec.unidade:
                 continue
+            if coluna == "tenant_id" and "tenants" in destino:
+                continue  # preenchida com o NPJ de destino
             if not col.nullable and col.default is None and not col.autoincrement:
                 rel.erro(
                     f"{spec.nome}.{coluna} é NOT NULL no destino e não existe na origem"
@@ -272,14 +274,50 @@ def conferir_schema(
                 )
 
 
-def resolver_unidade(conn: Connection, destino: dict[str, Table], sigla: str) -> int:
+def resolver_tenant(
+    conn: Connection, destino: dict[str, Table], slug: str | None
+) -> int | None:
+    """NPJ que recebe a importação; None num destino anterior à multitenancy.
+
+    Com um só NPJ no destino, é ele. Com vários, `--tenant` é obrigatório: a
+    sigla da unidade só é única dentro de cada NPJ.
+    """
+    tenants = destino.get("tenants")
+    if tenants is None:
+        if slug:
+            raise ImportacaoAbortada("--tenant informado, mas o destino não tem `tenants`")
+        return None
+    if slug:
+        tenant_id = conn.execute(
+            select(tenants.c.id).where(tenants.c.slug == slug)
+        ).scalar_one_or_none()
+        if tenant_id is None:
+            raise ImportacaoAbortada(f"nenhum tenant com slug {slug!r} no destino")
+        return int(tenant_id)
+    ids = [linha[0] for linha in conn.execute(select(tenants.c.id))]
+    if len(ids) != 1:
+        raise ImportacaoAbortada(
+            f"o destino tem {len(ids)} tenants: informe --tenant com o slug do NPJ"
+        )
+    return int(ids[0])
+
+
+def _do_tenant(stmt, tabela: Table, tenant_id: int | None):
+    if tenant_id is not None and "tenant_id" in tabela.columns:
+        return stmt.where(tabela.c.tenant_id == tenant_id)
+    return stmt
+
+
+def resolver_unidade(
+    conn: Connection, destino: dict[str, Table], sigla: str, tenant_id: int | None = None
+) -> int:
     unidades = destino.get("unidades")
     if unidades is None:
         raise ImportacaoAbortada(
             "o banco de destino não tem a tabela `unidades`: rode a migration da Fase A antes"
         )
     linha = conn.execute(
-        select(unidades.c.id).where(unidades.c.sigla == sigla)
+        _do_tenant(select(unidades.c.id).where(unidades.c.sigla == sigla), unidades, tenant_id)
     ).first()
     if linha is None:
         raise ImportacaoAbortada(
@@ -288,12 +326,17 @@ def resolver_unidade(conn: Connection, destino: dict[str, Table], sigla: str) ->
     return int(linha[0])
 
 
-def _valores_unicos(conn: Connection, tabela: Table, coluna: str) -> set[Any]:
+def _valores_unicos(
+    conn: Connection, tabela: Table, coluna: str, tenant_id: int | None = None
+) -> set[Any]:
+    """Valores da coluna; com `tenant_id`, só os daquele NPJ."""
     col = tabela.columns[coluna]
-    return {
-        linha[0]
-        for linha in conn.execute(select(col).where(col.isnot(None)))
-    }
+    stmt = _do_tenant(select(col).where(col.isnot(None)), tabela, tenant_id)
+    return {linha[0] for linha in conn.execute(stmt)}
+
+
+# Unicidades que continuam valendo para a plataforma inteira.
+UNICAS_GLOBAIS = {("password_reset_tokens", "token_hash")}
 
 
 def conferir_colisoes(
@@ -305,6 +348,7 @@ def conferir_colisoes(
     *,
     reusar_assistencia_por_email: bool,
     zerar_numero_processo_colidido: bool,
+    tenant_id: int | None = None,
 ) -> None:
     """Procura colisão de coluna UNIQUE entre as duas bases antes de inserir.
 
@@ -318,9 +362,10 @@ def conferir_colisoes(
         for coluna in spec.unicas:
             if coluna not in origem[spec.nome].columns:
                 continue
+            escopo = None if (spec.nome, coluna) in UNICAS_GLOBAIS else tenant_id
             colididos = _valores_unicos(
                 conn_origem, origem[spec.nome], coluna
-            ) & _valores_unicos(conn_destino, destino[spec.nome], coluna)
+            ) & _valores_unicos(conn_destino, destino[spec.nome], coluna, escopo)
             if not colididos:
                 continue
             amostra = ", ".join(str(v) for v in sorted(colididos, key=str)[:5])
@@ -394,6 +439,7 @@ def importar_tabela(
     dedup: dict[str, str],
     numeros_colididos: set[Any],
     reaproveitar_ids: dict[Any, Any] | None = None,
+    tenant_id: int | None = None,
 ) -> None:
     tab_origem = origem[spec.nome]
     tab_destino = destino[spec.nome]
@@ -404,11 +450,27 @@ def importar_tabela(
     pk = None if spec.sem_id else "id"
     coluna_dedup = dedup.get(spec.nome)
     indice_dedup: dict[Any, Any] = {}
-    if coluna_dedup:
+    if coluna_dedup and spec.nome == "usuarios" and tenant_id is not None:
+        # O e-mail é único na plataforma: uma conta de outro NPJ não pode ser
+        # reaproveitada, nem duplicada.
+        for email, id_destino, tenant_destino in conn_destino.execute(
+            select(
+                colunas_destino[coluna_dedup], colunas_destino["id"], colunas_destino["tenant_id"]
+            )
+        ):
+            if tenant_destino == tenant_id:
+                indice_dedup[email] = id_destino
+            else:
+                indice_dedup.setdefault(email, None)
+    elif coluna_dedup:
         indice_dedup = {
             linha[0]: linha[1]
             for linha in conn_destino.execute(
-                select(colunas_destino[coluna_dedup], colunas_destino[pk or "id"])
+                _do_tenant(
+                    select(colunas_destino[coluna_dedup], colunas_destino[pk or "id"]),
+                    tab_destino,
+                    tenant_id,
+                )
             )
         }
 
@@ -420,7 +482,11 @@ def importar_tabela(
         indice_por_fk = {
             linha[0]: linha[1]
             for linha in conn_destino.execute(
-                select(colunas_destino[spec.dedup_fk], colunas_destino["id"])
+                _do_tenant(
+                    select(colunas_destino[spec.dedup_fk], colunas_destino["id"]),
+                    tab_destino,
+                    tenant_id,
+                )
             )
             if linha[0] is not None
         }
@@ -440,6 +506,11 @@ def importar_tabela(
             continue
 
         if coluna_dedup and dados.get(coluna_dedup) in indice_dedup:
+            if indice_dedup[dados[coluna_dedup]] is None:
+                raise ImportacaoAbortada(
+                    f"{spec.nome}.{coluna_dedup} {dados[coluna_dedup]!r} já pertence a "
+                    "outro NPJ no destino"
+                )
             mapa[spec.nome][id_antigo] = indice_dedup[dados[coluna_dedup]]
             rel.reaproveitados[spec.nome] += 1
             continue
@@ -488,6 +559,9 @@ def importar_tabela(
 
         if spec.unidade:
             valores["unidade_id"] = unidade_id
+        if tenant_id is not None and "tenant_id" in colunas_destino:
+            # Sobrescreve o tenant da origem, se ela já for multitenant.
+            valores["tenant_id"] = tenant_id
         if spec.nome == "notificacao":
             _ajustar_notificacao(valores, mapa, rel)
 
@@ -557,6 +631,7 @@ def vincular_usuarios(
     mapa: dict[str, dict[Any, Any]],
     unidade_id: int,
     rel: Relatorio,
+    tenant_id: int | None = None,
 ) -> None:
     """Dá acesso à unidade nova a todo usuário importado ou reaproveitado.
 
@@ -574,9 +649,10 @@ def vincular_usuarios(
     for usuario_id in sorted(set(mapa.get("usuarios", {}).values())):
         if usuario_id in ja_vinculados:
             continue
-        conn_destino.execute(
-            tabela.insert().values(usuario_id=usuario_id, unidade_id=unidade_id)
-        )
+        valores = {"usuario_id": usuario_id, "unidade_id": unidade_id}
+        if tenant_id is not None and "tenant_id" in tabela.columns:
+            valores["tenant_id"] = tenant_id
+        conn_destino.execute(tabela.insert().values(**valores))
         rel.vinculos_unidade += 1
 
 
@@ -590,6 +666,7 @@ def importar(
     importar_arquivos_gerais: bool = True,
     reusar_assistencia_por_email: bool = False,
     zerar_numero_processo_colidido: bool = False,
+    tenant: str | None = None,
 ) -> Relatorio:
     """Roda a importação inteira numa transação; só confirma com `executar`."""
 
@@ -604,7 +681,8 @@ def importar(
         destino = _refletir(conn_destino)
 
         conferir_schema(origem, destino, rel)
-        unidade_id = resolver_unidade(conn_destino, destino, sigla)
+        tenant_id = resolver_tenant(conn_destino, destino, tenant)
+        unidade_id = resolver_unidade(conn_destino, destino, sigla, tenant_id)
         conferir_colisoes(
             conn_origem,
             conn_destino,
@@ -613,6 +691,7 @@ def importar(
             rel,
             reusar_assistencia_por_email=reusar_assistencia_por_email,
             zerar_numero_processo_colidido=zerar_numero_processo_colidido,
+            tenant_id=tenant_id,
         )
         if rel.erros:
             raise ImportacaoAbortada("; ".join(rel.erros))
@@ -625,7 +704,7 @@ def importar(
         if zerar_numero_processo_colidido and "processos" in origem:
             numeros_colididos = _valores_unicos(
                 conn_origem, origem["processos"], "numero"
-            ) & _valores_unicos(conn_destino, destino["processos"], "numero")
+            ) & _valores_unicos(conn_destino, destino["processos"], "numero", tenant_id)
 
         mapa: dict[str, dict[Any, Any]] = {}
         novos: dict[str, set[Any]] = {}
@@ -648,12 +727,13 @@ def importar(
                 prefixo=prefixo,
                 dedup=dedup,
                 numeros_colididos=numeros_colididos,
+                tenant_id=tenant_id,
             )
 
         ajustar_autoria_usuarios(
             conn_origem, conn_destino, origem, destino, mapa, novos, rel
         )
-        vincular_usuarios(conn_destino, destino, mapa, unidade_id, rel)
+        vincular_usuarios(conn_destino, destino, mapa, unidade_id, rel, tenant_id)
 
         if executar:
             transacao.commit()
@@ -698,6 +778,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--destino", required=True, help="URL SQLAlchemy do banco final")
     parser.add_argument("--sigla", required=True, help="sigla da unidade no destino, ex.: NL")
     parser.add_argument(
+        "--tenant",
+        help="slug do NPJ de destino; obrigatório quando o destino tem mais de um",
+    )
+    parser.add_argument(
         "--executar",
         action="store_true",
         help="confirma a transação; sem isso o script só ensaia e dá rollback",
@@ -734,6 +818,7 @@ def main(argv: list[str] | None = None) -> int:
             importar_arquivos_gerais=not args.sem_arquivos_gerais,
             reusar_assistencia_por_email=args.reusar_assistencia_por_email,
             zerar_numero_processo_colidido=args.zerar_numero_processo_colidido,
+            tenant=args.tenant,
         )
     except ImportacaoAbortada as erro:
         print("importação abortada:", erro, file=sys.stderr)

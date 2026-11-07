@@ -2,7 +2,7 @@ import logging
 from datetime import date
 from typing import Any
 
-from sqlalchemy import insert, select
+from sqlalchemy import and_, insert, select
 from sqlalchemy import true as sa_true
 from sqlalchemy import update as sql_update
 
@@ -28,13 +28,14 @@ class PlantaoRepository(BaseRepository):
     escrita: bool = False
 
     def _escala(self, stmt, table):
+        stmt = self.escopo(stmt, table)
         if self.escala_id is not None:
             stmt = stmt.where(table.c.plantao_id == self.escala_id)
         return stmt.with_for_update() if self.escrita else stmt
 
     def list_escalas(self, unidade_id):
         rows = self.session.execute(
-            select(plantao)
+            self.escopo(select(plantao), plantao)
             .where(plantao.c.unidade_id == unidade_id)
             .order_by(plantao.c.id.desc())
         ).mappings()
@@ -42,7 +43,9 @@ class PlantaoRepository(BaseRepository):
 
     def get_plantao(self, unidade_id=None, lock=False):
         self.escrita = self.escrita or lock
-        stmt = select(plantao).where(plantao.c.unidade_id == unidade_id)
+        stmt = self.escopo(
+            select(plantao).where(plantao.c.unidade_id == unidade_id), plantao
+        )
         if self.escala_id is not None:
             stmt = stmt.where(plantao.c.id == self.escala_id)
         stmt = stmt.order_by(plantao.c.id.desc()).limit(1)
@@ -52,13 +55,15 @@ class PlantaoRepository(BaseRepository):
         return from_dict(Plantao, dict(row)) if row else None
 
     def create_plantao(self, data: dict[str, Any]) -> int:
-        result = self.session.execute(insert(plantao).values(**data))
+        result = self.session.execute(insert(plantao).values(**self.valores(data)))
         self.session.flush()
         return result.lastrowid
 
     def update_plantao(self, id: int, data: dict[str, Any]) -> None:
         self.session.execute(
-            sql_update(plantao).where(plantao.c.id == id).values(**data)
+            self.escopo(sql_update(plantao).where(plantao.c.id == id), plantao).values(
+                **data
+            )
         )
 
     # --- dias abertos para plantão ---------------------------------------
@@ -86,7 +91,14 @@ class PlantaoRepository(BaseRepository):
     def create_dia(self, data: date, unidade_id: int) -> int:
         result = self.session.execute(
             insert(dias_plantao).values(
-                data=data, status=True, unidade_id=unidade_id, plantao_id=self.escala_id
+                **self.valores(
+                    {
+                        "data": data,
+                        "status": True,
+                        "unidade_id": unidade_id,
+                        "plantao_id": self.escala_id,
+                    }
+                )
             )
         )
         self.session.flush()
@@ -94,9 +106,9 @@ class PlantaoRepository(BaseRepository):
 
     def set_status_dia(self, id: int, status: bool) -> None:
         self.session.execute(
-            sql_update(dias_plantao)
-            .where(dias_plantao.c.id == id)
-            .values(status=status)
+            self.escopo(
+                sql_update(dias_plantao).where(dias_plantao.c.id == id), dias_plantao
+            ).values(status=status)
         )
 
     # --- dias marcados pelos usuários ------------------------------------
@@ -142,7 +154,10 @@ class PlantaoRepository(BaseRepository):
             )
             .join(
                 usuarios,
-                usuarios.c.id == dias_marcados_plantao.c.id_usuario,
+                and_(
+                    usuarios.c.id == dias_marcados_plantao.c.id_usuario,
+                    self.no_tenant(usuarios),
+                ),
                 isouter=self.incluir_inativos,
             )
             .where(
@@ -173,12 +188,16 @@ class PlantaoRepository(BaseRepository):
     ) -> int:
         result = self.session.execute(
             insert(dias_marcados_plantao).values(
-                data_marcada=data_marcada,
-                id_usuario=id_usuario,
-                confirmacao="aberto",
-                status=True,
-                unidade_id=unidade_id,
-                plantao_id=self.escala_id,
+                **self.valores(
+                    {
+                        "data_marcada": data_marcada,
+                        "id_usuario": id_usuario,
+                        "confirmacao": "aberto",
+                        "status": True,
+                        "unidade_id": unidade_id,
+                        "plantao_id": self.escala_id,
+                    }
+                )
             )
         )
         self.session.flush()
@@ -196,6 +215,7 @@ class PlantaoRepository(BaseRepository):
                     else dias_marcados_plantao.c.status.is_(True)
                 ),
                 dias_marcados_plantao.c.unidade_id == unidade_id,
+                self.no_tenant(dias_marcados_plantao),
             )
             .values(status=False)
         )
@@ -221,10 +241,15 @@ class PlantaoRepository(BaseRepository):
             .join(usuarios, usuarios.c.id == dias_marcados_plantao.c.id_usuario)
             .join(plantao, plantao.c.id == dias_marcados_plantao.c.plantao_id)
             .where(
+                self.no_tenant(usuarios),
+                self.no_tenant(plantao),
                 dias_marcados_plantao.c.data_marcada == data,
                 dias_marcados_plantao.c.confirmacao == "aberto",
                 dias_marcados_plantao.c.plantao_id.in_(
-                    select(plantao.c.id).where(plantao.c.cancelado.is_(False))
+                    self.escopo(
+                        select(plantao.c.id).where(plantao.c.cancelado.is_(False)),
+                        plantao,
+                    )
                 ),
                 (
                     sa_true()
@@ -247,11 +272,17 @@ class PlantaoRepository(BaseRepository):
     def find_marcacao_by_id(
         self, id: int, unidade_id: int | None = None
     ) -> DiaMarcadoPlantao | None:
-        stmt = select(dias_marcados_plantao).where(
-            dias_marcados_plantao.c.id == id,
-            dias_marcados_plantao.c.plantao_id.in_(
-                select(plantao.c.id).where(plantao.c.cancelado.is_(False))
+        stmt = self.escopo(
+            select(dias_marcados_plantao).where(
+                dias_marcados_plantao.c.id == id,
+                dias_marcados_plantao.c.plantao_id.in_(
+                    self.escopo(
+                        select(plantao.c.id).where(plantao.c.cancelado.is_(False)),
+                        plantao,
+                    )
+                ),
             ),
+            dias_marcados_plantao,
         )
         if unidade_id is not None:
             stmt = stmt.where(dias_marcados_plantao.c.unidade_id == unidade_id)
@@ -260,7 +291,8 @@ class PlantaoRepository(BaseRepository):
 
     def update_confirmacao_marcacao(self, id: int, confirmacao: str) -> None:
         self.session.execute(
-            sql_update(dias_marcados_plantao)
-            .where(dias_marcados_plantao.c.id == id)
-            .values(confirmacao=confirmacao)
+            self.escopo(
+                sql_update(dias_marcados_plantao).where(dias_marcados_plantao.c.id == id),
+                dias_marcados_plantao,
+            ).values(confirmacao=confirmacao)
         )

@@ -50,4 +50,8 @@ class JWTAuth:
         if not user_id:
             return None
 
+        # Até o token carregar o tenant (PR 4 do plano multitenant), o NPJ vem
+        # do próprio usuário. Conta removida ou NPJ inativo invalidam o token.
+        if not user_service.entrar_no_tenant_do_usuario(user_id):
+            return None
         return user_service.find_by_id(user_id)

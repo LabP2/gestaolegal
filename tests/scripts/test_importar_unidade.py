@@ -104,14 +104,24 @@ def evento(id_caso: int, id_usuario: int, arquivo: str | None = None) -> dict:
     }
 
 
+TENANT = 1
+
+
 def _criar_banco(caminho, unidades: list[tuple[str, str]]):
     motor = create_engine(f"sqlite:///{caminho}")
     metadata.create_all(motor)
     with motor.begin() as conn:
+        conn.execute(
+            metadata.tables["tenants"].insert().values(
+                id=TENANT, nome="DAJ", sigla="DAJ", slug="daj-ufmg", ativo=True,
+                criado_em=AGORA,
+            )
+        )
         for indice, (nome, sigla) in enumerate(unidades, start=1):
             conn.execute(
                 metadata.tables["unidades"].insert().values(
-                    id=indice, nome=nome, sigla=sigla, ativa=True, criado=AGORA
+                    id=indice, nome=nome, sigla=sigla, ativa=True, criado=AGORA,
+                    tenant_id=TENANT,
                 )
             )
     return motor
@@ -134,6 +144,7 @@ def urls(bancos):
 
 
 def inserir(motor, tabela: str, valores: dict) -> int:
+    valores = {"tenant_id": TENANT, **valores}
     with motor.begin() as conn:
         resultado = conn.execute(metadata.tables[tabela].insert().values(**valores))
         return resultado.inserted_primary_key[0]
@@ -292,7 +303,7 @@ class TestDeduplicacao:
         with destino.begin() as conn:
             conn.execute(
                 metadata.tables["usuarios_unidades"].insert().values(
-                    usuario_id=u_bh, unidade_id=1
+                    usuario_id=u_bh, unidade_id=1, tenant_id=TENANT
                 )
             )
         inserir(origem, "usuarios", usuario("comum@daj.br"))

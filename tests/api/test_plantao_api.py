@@ -505,10 +505,10 @@ class TestEscalas:
                 select(usuarios.c.id).where(usuarios.c.email == "admin@gl.com")
             ).scalar_one()
             ident = session.execute(
-                insert(plantao).values(unidade_id=1, nome="Legado", legado=True)
+                insert(plantao).values(tenant_id=1, unidade_id=1, nome="Legado", legado=True)
             ).lastrowid
             session.execute(
-                insert(dias_marcados_plantao).values(
+                insert(dias_marcados_plantao).values(tenant_id=1, 
                     plantao_id=ident,
                     unidade_id=1,
                     id_usuario=uid,

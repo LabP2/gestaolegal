@@ -5,6 +5,7 @@ from typing import cast
 from flask import Blueprint, request
 
 from gestaolegal.config import Config
+from gestaolegal.database.tables import TENANT_PADRAO_ID
 from gestaolegal.exceptions import (
     SetupException,
     UnauthorizedException,
@@ -14,6 +15,7 @@ from gestaolegal.services.password_reset_service import PasswordResetService
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.api_response import success_response
 from gestaolegal.utils.jwt_auth import JWTAuth
+from gestaolegal.utils.request_context import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +85,8 @@ def setup_admin():
     email = data["email"]
     password = data["password"]
 
+    # Instalação nova: o primeiro admin é do NPJ inicial, criado pela migration.
+    RequestContext.set_tenant(TENANT_PADRAO_ID)
     user = user_service.create_admin(email, password)
     token = JWTAuth.generate_token(user)
 

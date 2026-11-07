@@ -15,4 +15,5 @@ class PasswordResetToken:
     expira_em: datetime
     criado_em: datetime
     usado_em: datetime | None = None
+    tenant_id: int | None = None
     id: int | None = None

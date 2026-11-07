@@ -47,7 +47,7 @@ def _inserir_registro(
     with app.app_context():
         session = get_session()
         result = session.execute(
-            insert(registro_entrada).values(
+            insert(registro_entrada).values(tenant_id=1, 
                 data_entrada=entrada,
                 data_saida=saida or datetime.combine(entrada.date(), time(23, 59, 59)),
                 id_usuario=id_usuario,
@@ -208,8 +208,8 @@ class TestConfirmacao:
         with app.app_context():
             session = get_session()
             ativa = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -219,8 +219,8 @@ class TestConfirmacao:
             ).lastrowid
             # Marcação apagada pelo botão "Editar": a v2 continuava listando
             session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -267,8 +267,8 @@ class TestConfirmacao:
         with app.app_context():
             session = get_session()
             plantao_id = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem_data,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -427,8 +427,8 @@ class TestUnidade:
         with app.app_context():
             session = get_session()
             marcacao_bh = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=admin_id,
                     confirmacao="aberto",

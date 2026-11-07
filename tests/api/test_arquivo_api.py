@@ -199,7 +199,9 @@ class TestDownload:
             from gestaolegal.database.session import transaction
             from gestaolegal.repositories.arquivo_repository import ArquivoRepository
 
-            with transaction():
+            from gestaolegal.utils.request_context import contexto_tenant
+
+            with contexto_tenant(1), transaction():
                 ArquivoRepository().update(criado["id"], {"caminho": None})
 
         response = client.get(f"/api/arquivo/{criado['id']}/download", headers=auth_headers)

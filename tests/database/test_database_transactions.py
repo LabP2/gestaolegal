@@ -8,7 +8,7 @@ class TestTransactionContextManager:
     def test_transaction_commits_on_success_outside_request(self) -> None:
         with transaction() as session:
             result = session.execute(
-                orientacao_juridica.insert().values(
+                orientacao_juridica.insert().values(tenant_id=1, 
                     area_direito="penal",
                     descricao="Test orientacao",
                     status=1,
@@ -45,7 +45,7 @@ class TestTransactionContextManager:
         with pytest.raises(ValueError):
             with transaction() as session:
                 session.execute(
-                    orientacao_juridica.insert().values(
+                    orientacao_juridica.insert().values(tenant_id=1, 
                         area_direito="penal",
                         descricao="Test orientacao before error",
                         status=1,
@@ -78,7 +78,7 @@ class TestTransactionContextManager:
         with pytest.raises(ValueError):
             with transaction() as session:
                 session.execute(
-                    orientacao_juridica.insert().values(
+                    orientacao_juridica.insert().values(tenant_id=1, 
                         area_direito="penal",
                         descricao="First orientacao",
                         status=1,
@@ -88,7 +88,7 @@ class TestTransactionContextManager:
                 )
 
                 session.execute(
-                    orientacao_juridica.insert().values(
+                    orientacao_juridica.insert().values(tenant_id=1, 
                         area_direito="civil",
                         descricao="Second orientacao",
                         status=1,

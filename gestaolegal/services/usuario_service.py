@@ -20,13 +20,13 @@ from gestaolegal.models.user_input import UserCreateInput, UserUpdateInput
 from gestaolegal.repositories.endereco_repository import EnderecoRepository
 from gestaolegal.repositories.repository import (
     ComplexWhereClause,
-    CountParams,
     SearchParams,
     WhereClause,
 )
+from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.repositories.unidade_repository import UnidadeRepository
 from gestaolegal.repositories.user_repository import UserRepository
-from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.request_context import RequestContext, sem_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +137,44 @@ class UsuarioService:
             per_page=result.per_page,
         )
 
+    def tenant_por_email(self, email: str) -> int | None:
+        """NPJ da conta com este e-mail, se existir e o NPJ estiver ativo.
+
+        O e-mail é único na plataforma, então ele basta para achar o NPJ. É a
+        única leitura de `usuarios` sem tenant no login.
+        """
+        with sem_tenant("login: localizar o NPJ pelo e-mail"):
+            tenant_id = self.repository.tenant_por_email(email)
+        if tenant_id is None or not TenantRepository().ativo(tenant_id):
+            return None
+        return tenant_id
+
+    def entrar_no_tenant_do_usuario(self, user_id: int) -> bool:
+        """Ativa o NPJ do usuário do token. False se o usuário ou o NPJ não valem."""
+        with sem_tenant("autenticação: localizar o NPJ do usuário do token"):
+            tenant_id = self.repository.tenant_do_usuario(user_id)
+        if tenant_id is None or not TenantRepository().ativo(tenant_id):
+            return False
+        RequestContext.set_tenant(tenant_id)
+        return True
+
+    def email_em_uso(self, email: str, ignorar_id: int | None = None) -> bool:
+        with sem_tenant("cadastro: e-mail é único na plataforma"):
+            return self.repository.email_em_uso(email, ignorar_id)
+
+    def _exigir_email_livre(self, email: str, ignorar_id: int | None = None) -> None:
+        # Mensagem genérica: não revela se a conta existe neste ou em outro NPJ.
+        if self.email_em_uso(email, ignorar_id):
+            raise ValidationException("E-mail já está em uso", field="email")
+
     def authenticate(self, email: str, senha: str) -> UserInfo | None:
+        """Confere e-mail e senha e deixa ativo o NPJ da conta."""
         logger.info(f"Authenticating user with email: {email}")
+        tenant_id = self.tenant_por_email(email)
+        if tenant_id is None:
+            logger.warning(f"Authentication failed: no active account for email: {email}")
+            return None
+        RequestContext.set_tenant(tenant_id)
         user = self.repository.find_by_email(email)
         if not user:
             logger.warning(f"Authentication failed: user not found for email: {email}")
@@ -159,6 +195,7 @@ class UsuarioService:
             f"Creating user with email: {user_input.email}, role: {user_input.urole}, created by: {criado_por}"
         )
         user_data = user_input.model_dump()
+        self._exigir_email_livre(user_data["email"])
 
         unidade_ids = user_data.pop("unidade_ids")
         self.__validar_unidades(unidade_ids)
@@ -208,6 +245,8 @@ class UsuarioService:
             raise NotFoundException(resource="User", resource_id=user_id)
 
         user_data = user_input.model_dump(exclude_none=True)
+        if "email" in user_data:
+            self._exigir_email_livre(user_data["email"], ignorar_id=user_id)
 
         unidade_ids: list[int] | None = user_data.pop("unidade_ids", None)
         if unidade_ids is not None:
@@ -355,8 +394,9 @@ class UsuarioService:
             user.unidades = self.unidade_repository.unidades_do_usuario(user.id)
 
     def has_any_users(self) -> bool:
-        count = self.repository.count(CountParams(where=None))
-        return count > 0
+        """Há alguma conta na plataforma (o setup inicial só vale sem nenhuma)."""
+        with sem_tenant("setup: verificar se a plataforma já tem usuários"):
+            return self.repository.existe_algum_usuario()
 
     def create_admin(self, email: str, password: str) -> UserInfo:
         logger.info(f"Creating initial admin user with email: {email}")

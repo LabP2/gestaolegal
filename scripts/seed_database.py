@@ -1,7 +1,9 @@
 """Dados fictícios de desenvolvimento, sem depender da API.
 
 Uso: uv run python scripts/seed_database.py [--dry-run] [--unidade SIGLA]
-Requer migrations aplicadas. Toda a carga usa uma única transação.
+                                             [--tenant SLUG]
+Requer migrations aplicadas. Toda a carga usa uma única transação e um único
+tenant (NPJ), por padrão o `daj-ufmg`.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ from sqlalchemy.exc import SQLAlchemyError
 metadata = runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "gestaolegal/database/tables.py")
 )["metadata"]
+
+TENANT_PADRAO_SLUG = "daj-ufmg"
 
 MARCA_ANTIGA = "seed_database:v1"
 MARCA = "Demonstração"
@@ -60,14 +64,18 @@ def cpf_demonstracao(base: int) -> str:
 
 
 class Seed:
-    def __init__(self, conn: Connection):
+    def __init__(self, conn: Connection, tenant_id: int):
         self.conn = conn
+        self.tenant_id = tenant_id
         self.criados: Counter[str] = Counter()
 
     def buscar(self, tabela: Table, chave: dict):
-        return self.conn.execute(select(tabela).filter_by(**chave)).mappings().one_or_none()
+        # Tudo o que o seed lê ou grava fica no tenant escolhido.
+        stmt = select(tabela).filter_by(**chave, tenant_id=self.tenant_id)
+        return self.conn.execute(stmt).mappings().one_or_none()
 
     def inserir(self, tabela: Table, dados: dict):
+        dados = {**dados, "tenant_id": self.tenant_id}
         result = self.conn.execute(tabela.insert().values(**dados))
         self.criados[tabela.name] += 1
         return result.inserted_primary_key[0] if "id" in tabela.c else None
@@ -95,7 +103,11 @@ class Seed:
 
     def carregar(self, senha: str, sigla: str | None, hoje: date):
         unidades = metadata.tables["unidades"]
-        query = select(unidades).where(unidades.c.ativa.is_(True)).order_by(unidades.c.id)
+        query = (
+            select(unidades)
+            .where(unidades.c.ativa.is_(True), unidades.c.tenant_id == self.tenant_id)
+            .order_by(unidades.c.id)
+        )
         if sigla:
             query = query.where(unidades.c.sigla == sigla)
         selecionadas = self.conn.execute(query).mappings().all()
@@ -106,7 +118,13 @@ class Seed:
         usuarios = {}
         for numero_usuario, (papel, nome) in enumerate(CONTAS, start=1):
             email = f"{papel}@ufmg.br"
-            existente = self.buscar(metadata.tables["usuarios"], {"email": email})
+            # O e-mail é único na plataforma: procura em todos os tenants.
+            usuarios_t = metadata.tables["usuarios"]
+            existente = self.conn.execute(
+                select(usuarios_t).where(usuarios_t.c.email == email)
+            ).mappings().one_or_none()
+            if existente is not None and existente["tenant_id"] != self.tenant_id:
+                raise ValueError(f"E-mail reservado ao seed já está em uso em outro NPJ: {email}")
             if existente is not None:
                 if existente["obs"] not in (MARCA, MARCA_ANTIGA):
                     raise ValueError(f"E-mail reservado ao seed já está em uso: {email}")
@@ -216,13 +234,24 @@ class Seed:
                     unidade_id=unidade_id, confirmacao="aberto", status=True)
 
 
+def tenant_por_slug(conn: Connection, slug: str) -> int:
+    tenants = metadata.tables["tenants"]
+    tenant_id = conn.execute(
+        select(tenants.c.id).where(tenants.c.slug == slug)
+    ).scalar_one_or_none()
+    if tenant_id is None:
+        raise ValueError(f"Tenant '{slug}' não encontrado. Aplique as migrations e confira --tenant.")
+    return tenant_id
+
+
 def seed_database(engine: Engine, *, senha: str, sigla: str | None = None,
-                  dry_run: bool = False, hoje: date | None = None) -> Counter:
+                  dry_run: bool = False, hoje: date | None = None,
+                  tenant: str = TENANT_PADRAO_SLUG) -> Counter:
     if not 6 <= len(senha.encode("utf-8")) <= 72:
         raise ValueError("SEED_PASSWORD deve ter entre 6 e 72 bytes em UTF-8.")
     with engine.connect() as conn:
         with conn.begin() as transaction:
-            seed = Seed(conn)
+            seed = Seed(conn, tenant_por_slug(conn, tenant))
             seed.carregar(senha, sigla, hoje or date.today())
             if dry_run:
                 transaction.rollback()
@@ -233,6 +262,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Executa e desfaz a transação ao final.")
     parser.add_argument("--unidade", metavar="SIGLA", help="Semeia apenas esta unidade ativa.")
+    parser.add_argument("--tenant", metavar="SLUG", default=TENANT_PADRAO_SLUG,
+                        help=f"NPJ que recebe os dados (padrão: {TENANT_PADRAO_SLUG}).")
     args = parser.parse_args(argv)
     load_dotenv(Path.cwd() / ".env")
     if os.environ.get("FLASK_ENV") == "production":
@@ -247,7 +278,7 @@ def main(argv=None) -> int:
             port=int(os.environ.get("DB_PORT", "3306")), database=os.environ["DB_NAME"])
         engine = create_engine(url)
         criados = seed_database(engine, senha=os.environ.get("SEED_PASSWORD", "123456"),
-            sigla=args.unidade, dry_run=args.dry_run)
+            sigla=args.unidade, dry_run=args.dry_run, tenant=args.tenant)
     except (ValueError, SQLAlchemyError) as exc:
         # Erros SQL podem carregar parâmetros, inclusive hashes de senha.
         mensagem = str(exc) if isinstance(exc, ValueError) else "Falha no banco. Confira a conexão e aplique as migrations. A transação foi desfeita."

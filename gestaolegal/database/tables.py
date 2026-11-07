@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
 )
 
 from sqlalchemy.dialects.mysql import VARCHAR, LONGTEXT
@@ -99,6 +100,7 @@ enderecos = Table(
     Column("cep", String(9), nullable=False),
     Column("cidade", String(100), nullable=False),
     Column("estado", String(100), nullable=False),
+    coluna_tenant(),
 )
 
 usuarios = Table(
@@ -137,6 +139,7 @@ usuarios = Table(
     Column("fim_bolsa", DateTime, nullable=True),
     Column("endereco_id", Integer, ForeignKey("enderecos.id"), nullable=True),
     Column("chave_recuperacao", Boolean, nullable=True, default=False),
+    coluna_tenant(),
 )
 
 atendidos = Table(
@@ -167,6 +170,7 @@ atendidos = Table(
     Column("pretende_constituir_pj", String(80), nullable=True),
     Column("status", Integer, nullable=False),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 assistidos = Table(
@@ -198,6 +202,7 @@ assistidos = Table(
     Column("pessoa_doente_obs", String(100), nullable=True),
     Column("gastos_medicacao", Numeric(10, 2), nullable=True),
     Column("obs", String(1000), nullable=True),
+    coluna_tenant(),
 )
 
 # O vínculo com assistidos delimita a unidade; não há unidade independente da PJ.
@@ -221,6 +226,7 @@ assistidos_pessoa_juridica = Table(
     Column("resultado_econ_neg", String(50), nullable=True),
     Column("tem_funcionarios", String(20), nullable=True),
     Column("qtd_funcionarios", String(7), nullable=True),
+    coluna_tenant(),
 )
 
 orientacao_juridica = Table(
@@ -234,6 +240,7 @@ orientacao_juridica = Table(
     Column("status", Integer, nullable=False),
     Column("id_usuario", Integer, ForeignKey("usuarios.id"), nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 atendido_xOrientacaoJuridica = Table(
@@ -247,6 +254,7 @@ atendido_xOrientacaoJuridica = Table(
         nullable=True,
     ),
     Column("id_atendido", Integer, ForeignKey("atendidos.id"), nullable=True),
+    coluna_tenant(),
 )
 
 casos = Table(
@@ -271,6 +279,7 @@ casos = Table(
     Column("descricao", Text, nullable=True),
     Column("numero_ultimo_processo", Integer, nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 casos_atendidos = Table(
@@ -278,6 +287,7 @@ casos_atendidos = Table(
     metadata,
     Column("id_caso", Integer, ForeignKey("casos.id"), nullable=True),
     Column("id_atendido", Integer, ForeignKey("atendidos.id"), nullable=True),
+    coluna_tenant(),
 )
 
 processos = Table(
@@ -285,7 +295,7 @@ processos = Table(
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("especie", String(25), nullable=False),
-    Column("numero", String(25), nullable=True, unique=True),
+    Column("numero", String(25), nullable=True),
     Column("identificacao", Text, nullable=True),
     Column("vara", String(200), nullable=True),
     Column("link", String(1000), nullable=True),
@@ -299,6 +309,10 @@ processos = Table(
     Column("id_caso", Integer, ForeignKey("casos.id"), nullable=False),
     Column("status", Boolean, nullable=False),
     Column("id_criado_por", Integer, ForeignKey("usuarios.id"), nullable=False),
+    coluna_tenant(),
+    # Mesmo número pode existir em NPJs diferentes. O nome é lido por
+    # _tratar_numero_duplicado (processo_repository.py) para responder 400.
+    UniqueConstraint("tenant_id", "numero", name="uq_processos_tenant_numero"),
 )
 
 eventos = Table(
@@ -316,6 +330,7 @@ eventos = Table(
     Column("id_usuario_responsavel", Integer, ForeignKey("usuarios.id"), nullable=True),
     Column("status", Boolean, nullable=False),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 # Relação 1:N, preservando a tabela e os IDs das instalações legadas.
@@ -328,6 +343,7 @@ arquivos_evento = Table(
         VARCHAR(300, charset="utf8mb4", collation="utf8mb4_0900_ai_ci"), "mysql"
     ), nullable=True),
     Column("indisponivel_origem", Boolean, nullable=False, server_default="0"),
+    coluna_tenant(),
 )
 
 
@@ -338,6 +354,7 @@ arquivos_caso = Table(
     Column("link_arquivo", String(300), nullable=True),
     Column("id_caso", Integer, ForeignKey("casos.id"), nullable=True),
     Column("indisponivel_origem", Boolean, nullable=False, server_default="0"),
+    coluna_tenant(),
 )
 
 arquivos = Table(
@@ -351,6 +368,7 @@ arquivos = Table(
     Column("caminho", String(300), nullable=True),
     Column("data_criacao", DateTime, nullable=True),
     Column("id_criado_por", Integer, ForeignKey("usuarios.id"), nullable=True),
+    coluna_tenant(),
 )
 
 notificacao = Table(
@@ -372,6 +390,7 @@ notificacao = Table(
     Column("data_criacao", DateTime, nullable=True),
     # Preenchida = notificação arquivada (some da lista padrão).
     Column("data_arquivamento", DateTime, nullable=True),
+    coluna_tenant(),
 )
 
 assistencias_judiciarias = Table(
@@ -383,9 +402,11 @@ assistencias_judiciarias = Table(
     Column("areas_atendidas", String(1000), nullable=False),
     Column("endereco_id", Integer, ForeignKey("enderecos.id"), nullable=True),
     Column("telefone", String(18), nullable=False),
-    Column("email", String(80), nullable=False, unique=True),
+    Column("email", String(80), nullable=False),
     Column("status", Integer, nullable=False),
     coluna_unidade(),
+    coluna_tenant(),
+    UniqueConstraint("tenant_id", "email", name="uq_assistencias_tenant_email"),
 )
 
 assistenciasJudiciarias_xOrientacao_juridica = Table(
@@ -404,6 +425,7 @@ assistenciasJudiciarias_xOrientacao_juridica = Table(
         ForeignKey("assistencias_judiciarias.id"),
         nullable=True,
     ),
+    coluna_tenant(),
 )
 
 lembretes = Table(
@@ -419,6 +441,7 @@ lembretes = Table(
     Column("descricao", Text, nullable=False),
     Column("status", Boolean, nullable=False),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 historicos = Table(
@@ -430,6 +453,7 @@ historicos = Table(
     Column("data", DateTime, nullable=False),
     Column("acao", String(50), nullable=True),
     Column("descricao", String(500), nullable=True),
+    coluna_tenant(),
 )
 
 documentos_roteiro = Table(
@@ -438,6 +462,7 @@ documentos_roteiro = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("area_direito", String(50), nullable=False),
     Column("link", String(1000), nullable=True),
+    coluna_tenant(),
 )
 
 fila_atendimentos = Table(
@@ -454,6 +479,7 @@ fila_atendimentos = Table(
     Column("id_atendido", Integer, ForeignKey("atendidos.id"), nullable=False),
     Column("data_saida", DateTime, nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 # Tabelas do plantão. Criadas pela migration baseline ed1b0a0a61a6 e declaradas
@@ -468,6 +494,7 @@ dias_plantao = Table(
     # False = dia removido da configuração (soft delete)
     Column("status", Boolean, nullable=False, default=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 plantao = Table(
@@ -481,6 +508,7 @@ plantao = Table(
     Column("cancelado", Boolean, nullable=False, default=False),
     Column("historico", Text().with_variant(LONGTEXT(), "mysql"), nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 dias_marcados_plantao = Table(
@@ -495,6 +523,7 @@ dias_marcados_plantao = Table(
     Column("status", Boolean, nullable=False, default=True),
     Column("id_usuario", Integer, ForeignKey("usuarios.id"), nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 registro_entrada = Table(
@@ -511,17 +540,21 @@ registro_entrada = Table(
     Column("confirmacao", String(15), nullable=False, default="aberto"),
     Column("id_usuario", Integer, ForeignKey("usuarios.id"), nullable=True),
     coluna_unidade(),
+    coluna_tenant(),
 )
 
 unidades = Table(
     "unidades",
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("nome", String(60), nullable=False, unique=True),
-    Column("sigla", String(10), nullable=False, unique=True),
+    Column("nome", String(60), nullable=False),
+    Column("sigla", String(10), nullable=False),
     # False = unidade desativada (some do seletor, mantém o histórico)
     Column("ativa", Boolean, nullable=False, default=True),
     Column("criado", DateTime, nullable=False),
+    coluna_tenant(),
+    UniqueConstraint("tenant_id", "nome", name="uq_unidades_tenant_nome"),
+    UniqueConstraint("tenant_id", "sigla", name="uq_unidades_tenant_sigla"),
 )
 
 usuarios_unidades = Table(
@@ -529,6 +562,7 @@ usuarios_unidades = Table(
     metadata,
     Column("usuario_id", Integer, ForeignKey("usuarios.id"), primary_key=True),
     Column("unidade_id", Integer, ForeignKey("unidades.id"), primary_key=True),
+    coluna_tenant(),
 )
 
 password_reset_tokens = Table(
@@ -542,4 +576,5 @@ password_reset_tokens = Table(
     # Preenchida = token já consumido (uso único).
     Column("usado_em", DateTime, nullable=True),
     Column("criado_em", DateTime, nullable=False),
+    coluna_tenant(),
 )

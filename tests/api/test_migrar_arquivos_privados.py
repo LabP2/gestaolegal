@@ -65,7 +65,7 @@ def banco(tmp_path: Path):
     metadata.create_all(bind=engine)
     with engine.begin() as conn:
         conn.execute(
-            insert(casos).values(
+            insert(casos).values(tenant_id=1, 
                 id=1,
                 id_usuario_responsavel=1,
                 area_direito="civel",
@@ -88,7 +88,7 @@ def _plantar(diretorio: Path, nome: str, conteudo: bytes = b"conteudo") -> str:
 
 def _anexo_caso(conn, registro_id: int, referencia: str | None, id_caso: int | None = 1) -> None:
     conn.execute(
-        insert(arquivos_caso).values(id=registro_id, link_arquivo=referencia, id_caso=id_caso)
+        insert(arquivos_caso).values(tenant_id=1, id=registro_id, link_arquivo=referencia, id_caso=id_caso)
     )
 
 
@@ -96,7 +96,7 @@ def _anexo_evento(
     conn, registro_id: int, referencia: str | None, status: bool = True, id_caso: int = 1
 ) -> None:
     conn.execute(
-        insert(eventos).values(
+        insert(eventos).values(tenant_id=1, 
             id=registro_id,
             id_caso=id_caso,
             tipo="reuniao",
@@ -112,7 +112,7 @@ def _anexo_evento(
 
 def _arquivo_geral(conn, registro_id: int, caminho: str | None, nome: str) -> None:
     conn.execute(
-        insert(arquivos).values(
+        insert(arquivos).values(tenant_id=1, 
             id=registro_id, titulo=f"t{registro_id}", nome=nome, caminho=caminho
         )
     )
@@ -1017,7 +1017,7 @@ def test_multiplos_anexos_legados_do_evento_migram_sem_perder_vinculo(banco, ori
     with engine.begin() as conn:
         _anexo_evento(conn, 1, None)
         for aid in (1, 2):
-            conn.execute(insert(arquivos_evento).values(id=aid, id_evento=1, id_caso=1,
+            conn.execute(insert(arquivos_evento).values(tenant_id=1, id=aid, id_evento=1, id_caso=1,
                 link_arquivo=f"{PREFIXOS['eventos']}/compartilhado.pdf"))
     manifesto = _manifesto_de(engine, mapa)
     result = migrador.aplicar(engine, manifesto, str(raiz_privada))

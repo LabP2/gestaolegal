@@ -110,21 +110,59 @@ def clean_tables(*table_names: str) -> None:
         session.close()
 
 
+# Tenant 1 é a DAJ/UFMG, com BH e NL. O tenant 2 é outro NPJ, com uma
+# unidade só, usado nos testes de isolamento entre tenants.
+TENANT_DAJ = 1
+TENANT_OUTRO = 2
+
 UNIDADE_BH = 1
 UNIDADE_NL = 2
+UNIDADE_OUTRO = 3
+
+
+def ensure_tenants() -> None:
+    session = db_session_module.get_session()
+    try:
+        for tenant_id, nome, sigla, slug in (
+            (TENANT_DAJ, "Divisão de Assistência Judiciária", "DAJ", "daj-ufmg"),
+            (TENANT_OUTRO, "Outro NPJ", "NPJX", "npj-x"),
+        ):
+            existente = session.execute(
+                text("SELECT id FROM tenants WHERE id = :id"), {"id": tenant_id}
+            ).fetchone()
+            if existente:
+                continue
+            session.execute(
+                text("""
+                    INSERT INTO tenants (id, nome, sigla, slug, ativo, criado_em)
+                    VALUES (:id, :nome, :sigla, :slug, 1, :criado_em)
+                """),
+                {
+                    "id": tenant_id,
+                    "nome": nome,
+                    "sigla": sigla,
+                    "slug": slug,
+                    "criado_em": datetime.now(),
+                },
+            )
+        session.commit()
+    finally:
+        session.close()
 
 
 def ensure_unidades() -> None:
-    """Garante as unidades 1 (Belo Horizonte) e 2 (Nova Lima).
+    """Garante os tenants e as unidades 1 (BH), 2 (NL) e 3 (do outro NPJ).
 
     Todo registro das tabelas raiz tem `unidade_id` NOT NULL, então as unidades
     precisam existir antes de qualquer inserção de teste.
     """
+    ensure_tenants()
     session = db_session_module.get_session()
     try:
-        for unidade_id, nome, sigla in (
-            (UNIDADE_BH, "Belo Horizonte", "BH"),
-            (UNIDADE_NL, "Nova Lima", "NL"),
+        for unidade_id, nome, sigla, tenant_id in (
+            (UNIDADE_BH, "Belo Horizonte", "BH", TENANT_DAJ),
+            (UNIDADE_NL, "Nova Lima", "NL", TENANT_DAJ),
+            (UNIDADE_OUTRO, "Sede", "SD", TENANT_OUTRO),
         ):
             existente = session.execute(
                 text("SELECT id FROM unidades WHERE id = :id"), {"id": unidade_id}
@@ -133,10 +171,11 @@ def ensure_unidades() -> None:
                 continue
             session.execute(
                 text("""
-                    INSERT INTO unidades (id, nome, sigla, ativa, criado)
-                    VALUES (:id, :nome, :sigla, 1, :criado)
+                    INSERT INTO unidades (tenant_id, id, nome, sigla, ativa, criado)
+                    VALUES (:tenant_id, :id, :nome, :sigla, 1, :criado)
                 """),
                 {
+                    "tenant_id": tenant_id,
                     "id": unidade_id,
                     "nome": nome,
                     "sigla": sigla,
@@ -148,7 +187,9 @@ def ensure_unidades() -> None:
         session.close()
 
 
-def vincular_unidades(usuario_id: int, unidade_ids: list[int]) -> None:
+def vincular_unidades(
+    usuario_id: int, unidade_ids: list[int], tenant_id: int = TENANT_DAJ
+) -> None:
     ensure_unidades()
     session = db_session_module.get_session()
     try:
@@ -164,10 +205,14 @@ def vincular_unidades(usuario_id: int, unidade_ids: list[int]) -> None:
                 continue
             session.execute(
                 text("""
-                    INSERT INTO usuarios_unidades (usuario_id, unidade_id)
-                    VALUES (:usuario_id, :unidade_id)
+                    INSERT INTO usuarios_unidades (tenant_id, usuario_id, unidade_id)
+                    VALUES (:tenant_id, :usuario_id, :unidade_id)
                 """),
-                {"usuario_id": usuario_id, "unidade_id": unidade_id},
+                {
+                    "tenant_id": tenant_id,
+                    "usuario_id": usuario_id,
+                    "unidade_id": unidade_id,
+                },
             )
         session.commit()
     finally:
@@ -200,13 +245,14 @@ def ensure_admin_user_exists() -> None:
 
         session.execute(
             text("""
-                INSERT INTO enderecos (
+                INSERT INTO enderecos (tenant_id,
                     logradouro, numero, bairro, cep, cidade, estado
-                ) VALUES (
+                ) VALUES (:tenant_id,
                     :logradouro, :numero, :bairro, :cep, :cidade, :estado
                 )
             """),
             {
+                "tenant_id": TENANT_DAJ,
                 "logradouro": "Rua Teste",
                 "numero": "1",
                 "bairro": "Centro",
@@ -223,17 +269,18 @@ def ensure_admin_user_exists() -> None:
 
         session.execute(
             text("""
-                INSERT INTO usuarios (
+                INSERT INTO usuarios (tenant_id,
                     nome, email, senha, urole, sexo, rg, cpf, profissao,
                     estado_civil, nascimento, celular, data_entrada,
                     bolsista, status, cert_atuacao_DAJ, criado, criadopor, endereco_id
-                ) VALUES (
+                ) VALUES (:tenant_id,
                     :nome, :email, :senha, :urole, :sexo, :rg, :cpf, :profissao,
                     :estado_civil, :nascimento, :celular, :data_entrada,
                     :bolsista, :status, :cert_atuacao_DAJ, :criado, :criadopor, :endereco_id
                 )
             """),
             {
+                "tenant_id": TENANT_DAJ,
                 "nome": "Admin Test",
                 "email": TEST_ADMIN_EMAIL,
                 "senha": hashed_password.decode("utf-8"),
@@ -293,13 +340,14 @@ def create_non_admin_user(app: Flask) -> None:
 
         session.execute(
             text("""
-                INSERT INTO enderecos (
+                INSERT INTO enderecos (tenant_id,
                     logradouro, numero, bairro, cep, cidade, estado
-                ) VALUES (
+                ) VALUES (:tenant_id,
                     :logradouro, :numero, :bairro, :cep, :cidade, :estado
                 )
             """),
             {
+                "tenant_id": TENANT_DAJ,
                 "logradouro": "Rua Usuário",
                 "numero": "2",
                 "bairro": "Centro",
@@ -316,17 +364,18 @@ def create_non_admin_user(app: Flask) -> None:
 
         session.execute(
             text("""
-                INSERT INTO usuarios (
+                INSERT INTO usuarios (tenant_id,
                     nome, email, senha, urole, sexo, rg, cpf, profissao,
                     estado_civil, nascimento, celular, data_entrada,
                     bolsista, status, cert_atuacao_DAJ, criado, criadopor, endereco_id
-                ) VALUES (
+                ) VALUES (:tenant_id,
                     :nome, :email, :senha, :urole, :sexo, :rg, :cpf, :profissao,
                     :estado_civil, :nascimento, :celular, :data_entrada,
                     :bolsista, :status, :cert_atuacao_DAJ, :criado, :criadopor, :endereco_id
                 )
             """),
             {
+                "tenant_id": TENANT_DAJ,
                 "nome": "Usuário Padrão",
                 "email": TEST_NON_ADMIN_EMAIL,
                 "senha": hashed_password.decode("utf-8"),
@@ -422,28 +471,32 @@ def criar_usuario(
     urole: str,
     nome: str,
     status: bool = True,
+    tenant_id: int = TENANT_DAJ,
 ) -> int:
     """Cria (ou recupera) um usuário com o papel pedido e devolve o id.
 
     Complementa `create_admin_user`/`create_non_admin_user` para os testes que
     precisam de outros papéis (prof, estag_direito) ou de usuário inativo.
     """
+    ensure_unidades()
+    unidade = UNIDADE_BH if tenant_id == TENANT_DAJ else UNIDADE_OUTRO
     session = db_session_module.get_session()
     try:
         existente = session.execute(
             text("SELECT id FROM usuarios WHERE email = :email"), {"email": email}
         ).fetchone()
         if existente:
-            vincular_unidades(existente[0], [UNIDADE_BH])
+            vincular_unidades(existente[0], [unidade], tenant_id)
             return existente[0]
 
         session.execute(
             text("""
-                INSERT INTO enderecos (
+                INSERT INTO enderecos (tenant_id,
                     logradouro, numero, bairro, cep, cidade, estado
-                ) VALUES ('Rua Teste', '1', 'Centro', '30000-000',
+                ) VALUES (:tenant_id, 'Rua Teste', '1', 'Centro', '30000-000',
                           'Belo Horizonte', 'MG')
-            """)
+            """),
+            {"tenant_id": tenant_id},
         )
         endereco_row = session.execute(text("SELECT last_insert_rowid() as id")).fetchone()
         assert endereco_row is not None
@@ -451,17 +504,18 @@ def criar_usuario(
         hashed = bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt())
         session.execute(
             text("""
-                INSERT INTO usuarios (
+                INSERT INTO usuarios (tenant_id,
                     nome, email, senha, urole, sexo, rg, cpf, profissao,
                     estado_civil, nascimento, celular, data_entrada,
                     bolsista, status, cert_atuacao_DAJ, criado, criadopor, endereco_id
-                ) VALUES (
+                ) VALUES (:tenant_id,
                     :nome, :email, :senha, :urole, 'M', '111', '111.111.111-11',
                     'Testes', 'solteiro', '1990-01-01', '(31) 90000-0000',
                     '2024-01-01', 0, :status, 'sim', :criado, 1, :endereco_id
                 )
             """),
             {
+                "tenant_id": tenant_id,
                 "nome": nome,
                 "email": email,
                 "senha": hashed.decode("utf-8"),
@@ -477,17 +531,19 @@ def criar_usuario(
             text("SELECT id FROM usuarios WHERE email = :email"), {"email": email}
         ).fetchone()
         assert criado is not None
-        vincular_unidades(criado[0], [UNIDADE_BH])
+        vincular_unidades(criado[0], [unidade], tenant_id)
         return criado[0]
     finally:
         session.close()
 
 
-def headers_para(client: FlaskClient, email: str, senha: str) -> dict[str, str]:
+def headers_para(
+    client: FlaskClient, email: str, senha: str, unidade: int = UNIDADE_BH
+) -> dict[str, str]:
     response = client.post("/api/auth/login", json={"email": email, "password": senha})
     assert response.status_code == 200, f"Login de {email} falhou: {response.status_code}"
     token = get_success_data(response)["token"]
-    return {"Authorization": f"Bearer {token}", "X-Unidade-Id": str(UNIDADE_BH)}
+    return {"Authorization": f"Bearer {token}", "X-Unidade-Id": str(unidade)}
 
 
 TEST_PROF_EMAIL = "prof@gl.com"

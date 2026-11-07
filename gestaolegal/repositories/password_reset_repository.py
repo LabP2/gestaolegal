@@ -19,17 +19,26 @@ class PasswordResetRepository(BaseRepository):
     def create(self, usuario_id: int, token_hash: str, expira_em: datetime) -> int:
         result = self.session.execute(
             insert(password_reset_tokens).values(
-                usuario_id=usuario_id,
-                token_hash=token_hash,
-                expira_em=expira_em,
-                criado_em=datetime.now(),
+                **self.valores(
+                    {
+                        "usuario_id": usuario_id,
+                        "token_hash": token_hash,
+                        "expira_em": expira_em,
+                        "criado_em": datetime.now(),
+                    }
+                )
             )
         )
         self.session.flush()
         return result.lastrowid
 
     def find_valid_by_hash(self, token_hash: str) -> PasswordResetToken | None:
-        """Token que existe, não foi usado e ainda não expirou."""
+        """Token que existe, não foi usado e ainda não expirou.
+
+        Consulta global: quem tem só o link ainda não tem tenant. O token
+        devolvido traz o `tenant_id`, que passa a valer para o resto do pedido.
+        """
+        self.exigir_sem_tenant()
         stmt = (
             select(password_reset_tokens)
             .where(password_reset_tokens.c.token_hash == token_hash)
@@ -41,26 +50,30 @@ class PasswordResetRepository(BaseRepository):
 
     def mark_used(self, id: int) -> None:
         self.session.execute(
-            sql_update(password_reset_tokens)
-            .where(password_reset_tokens.c.id == id)
-            .values(usado_em=datetime.now())
+            self.escopo(
+                sql_update(password_reset_tokens).where(
+                    password_reset_tokens.c.id == id
+                ),
+                password_reset_tokens,
+            ).values(usado_em=datetime.now())
         )
 
     def invalidate_for_user(self, usuario_id: int) -> int:
         """Consome os pedidos anteriores do usuário, deixando um link válido só."""
-        stmt = (
+        stmt = self.escopo(
             sql_update(password_reset_tokens)
             .where(password_reset_tokens.c.usuario_id == usuario_id)
-            .where(password_reset_tokens.c.usado_em.is_(None))
-            .values(usado_em=datetime.now())
-        )
+            .where(password_reset_tokens.c.usado_em.is_(None)),
+            password_reset_tokens,
+        ).values(usado_em=datetime.now())
         return self.session.execute(stmt).rowcount
 
     def contar_desde(self, usuario_id: int, desde: datetime) -> int:
-        stmt = (
+        stmt = self.escopo(
             select(func.count())
             .select_from(password_reset_tokens)
             .where(password_reset_tokens.c.usuario_id == usuario_id)
-            .where(password_reset_tokens.c.criado_em >= desde)
+            .where(password_reset_tokens.c.criado_em >= desde),
+            password_reset_tokens,
         )
         return self.session.execute(stmt).scalar() or 0

@@ -17,10 +17,13 @@ def engine():
 
     metadata.create_all(engine)
     with engine.begin() as conn:
+        conn.execute(metadata.tables["tenants"].insert(), [
+            {"id": 1, "nome": "DAJ", "sigla": "DAJ", "slug": "daj-ufmg", "ativo": True, "criado_em": datetime.now()},
+        ])
         conn.execute(metadata.tables["unidades"].insert(), [
-            {"id": 7, "nome": "Belo Horizonte", "sigla": "BH", "ativa": True, "criado": datetime.now()},
-            {"id": 12, "nome": "Nova Lima", "sigla": "NL", "ativa": True, "criado": datetime.now()},
-            {"id": 15, "nome": "Inativa", "sigla": "OFF", "ativa": False, "criado": datetime.now()},
+            {"id": 7, "nome": "Belo Horizonte", "sigla": "BH", "ativa": True, "criado": datetime.now(), "tenant_id": 1},
+            {"id": 12, "nome": "Nova Lima", "sigla": "NL", "ativa": True, "criado": datetime.now(), "tenant_id": 1},
+            {"id": 15, "nome": "Inativa", "sigla": "OFF", "ativa": False, "criado": datetime.now(), "tenant_id": 1},
         ])
     yield engine
     engine.dispose()

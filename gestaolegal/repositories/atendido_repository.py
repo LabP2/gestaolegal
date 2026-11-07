@@ -32,19 +32,19 @@ class AtendidoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int, unidade_id: int | None = None) -> Atendido | None:
-        stmt = select(atendidos).where(atendidos.c.id == id)
+        stmt = self.escopo(select(atendidos).where(atendidos.c.id == id), atendidos)
         if unidade_id is not None:
             stmt = stmt.where(atendidos.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Atendido, dict(result._mapping)) if result else None
 
     def find_by_email(self, email: str) -> Atendido | None:
-        stmt = select(atendidos).where(atendidos.c.email == email)
+        stmt = self.escopo(select(atendidos).where(atendidos.c.email == email), atendidos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Atendido, dict(result._mapping)) if result else None
 
     def get(self, params: GetParams) -> list[Atendido]:
-        stmt = select(atendidos)
+        stmt = self.escopo(select(atendidos), atendidos)
         stmt = self._apply_where_clause(stmt, params.get("where"), atendidos)
         result = self.session.execute(stmt).all()
         return [from_dict(Atendido, dict(row._mapping)) for row in result]
@@ -52,7 +52,7 @@ class AtendidoRepository(BaseRepository):
     def get_by_ids(self, ids: list[int]) -> list[Atendido]:
         if not ids:
             return []
-        stmt = select(atendidos).where(atendidos.c.id.in_(ids))
+        stmt = self.escopo(select(atendidos).where(atendidos.c.id.in_(ids)), atendidos)
         results = self.session.execute(stmt).all()
         return [from_dict(Atendido, dict(row._mapping)) for row in results]
 
@@ -79,6 +79,7 @@ class AtendidoRepository(BaseRepository):
                 orientacao_juridica_ids
             )
         )
+        stmt = self.escopo(stmt, atendidos, atendido_xOrientacaoJuridica)
 
         result = self.session.execute(stmt).mappings().all()
 
@@ -102,9 +103,14 @@ class AtendidoRepository(BaseRepository):
     ) -> PaginatedResult[dict]:
         # EXISTS mantém uma pessoa por resultado mesmo quando o legado tem
         # mais de uma ficha de assistido para o mesmo atendido.
-        has_assistido = select(assistidos.c.id).where(
-            assistidos.c.id_atendido == atendidos.c.id
-        ).exists()
+        has_assistido = (
+            select(assistidos.c.id)
+            .where(
+                assistidos.c.id_atendido == atendidos.c.id,
+                self.no_tenant(assistidos),
+            )
+            .exists()
+        )
         stmt = select(
             atendidos.c.id,
             atendidos.c.nome,
@@ -119,6 +125,7 @@ class AtendidoRepository(BaseRepository):
             has_assistido.label("is_assistido"),
         )
 
+        stmt = self.escopo(stmt, atendidos)
         stmt = self._apply_where_clause(stmt, params.get("where"), atendidos)
 
         term = search.strip()
@@ -154,49 +161,59 @@ class AtendidoRepository(BaseRepository):
         )
 
     def find_one(self, params: SearchParams) -> Atendido | None:
-        stmt = select(atendidos)
+        stmt = self.escopo(select(atendidos), atendidos)
         stmt = self._apply_where_clause(stmt, params.get("where"), atendidos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Atendido, dict(result._mapping)) if result else None
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(atendidos)
+        stmt = self.escopo(select(func.count()).select_from(atendidos), atendidos)
         stmt = self._apply_where_clause(stmt, params.get("where"), atendidos)
 
         result = self.session.execute(stmt).scalar()
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(atendidos).values(**data)
+        stmt = insert(atendidos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        check_stmt = select(atendidos).where(atendidos.c.id == id)
+        check_stmt = self.escopo(select(atendidos).where(atendidos.c.id == id), atendidos)
         existing = self.session.execute(check_stmt).first()
 
         if not existing:
             raise ValueError(f"Atendido with id {id} not found")
 
-        stmt = sql_update(atendidos).where(atendidos.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(atendidos).where(atendidos.c.id == id), atendidos
+        ).values(**data)
         self.session.execute(stmt)
 
     def delete(self, id: int) -> bool:
-        stmt = sql_update(atendidos).where(atendidos.c.id == id).values(status=0)
+        stmt = self.escopo(
+            sql_update(atendidos).where(atendidos.c.id == id), atendidos
+        ).values(status=0)
         result = self.session.execute(stmt)
         return result.rowcount > 0
 
     def find_assistido_by_atendido_id(self, atendido_id: int) -> Assistido | None:
-        stmt = select(assistidos).where(assistidos.c.id_atendido == atendido_id)
+        stmt = self.escopo(
+            select(assistidos).where(assistidos.c.id_atendido == atendido_id), assistidos
+        )
         result = self.session.execute(stmt).one_or_none()
         if not result:
             return None
         assistido = from_dict(Assistido, dict(result._mapping))
         pj = (
             self.session.execute(
-                select(assistidos_pessoa_juridica)
-                .where(assistidos_pessoa_juridica.c.id_assistido == assistido.id)
+                self.escopo(
+                    select(assistidos_pessoa_juridica).where(
+                        assistidos_pessoa_juridica.c.id_assistido == assistido.id
+                    ),
+                    assistidos_pessoa_juridica,
+                )
                 .order_by(assistidos_pessoa_juridica.c.id.desc())
                 .limit(1)
             )
@@ -228,27 +245,33 @@ class AtendidoRepository(BaseRepository):
     ) -> list[Assistido]:
         if not atendido_ids:
             return []
-        stmt = select(assistidos).where(assistidos.c.id_atendido.in_(atendido_ids))
+        stmt = self.escopo(
+            select(assistidos).where(assistidos.c.id_atendido.in_(atendido_ids)),
+            assistidos,
+        )
         results = self.session.execute(stmt).all()
         return [from_dict(Assistido, dict(row._mapping)) for row in results]
 
     def create_assistido(self, data: dict[str, Any]) -> int:
-        stmt = insert(assistidos).values(**data)
+        stmt = insert(assistidos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update_assistido(self, id_atendido: int, data: dict[str, Any]) -> None:
-        check_stmt = select(assistidos).where(assistidos.c.id_atendido == id_atendido)
+        check_stmt = self.escopo(
+            select(assistidos).where(assistidos.c.id_atendido == id_atendido), assistidos
+        )
         existing = self.session.execute(check_stmt).first()
 
         if not existing:
             raise ValueError(f"Assistido for atendido {id_atendido} not found")
 
         stmt = (
-            sql_update(assistidos)
-            .where(assistidos.c.id_atendido == id_atendido)
-            .values(**data)
+            self.escopo(
+                sql_update(assistidos).where(assistidos.c.id_atendido == id_atendido),
+                assistidos,
+            ).values(**data)
         )
         self.session.execute(stmt)
 
@@ -257,20 +280,26 @@ class AtendidoRepository(BaseRepository):
         dados["socios"] = json.dumps(dados["socios"], ensure_ascii=False)
         # Atualiza apenas os campos deste formulário, preservando o restante do legado.
         existente = self.session.execute(
-            select(assistidos_pessoa_juridica.c.id).where(
-                assistidos_pessoa_juridica.c.id_assistido == id_assistido
+            self.escopo(
+                select(assistidos_pessoa_juridica.c.id).where(
+                    assistidos_pessoa_juridica.c.id_assistido == id_assistido
+                ),
+                assistidos_pessoa_juridica,
             )
         ).first()
         if existente:
             self.session.execute(
-                sql_update(assistidos_pessoa_juridica)
-                .where(assistidos_pessoa_juridica.c.id_assistido == id_assistido)
-                .values(**dados)
+                self.escopo(
+                    sql_update(assistidos_pessoa_juridica).where(
+                        assistidos_pessoa_juridica.c.id_assistido == id_assistido
+                    ),
+                    assistidos_pessoa_juridica,
+                ).values(**dados)
             )
         else:
             self.session.execute(
                 insert(assistidos_pessoa_juridica).values(
-                    id_assistido=id_assistido, **dados
+                    **self.valores({"id_assistido": id_assistido, **dados})
                 )
             )
         self.session.flush()

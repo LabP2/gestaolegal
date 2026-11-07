@@ -33,7 +33,7 @@ def _inserir_presenca(app, id_usuario: int, dia: date, entrada: str, saida: str,
     with app.app_context():
         session = get_session()
         session.execute(
-            insert(registro_entrada).values(
+            insert(registro_entrada).values(tenant_id=1, 
                 data_entrada=datetime.combine(dia, time(h_e, m_e)),
                 data_saida=datetime.combine(dia, time(h_s, m_s)),
                 id_usuario=id_usuario,
@@ -54,8 +54,8 @@ def _inserir_plantao(app, id_usuario: int, dia: date, status=True, confirmacao="
     with app.app_context():
         session = get_session()
         session.execute(
-            insert(dias_marcados_plantao).values(
-                plantao_id=session.execute(insert(plantao).values(unidade_id=unidade_id)).lastrowid,
+            insert(dias_marcados_plantao).values(tenant_id=1, 
+                plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=unidade_id)).lastrowid,
                 data_marcada=dia,
                 id_usuario=id_usuario,
                 status=status,

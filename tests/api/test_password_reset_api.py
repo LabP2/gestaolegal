@@ -126,8 +126,10 @@ class TestValidacao:
             PasswordResetRepository,
         )
 
+        from gestaolegal.utils.request_context import contexto_tenant
+
         token = "token-vencido"
-        with app.app_context():
+        with app.app_context(), contexto_tenant(1):
             repo = PasswordResetRepository()
             repo.create(
                 usuario,
