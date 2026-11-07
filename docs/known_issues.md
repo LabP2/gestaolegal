@@ -122,25 +122,6 @@ A validação precisa conferir também `ativa`, com teste de acesso após a
 desativação. Administradores também dependem de vínculo; o papel não concede
 acesso automático a todas as unidades.
 
-## Multitenant: referência a id de outro NPJ no corpo
-
-**O que acontece.** Ao criar um caso, uma orientação, uma senha da fila ou um
-lembrete, a API grava os ids recebidos no corpo (`ids_clientes`,
-`id_orientador`, `atendidos_ids`, `id_atendido`, `id_usuario`...) sem conferir
-se são do NPJ da requisição. Um admin de outro NPJ que mande ids da DAJ cria um
-registro dele apontando para um atendido ou usuário da DAJ.
-
-**O que não acontece.** Nada da DAJ é lido nem alterado: toda leitura filtra o
-tenant, então o registro criado aparece sem o cliente ou o orientador
-estrangeiro (`tests/api/test_tenant_vazamento.py`).
-
-**Como resolver.** A M3 (FKs compostas `(tenant_id, x_id)`, PR 5 de
-`docs/plano-multitenant.md`) recusa a referência no banco, mas como
-`IntegrityError` (500). Para responder 400/404, os services precisam conferir
-cada id referenciado com o repositório, que já filtra o tenant. O teste
-`test_criacao_com_referencia_a_outro_npj_e_recusada` está marcado `xfail`
-estrito e passa a falhar, pedindo a remoção da marca, quando isso for feito.
-
 ## Correções já entregues
 
 Os itens abaixo não são mais limitações do código atual:
@@ -152,6 +133,7 @@ Os itens abaixo não são mais limitações do código atual:
 | [#183 — múltiplos anexos de evento](https://github.com/gestaolegalufmg/gestaolegal/issues/183) | Criação aceita vários anexos; edição acrescenta arquivos e permite gerenciar os existentes. |
 | [#190 — arquivos privados em pasta pública](https://github.com/gestaolegalufmg/gestaolegal/issues/190) | Raiz privada, downloads autenticados e bloqueio dos caminhos estáticos. |
 | [#205 — número longo de processo](https://github.com/gestaolegalufmg/gestaolegal/issues/205) | Número como texto de até 25 caracteres, preservando pontuação e zeros iniciais. |
+| Referência a id de outro NPJ no corpo (multitenant) | Caso, orientação, fila, lembrete, evento e processo conferem no repositório do tenant cada id recebido no corpo. Id de outro NPJ e id inexistente dão o mesmo 400, com o campo (`tests/api/test_referencias_api.py`, `test_tenant_vazamento.py`). |
 | [#366 — atalho Plantão com 404](https://github.com/gestaolegalufmg/gestaolegal/issues/366) | O atalho usa uma rota existente, que redireciona para a listagem de escalas. |
 
 As mudanças de plantão estão descritas em [Escalas de plantão](escalas-plantao.md).

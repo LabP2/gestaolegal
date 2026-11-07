@@ -34,6 +34,7 @@ from gestaolegal.services import private_file_storage
 from gestaolegal.services.historico_service import HistoricoService
 from gestaolegal.services.notificacao_service import NotificacaoService
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existente, exigir_existentes
 
 logger = logging.getLogger(__name__)
 
@@ -188,10 +189,19 @@ class CasoService:
         )
         return result
 
+    @staticmethod
+    def _conferir_referencias(caso_input: CasoCreateInput | CasoUpdateInput) -> None:
+        for campo in ("id_usuario_responsavel", "id_orientador", "id_estagiario", "id_colaborador"):
+            exigir_existente("usuarios", getattr(caso_input, campo), campo)
+        if caso_input.ids_clientes:
+            exigir_existentes("atendidos", caso_input.ids_clientes, "ids_clientes")
+
     def create(self, caso_input: CasoCreateInput, criado_por_id: int) -> Caso:
         logger.info(
             f"Creating caso with area_direito: {caso_input.area_direito}, created by: {criado_por_id}, clients count: {len(caso_input.ids_clientes) if caso_input.ids_clientes else 0}"
         )
+
+        self._conferir_referencias(caso_input)
 
         with transaction():
             caso_data = caso_input.model_dump(exclude={"ids_clientes"})
@@ -241,6 +251,8 @@ class CasoService:
         if not existing:
             logger.error(f"Update failed: caso not found with id: {caso_id}")
             raise NotFoundException(resource="Caso", resource_id=caso_id)
+
+        self._conferir_referencias(caso_input)
 
         with transaction():
             caso_data = caso_input.model_dump(

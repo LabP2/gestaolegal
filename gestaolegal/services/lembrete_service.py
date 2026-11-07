@@ -16,6 +16,7 @@ from gestaolegal.repositories.lembrete_repository import LembreteRepository
 from gestaolegal.repositories.repository import GetParams, WhereClause
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existente
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ class LembreteService:
         if not caso:
             logger.warning(f"Caso {caso_id} is not in the active unidade")
             raise NotFoundException(resource="Caso", resource_id=caso_id)
+        exigir_existente("usuarios", data.id_usuario, "id_usuario")
 
         with transaction():
             num_lembrete = self.repository.count_by_caso(caso_id) + 1
@@ -138,6 +140,7 @@ class LembreteService:
         )
         if not existing:
             raise NotFoundException(resource="Lembrete", resource_id=lembrete_id)
+        exigir_existente("usuarios", data.id_usuario, "id_usuario")
         with transaction():
             update_data = data.model_dump(exclude_none=True)
             if update_data:

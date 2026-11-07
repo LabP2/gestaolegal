@@ -109,22 +109,24 @@ def _processo(_: Ids) -> dict[str, Any]:
     return {"especie": "Ação", "numero": "5550001", "status": True}
 
 
+# As escritas do outro NPJ referenciam os próprios registros ("meu_*"). O
+# teste de referência cruzada troca esses ids pelos da DAJ.
 def _lembrete(ids: Ids) -> dict[str, Any]:
-    return {"id_usuario": ids["usuario"], "data_lembrete": "2026-09-15T00:00:00", "descricao": "Outro"}
+    return {"id_usuario": ids["meu_usuario"], "data_lembrete": "2026-09-15T00:00:00", "descricao": "Outro"}
 
 
 def _caso(ids: Ids) -> dict[str, Any]:
     return {
-        "id_usuario_responsavel": ids["usuario"],
-        "id_orientador": ids["usuario"],
+        "id_usuario_responsavel": ids["meu_usuario"],
+        "id_orientador": ids["meu_usuario"],
         "area_direito": "civel",
         "situacao_deferimento": "deferido",
-        "ids_clientes": [ids["atendido"]],
+        "ids_clientes": [ids["meu_atendido"]],
     }
 
 
 def _orientacao(ids: Ids) -> dict[str, Any]:
-    return {"area_direito": "civel", "descricao": "Orientação do outro NPJ", "atendidos_ids": [ids["atendido"]]}
+    return {"area_direito": "civel", "descricao": "Orientação do outro NPJ", "atendidos_ids": [ids["meu_atendido"]]}
 
 
 def _assistencia(_: Ids) -> dict[str, Any]:
@@ -342,7 +344,7 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("GET", "/api/fila_atendimento/"): Rota("colecao"),
     ("GET", "/api/fila_atendimento/preview"): Rota("colecao"),
     ("POST", "/api/fila_atendimento/"): Rota(
-        "escrita", json=lambda ids: {"id_atendido": ids["atendido"], "prioridade": 0, "psicologia": False}
+        "escrita", json=lambda ids: {"id_atendido": ids["meu_atendido"], "prioridade": 0, "psicologia": False}
     ),
     ("POST", "/api/fila_atendimento/<int:id>/chamar"): Rota("id", {"id": "fila"}, json=_sem_corpo),
     ("POST", "/api/fila_atendimento/<int:id>/cancelar"): Rota("id", {"id": "fila"}, json=_sem_corpo),
@@ -643,12 +645,18 @@ def cenario(app: Flask, client: FlaskClient, create_admin_user: None) -> Cenario
     outro = headers_para(client, OUTRO_EMAIL, OUTRO_SENHA, unidade=UNIDADE_OUTRO)
     daj = headers_para(client, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
 
+    # Registros do próprio outro NPJ, referenciados pelas escritas dele. Criados
+    # antes de fotografar as coleções, para não mudarem a comparação.
+    meus = {"meu_usuario": _ok(client.get("/api/user/me", headers=outro))["id"]}
+    corpo = {**_atendido({}), "nome": "Atendido do outro NPJ", "cpf": "902.000.000-01", "email": "um@outro-npj.br"}
+    meus["meu_atendido"] = _ok(client.post("/api/atendido/", json=corpo, headers=outro))["id"]
+
     antes = {}
     for chave in _de("colecao"):
         response = _chamar(client, *chave, ROTAS[chave], {}, outro)
         antes[chave] = (response.status_code, _corpo(response))
 
-    ids = _criar_dados_da_daj(client, daj)
+    ids = {**_criar_dados_da_daj(client, daj), **meus}
     return Cenario(ids=ids, daj=daj, outro=outro, antes=antes, foto=_fotografia_da_daj())
 
 
@@ -776,11 +784,9 @@ def test_escrita_no_proprio_npj_nao_toca_outro(client, cenario, caplog, chave):
     assert motivos <= {MOTIVO_AUTENTICACAO} | ROTAS[chave].motivos
 
 
-# Referências a ids da DAJ no corpo de uma criação. Hoje a API aceita e grava
-# a referência cruzada (não mostra nada da DAJ, porque toda leitura é filtrada);
-# a FK composta da M3 (PR 5) passa a recusar no banco, mas como erro 500, não
-# como 4xx. Ver docs/known_issues.md, "Multitenant: referência a id de outro
-# NPJ no corpo".
+# Referências a ids da DAJ no corpo de uma criação. Os services conferem cada
+# id no repositório do tenant e recusam com 400, igual a um id inexistente.
+# Sem isso, a referência cruzada era gravada (a leitura não mostrava nada).
 REFERENCIAS_CRUZADAS = [
     ("POST", "/api/caso/"),
     ("POST", "/api/orientacao_juridica/"),
@@ -789,26 +795,32 @@ REFERENCIAS_CRUZADAS = [
 ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a API não valida o tenant dos ids referenciados no corpo (docs/known_issues.md)",
-)
 @pytest.mark.parametrize("chave", REFERENCIAS_CRUZADAS, ids=_id_teste)
 def test_criacao_com_referencia_a_outro_npj_e_recusada(client, cenario, chave):
     rota = ROTAS.get(chave)
-    ids = dict(cenario.ids)
+    # A mesma escrita que passa com os ids do próprio NPJ, agora com os da DAJ.
+    ids = {**cenario.ids, "meu_usuario": cenario.ids["usuario"], "meu_atendido": cenario.ids["atendido"]}
     if chave == ("POST", "/api/caso/<int:caso_id>/lembretes"):
         # Um caso do próprio NPJ, com o lembrete apontando para usuário da DAJ.
         proprio = client.post(
             "/api/caso/",
-            json={"id_usuario_responsavel": 0, "area_direito": "civel", "situacao_deferimento": "deferido"},
+            json={
+                "id_usuario_responsavel": cenario.ids["meu_usuario"],
+                "area_direito": "civel",
+                "situacao_deferimento": "deferido",
+            },
             headers=cenario.outro,
         )
         ids["caso"] = get_success_data(proprio)["id"]
         rota = Rota("escrita", _CASO, json=_lembrete)
     assert rota is not None
     response = _chamar(client, *chave, rota, ids, cenario.outro)
-    assert 400 <= response.status_code < 500, (response.status_code, _corpo(response))
+    assert response.status_code == 400, (response.status_code, _corpo(response))
+    # Mesma resposta de um id que não existe: não revela que o da DAJ existe.
+    inexistente = {**ids, "meu_usuario": ID_INEXISTENTE, "meu_atendido": ID_INEXISTENTE}
+    controle = _chamar(client, *chave, rota, inexistente, cenario.outro)
+    assert (response.status_code, _corpo(response)) == (controle.status_code, _corpo(controle))
+    assert _fotografia_da_daj() == cenario.foto
 
 
 def test_dono_continua_lendo_os_proprios_dados(client, cenario):

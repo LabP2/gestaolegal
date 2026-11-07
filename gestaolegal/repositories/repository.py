@@ -1,6 +1,7 @@
+from collections.abc import Iterable
 from typing import Any, Literal, Protocol, TypedDict, TypeVar
 
-from sqlalchemy import ColumnElement, Select, Table, and_, or_
+from sqlalchemy import ColumnElement, Select, Table, and_, or_, select
 from sqlalchemy.orm import Session
 
 from gestaolegal.common import PageParams, PaginatedResult
@@ -109,6 +110,16 @@ class BaseRepository:
         if data.get("tenant_id", tenant_id) != tenant_id:
             raise ValueError("tenant_id diferente do tenant ativo")
         return {**data, "tenant_id": tenant_id}
+
+    def ids_do_tenant(self, tabela: Table, ids: Iterable[int]) -> set[int]:
+        """Quais destes ids existem em `tabela` no tenant ativo."""
+        procurados = set(ids)
+        if not procurados:
+            return set()
+        stmt = self.escopo(
+            select(tabela.c.id).where(tabela.c.id.in_(procurados)), tabela
+        )
+        return set(self.session.execute(stmt).scalars())
 
     def _apply_where_clause(
         self,
