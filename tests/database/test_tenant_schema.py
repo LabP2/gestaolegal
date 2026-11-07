@@ -4,7 +4,7 @@ Uma tabela nova sem `tenant_id`, ou uma unicidade que esqueça o tenant, quebra
 estes testes antes de chegar a uma migration.
 """
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
 
 from gestaolegal.database.tables import (
     TABELAS_GLOBAIS,
@@ -40,9 +40,17 @@ def test_toda_tabela_de_tenant_tem_tenant_id_obrigatorio_indexado_e_com_fk():
         assert coluna.nullable is False, tabela.name
         assert coluna.index is True, tabela.name
         assert coluna.default is None and coluna.server_default is None, tabela.name
-        assert {fk.target_fullname for fk in coluna.foreign_keys} == {"tenants.id"}, (
-            tabela.name
-        )
+        # A FK de uma coluna só é para `tenants`. As demais FKs em que o
+        # tenant_id aparece são as compostas (PR 5), testadas abaixo.
+        simples = {
+            fk.target_fullname
+            for fk in coluna.foreign_keys
+            if len(fk.constraint.columns) == 1
+        }
+        assert simples == {"tenants.id"}, tabela.name
+        for fk in coluna.foreign_keys:
+            if len(fk.constraint.columns) > 1:
+                assert fk.column.name == "tenant_id", (tabela.name, fk.target_fullname)
 
 
 def test_toda_unicidade_de_tabela_de_tenant_inclui_o_tenant():
@@ -81,3 +89,52 @@ def test_coluna_tenant_e_obrigatoria_indexada_e_sem_default():
 def test_coluna_tenant_devolve_uma_coluna_nova_a_cada_chamada():
     # Column não pode ser compartilhada entre tabelas.
     assert coluna_tenant() is not coluna_tenant()
+
+
+def _fks_entre_tabelas_de_tenant():
+    for tabela in _tabelas_de_tenant():
+        for fk in tabela.foreign_key_constraints:
+            if fk.referred_table.name not in TABELAS_GLOBAIS:
+                yield tabela, fk
+
+
+def test_fk_entre_tabelas_de_tenant_e_composta_com_o_tenant():
+    fks = list(_fks_entre_tabelas_de_tenant())
+    assert fks, "nenhuma FK entre tabelas de tenant"
+    for tabela, fk in fks:
+        locais = [c.name for c in fk.columns]
+        remotas = [e.column.name for e in fk.elements]
+        assert len(locais) == 2 and locais[0] == "tenant_id", (tabela.name, locais)
+        assert remotas == ["tenant_id", "id"], (tabela.name, fk.name, remotas)
+
+
+def test_coluna_de_id_nao_tem_fk_simples_para_tabela_de_tenant():
+    # Uma FK simples ao lado da composta deixaria o banco aceitar o par errado
+    # quando a composta for removida por engano.
+    for tabela in _tabelas_de_tenant():
+        for fk in tabela.foreign_key_constraints:
+            if len(fk.columns) == 1:
+                assert fk.referred_table.name in TABELAS_GLOBAIS, (
+                    tabela.name,
+                    fk.name,
+                )
+
+
+def test_toda_tabela_referenciada_tem_unique_tenant_id_id():
+    for tabela, fk in _fks_entre_tabelas_de_tenant():
+        pai = fk.referred_table
+        unicas = {
+            tuple(c.name for c in uc.columns)
+            for uc in pai.constraints
+            if isinstance(uc, UniqueConstraint)
+        }
+        assert ("tenant_id", "id") in unicas, pai.name
+
+
+def test_nomes_das_constraints_cabem_no_mysql():
+    for tabela in metadata.sorted_tables:
+        for constraint in tabela.constraints:
+            if isinstance(constraint, (ForeignKeyConstraint, UniqueConstraint)):
+                assert constraint.name is None or len(constraint.name) <= 64, (
+                    constraint.name
+                )
