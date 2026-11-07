@@ -10,8 +10,9 @@ from werkzeug.datastructures import FileStorage
 from gestaolegal.exceptions import ValidationException
 from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.services import private_file_storage
+from gestaolegal.utils.request_context import contexto_tenant
 from gestaolegal.services.evento_service import EventoService
-from tests.api.conftest import clean_tables, get_success_data
+from tests.api.conftest import TENANT_DAJ, clean_tables, get_success_data
 
 
 @pytest.fixture(autouse=True)
@@ -656,12 +657,12 @@ def test_criar_evento_em_caso_de_outra_unidade_responde_404(
 
 def _anexo_do_evento(app: Flask, ref: str) -> bool:
     """O anexo está no volume? O banco guarda só a referência relativa."""
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return private_file_storage.exists("eventos", ref)
 
 
 def _eventos_no_volume(app: Flask) -> list[str]:
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return sorted(os.listdir(private_file_storage.categoria_dir("eventos")))
 
 
@@ -928,7 +929,7 @@ def test_download_com_anexo_ausente_do_volume(
     caso_id = _criar_caso(client, auth_headers, sample_caso_data)
     evento = _criar_evento_com_anexo(client, auth_headers, caso_id)
 
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         os.remove(private_file_storage.resolve("eventos", _referencia_anexo(evento["arquivos"][0]["id"])))
 
     response = client.get(

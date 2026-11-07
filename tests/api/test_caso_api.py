@@ -7,7 +7,9 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from gestaolegal.services import private_file_storage
+from gestaolegal.utils.request_context import contexto_tenant
 from tests.api.conftest import (
+    TENANT_DAJ,
     assert_success_response,
     clean_tables,
     get_success_data,
@@ -20,12 +22,12 @@ def caminho_do_anexo(app: Flask, ref: str) -> str:
     O banco guarda só a referência relativa à categoria; quem sabe traduzir
     para disco é o `private_file_storage`, e ele precisa do contexto do app.
     """
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return private_file_storage.resolve("casos", ref)
 
 
 def anexo_existe(app: Flask, ref: str) -> bool:
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return private_file_storage.exists("casos", ref)
 
 

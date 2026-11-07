@@ -60,10 +60,13 @@ legados ficam como estão.
   Fase A e foi removido para que o esquecimento apareça, em vez de gravar calado em
   Belo Horizonte um registro de outra unidade.
 - Uploads vão para o volume privado `PRIVATE_FILES_ROOT` (padrão
-  `/data/gestaolegal/uploads`), nas categorias `casos`, `eventos` e `arquivos`.
+  `/data/gestaolegal/uploads`), em `<tenant_id>/<categoria>`, com as categorias
+  `casos`, `eventos` e `arquivos`. Sem tenant no contexto, nada é lido nem
+  gravado, e o layout antigo sem tenant não é lido (`scripts/mover_arquivos_tenant.py`
+  move os anexos antigos para `1/`).
   A raiz é validada na subida do app: se estiver dentro de `app.static_folder`
-  (ou contendo ela), a API não sobe. Registros herdados da 2.0 não têm
-  `caminho`; o service resolve para a raiz da categoria + `nome`.
+  (ou contendo ela), a API não sobe. Registros de `arquivos` herdados da 2.0
+  sem `caminho` dão 404 no download; o service nunca monta caminho pelo `nome`.
 - Portas publicadas vêm de `APP_PORT`, `DB_PORT`, `WEB_PORT` e
   `MAILPIT_UI_PORT` (padrões 5000, 3306, 5001, 8025). Script que aponte para
   `localhost:5000` fixo fala com o checkout principal e não com um checkout

@@ -1,8 +1,15 @@
 """Único ponto de contato com o filesystem dos anexos privados (#190).
 
 Todo anexo — de caso, de evento ou geral — mora na raiz privada
-(`PRIVATE_FILES_ROOT`), dentro de uma das categorias declaradas em
-`PRIVATE_FILE_CATEGORIES`. O banco guarda a **referência** (o nome gerado,
+(`PRIVATE_FILES_ROOT`), na pasta do tenant ativo e dentro de uma das
+categorias declaradas em `PRIVATE_FILE_CATEGORIES`:
+`<raiz>/<tenant_id>/<categoria>/<ref>` (docs/plano-multitenant.md, §8).
+
+A pasta do tenant vem do `RequestContext`, sem fallback: fora de um tenant,
+nenhum anexo é lido nem gravado. Não existe leitura no layout antigo
+(`<raiz>/<categoria>`), porque um fallback seria o caminho por onde um NPJ
+leria a pasta de outro. Os anexos de antes da multitenancy vão para `1/` com
+`scripts/mover_arquivos_tenant.py`. O banco guarda a **referência** (o nome gerado,
 relativo à categoria), nunca o caminho absoluto: assim a raiz pode mudar de
 lugar sem reescrever registro nenhum.
 
@@ -20,6 +27,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from gestaolegal.exceptions import ValidationException
+from gestaolegal.utils.request_context import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +62,20 @@ def _root() -> str:
     return os.path.realpath(str(root))
 
 
+def tenant_dir() -> str:
+    """Pasta do tenant ativo dentro da raiz. Sem tenant, RuntimeError.
+
+    Usa o id, não o slug: o id é imutável e é o que as FKs usam.
+    """
+    return os.path.join(_root(), str(RequestContext.get_tenant()))
+
+
 def categoria_dir(categoria: str) -> str:
-    """Diretório da categoria, criado se ainda não existir."""
+    """Diretório da categoria no tenant ativo, criado se ainda não existir."""
     categorias = current_app.config.get("PRIVATE_FILE_CATEGORIES", ())
     if categoria not in categorias:
         raise PrivateFileError(f"Categoria de arquivo desconhecida: {categoria!r}")
-    caminho = os.path.join(_root(), categoria)
+    caminho = os.path.join(tenant_dir(), categoria)
     os.makedirs(caminho, exist_ok=True)
     return os.path.realpath(caminho)
 
@@ -144,7 +160,10 @@ def exists(categoria: str, ref: str | None) -> bool:
 
 
 def resolve(categoria: str, ref: str | None) -> str:
-    """Caminho absoluto da referência, confinado à categoria.
+    """Caminho absoluto da referência, confinado à categoria do tenant ativo.
+
+    O confinamento é o que impede ler a pasta de outro tenant: `..` e
+    symlink que saiam de `<raiz>/<tenant>/<categoria>` são recusados.
 
     Não exige que o arquivo exista — quem lê é que decide o que fazer com a
     ausência.
