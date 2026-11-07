@@ -177,7 +177,8 @@ rotina parou.
 ## 4. Backend
 
 **Cliente** (`gestaolegal/integrations/djen_client.py`):
-- usa `urllib` da biblioteca padrão, ou `httpx` como dependência nova;
+- usa `urllib.request` da biblioteca padrão, sem dependência nova, atrás de uma
+  função de transporte que os testes substituem;
 - timeout de 30 s, `User-Agent` genérico do sistema e paginação;
 - respeita o limite de taxa: espera quando `x-ratelimit-remaining` ≤ 1 e
   reage a 429 com backoff;
@@ -216,7 +217,16 @@ Pontos que diferem do fluxo de requisição:
 - `origem`: `djen`.
 
 **HTML:**
+- A resposta da API é JSON, mas o campo `texto` vem com um documento HTML
+  dentro: com `<!DOCTYPE>`, `<head>`, `<style>` e acentos em entidades
+  (`&ccedil;`). Foi assim em 5 de 5 publicações do TRF6 (06/11) e em 79 de 100
+  do TJMG; as outras vieram em texto simples.
 - `texto_html` é conteúdo de terceiros.
+- `head`, `style` e `script` são removidos **com o conteúdo**
+  (`clean_content_tags` do `nh3`). Sem isso, o CSS da publicação mudaria a
+  fonte e o espaçamento da nossa página.
+- `texto_plano` é gerado com `html.parser` da biblioteca padrão (tags fora,
+  entidades convertidas) e serve para o resumo do evento e para a busca.
 - A API devolve um `texto_html_seguro`, limpo no backend com `nh3` (dependência
   nova) numa lista restrita de tags (`p`, `b`, `strong`, `i`, `u`, `br`,
   `table`, `tr`, `td`, `section`, `span`), sem atributos.
@@ -330,7 +340,7 @@ sintéticas, montadas a partir da estrutura real, com nomes fictícios.
 
 ## Decisões
 
-Tomadas em 2026-11-06:
+Tomadas em 2026-11-06 e 2026-11-07:
 
 1. **OABs monitoradas:** lista própria (`djen_oabs`), mantida pelo admin.
    O `usuarios.oab` serve só como sugestão.
@@ -338,9 +348,6 @@ Tomadas em 2026-11-06:
 3. **Rotina:** dias úteis, às 8h e às 14h, com janela de 3 dias.
 4. **Retenção:** 90 dias para publicações descartadas e para pendentes sem
    caso.
-
-Em aberto:
-
-5. **Dependências novas.** Recomendação: `nh3` para limpar o HTML (não há
-   alternativa segura na biblioteca padrão) e `urllib` da biblioteca padrão
-   no cliente, evitando adicionar `httpx` só para isso.
+5. **Dependências:** `nh3` para filtrar o HTML do campo `texto` (mantém
+   negrito, parágrafos e tabelas) e `urllib` da biblioteca padrão para chamar a
+   API, sem `httpx`. Decidido em 2026-11-07.
