@@ -1,9 +1,11 @@
 """Dados fictícios de desenvolvimento, sem depender da API.
 
 Uso: uv run python scripts/seed_database.py [--dry-run] [--unidade SIGLA]
-                                             [--tenant SLUG]
-Requer migrations aplicadas. Toda a carga usa uma única transação e um único
-tenant (NPJ), por padrão o `daj-ufmg`.
+                                             [--tenant SLUG ...]
+Requer migrations aplicadas. Toda a carga usa uma única transação. Sem
+`--tenant`, semeia os dois NPJs de demonstração: o `daj-ufmg` (tenant 1, criado
+pela migration, contas @ufmg.br) e o `npj-demo` (criado aqui se faltar, contas
+@npjdemo.br). Com `--unidade` e sem `--tenant`, semeia só o `daj-ufmg`.
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ import os
 import runpy
 import sys
 from collections import Counter
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
@@ -45,6 +49,48 @@ NOMES_ATENDIDOS = (
     "Larissa Gomes", "Marcos Ribeiro", "Natália Barros", "Otávio Teixeira",
     "Patrícia Araújo", "Rafael Mendes", "Sílvia Carvalho", "Tiago Nunes",
 )
+# Nomes diferentes dos da DAJ: um vazamento entre NPJs fica visível na tela.
+NOMES_ATENDIDOS_NPJ_DEMO = (
+    "Alice Moreira", "Bernardo Siqueira", "Cecília Prado", "Daniel Viana",
+    "Estela Quintão", "Felipe Arantes", "Giovana Leal", "Hugo Bastos",
+    "Ingrid Fontes", "Júlio Paiva", "Lívia Camargo", "Mateus Brandão",
+    "Nina Valadares", "Olavo Rezende", "Paula Drummond", "Renato Tavares",
+    "Sofia Guimarães", "Túlio Andrade", "Vera Lacerda", "Wagner Coutinho",
+)
+
+
+@dataclass(frozen=True)
+class TenantDemo:
+    """Um NPJ que o seed sabe semear. Os e-mails são únicos na plataforma."""
+
+    slug: str
+    dominio: str
+    contas: tuple[tuple[str, str], ...]
+    nomes_atendidos: tuple[str, ...]
+    base_cpf_usuarios: int
+    # None: o tenant vem da migration (tenant 1) e não é criado pelo seed.
+    criar: tuple[str, str] | None = None  # (nome, sigla) do tenant
+    unidade: tuple[str, str] | None = None  # (nome, sigla) da unidade criada
+
+
+TENANTS_DEMO = {
+    TENANT_PADRAO_SLUG: TenantDemo(
+        slug=TENANT_PADRAO_SLUG, dominio="ufmg.br", contas=CONTAS,
+        nomes_atendidos=NOMES_ATENDIDOS, base_cpf_usuarios=900_000_000,
+    ),
+    "npj-demo": TenantDemo(
+        slug="npj-demo", dominio="npjdemo.br",
+        contas=(
+            ("admin", "Administração NPJ Demo"),
+            ("orient", "Otávio Orientador"),
+            ("estag_direito", "Estela Estagiária"),
+            ("colab_ext", "Caio Colaborador"),
+        ),
+        nomes_atendidos=NOMES_ATENDIDOS_NPJ_DEMO, base_cpf_usuarios=910_000_000,
+        criar=("NPJ de Demonstração", "NPJD"), unidade=("Sede", "SEDE"),
+    ),
+}
+SLUGS_DEMO = tuple(TENANTS_DEMO)
 
 
 def cpf_demonstracao(base: int) -> str:
@@ -64,10 +110,13 @@ def cpf_demonstracao(base: int) -> str:
 
 
 class Seed:
-    def __init__(self, conn: Connection, tenant_id: int):
+    def __init__(self, conn: Connection, tenant_id: int,
+                 demo: TenantDemo = TENANTS_DEMO[TENANT_PADRAO_SLUG],
+                 criados: Counter[str] | None = None):
         self.conn = conn
         self.tenant_id = tenant_id
-        self.criados: Counter[str] = Counter()
+        self.demo = demo
+        self.criados: Counter[str] = Counter() if criados is None else criados
 
     def buscar(self, tabela: Table, chave: dict):
         # Tudo o que o seed lê ou grava fica no tenant escolhido.
@@ -102,6 +151,10 @@ class Seed:
         })
 
     def carregar(self, senha: str, sigla: str | None, hoje: date):
+        if self.demo.unidade is not None:
+            nome_unidade, sigla_unidade = self.demo.unidade
+            self.garantir("unidades", {"sigla": sigla_unidade}, nome=nome_unidade,
+                          ativa=True, criado=datetime.combine(hoje, time(9)))
         unidades = metadata.tables["unidades"]
         query = (
             select(unidades)
@@ -116,8 +169,9 @@ class Seed:
 
         agora = datetime.combine(hoje, time(9))
         usuarios = {}
-        for numero_usuario, (papel, nome) in enumerate(CONTAS, start=1):
-            email = f"{papel}@ufmg.br"
+        base_cpf = self.demo.base_cpf_usuarios
+        for numero_usuario, (papel, nome) in enumerate(self.demo.contas, start=1):
+            email = f"{papel}@{self.demo.dominio}"
             # O e-mail é único na plataforma: procura em todos os tenants.
             usuarios_t = metadata.tables["usuarios"]
             existente = self.conn.execute(
@@ -132,7 +186,7 @@ class Seed:
                 if existente["nome"] == f"{nome} Seed":
                     ajustes["nome"] = nome
                 if existente["cpf"] == "000.000.000-00":
-                    ajustes["cpf"] = cpf_demonstracao(900_000_000 + numero_usuario)
+                    ajustes["cpf"] = cpf_demonstracao(base_cpf + numero_usuario)
                 if existente["rg"] == "SEED":
                     ajustes["rg"] = f"MG-{100_000 + numero_usuario}"
                 tabela = metadata.tables["usuarios"]
@@ -142,7 +196,7 @@ class Seed:
             uid = self.garantir("usuarios", {"email": email},
                 nome=nome, senha=bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode(),
                 urole=papel, sexo="F", rg=f"MG-{100_000 + numero_usuario}",
-                cpf=cpf_demonstracao(900_000_000 + numero_usuario),
+                cpf=cpf_demonstracao(base_cpf + numero_usuario),
                 profissao="Demonstração", estado_civil="solteiro",
                 nascimento=date(1990, 1, 15), celular="(31) 90000-0000",
                 data_entrada=hoje, criado=agora, criadopor=usuarios.get("admin", 0),
@@ -158,7 +212,7 @@ class Seed:
             for uid in usuarios.values():
                 self.garantir("usuarios_unidades", {"usuario_id": uid, "unidade_id": unidade_id})
             admin, orient, estag = (usuarios[p] for p in ("admin", "orient", "estag_direito"))
-            for indice, nome in enumerate(NOMES_ATENDIDOS, start=1):
+            for indice, nome in enumerate(self.demo.nomes_atendidos, start=1):
                 chave = {"unidade_id": unidade_id, "email": f"atendido{indice}.u{unidade_id}@example.test"}
                 tabela = metadata.tables["atendidos"]
                 existente = self.buscar(tabela, chave)
@@ -234,37 +288,63 @@ class Seed:
                     unidade_id=unidade_id, confirmacao="aberto", status=True)
 
 
-def tenant_por_slug(conn: Connection, slug: str) -> int:
+def garantir_tenant(conn: Connection, demo: TenantDemo, agora: datetime,
+                    criados: Counter[str]) -> int:
+    """Id do tenant; cria os de demonstração que o seed sabe criar."""
     tenants = metadata.tables["tenants"]
     tenant_id = conn.execute(
-        select(tenants.c.id).where(tenants.c.slug == slug)
+        select(tenants.c.id).where(tenants.c.slug == demo.slug)
     ).scalar_one_or_none()
-    if tenant_id is None:
-        raise ValueError(f"Tenant '{slug}' não encontrado. Aplique as migrations e confira --tenant.")
-    return tenant_id
+    if tenant_id is not None:
+        return tenant_id
+    if demo.criar is None:
+        raise ValueError(f"Tenant '{demo.slug}' não encontrado. Aplique as migrations.")
+    nome, sigla = demo.criar
+    result = conn.execute(tenants.insert().values(
+        nome=nome, sigla=sigla, slug=demo.slug, ativo=True, criado_em=agora))
+    criados["tenants"] += 1
+    return result.inserted_primary_key[0]
 
 
 def seed_database(engine: Engine, *, senha: str, sigla: str | None = None,
                   dry_run: bool = False, hoje: date | None = None,
-                  tenant: str = TENANT_PADRAO_SLUG) -> Counter:
+                  tenants: Sequence[str] = (TENANT_PADRAO_SLUG,)) -> Counter:
     if not 6 <= len(senha.encode("utf-8")) <= 72:
         raise ValueError("SEED_PASSWORD deve ter entre 6 e 72 bytes em UTF-8.")
+    if isinstance(tenants, str) or not tenants:
+        raise ValueError("Informe ao menos um tenant de demonstração.")
+    desconhecidos = [slug for slug in tenants if slug not in TENANTS_DEMO]
+    if desconhecidos:
+        # Só os NPJs de demonstração: semear um NPJ real misturaria dados fictícios.
+        raise ValueError("Tenant fora da demonstração: " + ", ".join(desconhecidos))
+    hoje = hoje or date.today()
+    criados: Counter[str] = Counter()
     with engine.connect() as conn:
         with conn.begin() as transaction:
-            seed = Seed(conn, tenant_por_slug(conn, tenant))
-            seed.carregar(senha, sigla, hoje or date.today())
+            for slug in dict.fromkeys(tenants):
+                demo = TENANTS_DEMO[slug]
+                tenant_id = garantir_tenant(conn, demo, datetime.combine(hoje, time(9)), criados)
+                Seed(conn, tenant_id, demo, criados).carregar(senha, sigla, hoje)
             if dry_run:
                 transaction.rollback()
-        return seed.criados
+        return criados
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Executa e desfaz a transação ao final.")
     parser.add_argument("--unidade", metavar="SIGLA", help="Semeia apenas esta unidade ativa.")
-    parser.add_argument("--tenant", metavar="SLUG", default=TENANT_PADRAO_SLUG,
-                        help=f"NPJ que recebe os dados (padrão: {TENANT_PADRAO_SLUG}).")
+    parser.add_argument("--tenant", metavar="SLUG", action="append", choices=SLUGS_DEMO,
+                        help="NPJ de demonstração que recebe os dados; pode repetir. "
+                             f"Padrão: {', '.join(SLUGS_DEMO)} (só {TENANT_PADRAO_SLUG} com --unidade).")
     args = parser.parse_args(argv)
+    if args.tenant:
+        tenants = tuple(args.tenant)
+    elif args.unidade:
+        # Compatível com o uso anterior: `--unidade BH` é uma unidade da DAJ.
+        tenants = (TENANT_PADRAO_SLUG,)
+    else:
+        tenants = SLUGS_DEMO
     load_dotenv(Path.cwd() / ".env")
     if os.environ.get("FLASK_ENV") == "production":
         parser.error("Seed de demonstração disponível apenas fora de production.")
@@ -278,7 +358,7 @@ def main(argv=None) -> int:
             port=int(os.environ.get("DB_PORT", "3306")), database=os.environ["DB_NAME"])
         engine = create_engine(url)
         criados = seed_database(engine, senha=os.environ.get("SEED_PASSWORD", "123456"),
-            sigla=args.unidade, dry_run=args.dry_run, tenant=args.tenant)
+            sigla=args.unidade, dry_run=args.dry_run, tenants=tenants)
     except (ValueError, SQLAlchemyError) as exc:
         # Erros SQL podem carregar parâmetros, inclusive hashes de senha.
         mensagem = str(exc) if isinstance(exc, ValueError) else "Falha no banco. Confira a conexão e aplique as migrations. A transação foi desfeita."

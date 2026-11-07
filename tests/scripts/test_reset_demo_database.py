@@ -72,7 +72,7 @@ def test_reset_order_and_cleanup(operations):
     assert [c[0] for c in steps.mock_calls] == ["ddl", "ddl", "migrate", "seed"]
     assert conn.exec_driver_sql.call_args_list[0].args == ("DROP DATABASE IF EXISTS `demo`",)
     upgrade.assert_called_once_with(config, "head")
-    seed.assert_called_once_with(engine, senha="123456")
+    seed.assert_called_once_with(engine, senha="123456", tenants=resetter.SLUGS_DEMO)
     assert "RELEASE_LOCK" in str(conn.execute.call_args.args[0])
     engine.dispose.assert_called_once()
     server.dispose.assert_called_once()
@@ -133,3 +133,113 @@ if [ "$step" = "$FAIL_AT" ]; then exit 1; fi
                             capture_output=True, text=True)
     assert (result.returncode == 0) == (not fail_at), result.stderr
     assert (tmp_path / "calls").read_text().splitlines() == expected
+
+
+def _resultado(scalar=None, slugs=()):
+    result = MagicMock()
+    result.scalar.return_value = scalar
+    result.scalars.return_value.all.return_value = list(slugs)
+    return result
+
+
+def _banco_com(conn, slugs, tabela_existe=True):
+    """Faz o MySQL simulado responder ao lock e à leitura de `tenants`."""
+    consultas = []
+
+    def execute(stmt, params=None):
+        sql = str(stmt)
+        consultas.append(sql)
+        if "information_schema" in sql:
+            assert params == {"db": "demo"}
+            return _resultado(scalar=1 if tabela_existe else 0)
+        if "FROM `demo`.tenants" in sql:
+            return _resultado(slugs=slugs)
+        return _resultado(scalar=1)  # GET_LOCK / RELEASE_LOCK
+
+    conn.execute.side_effect = execute
+    conn.dialect.identifier_preparer.quote_identifier.side_effect = lambda n: f"`{n}`"
+    return consultas
+
+
+def test_slugs_permitidos_padrao_sao_os_npjs_de_demonstracao(monkeypatch):
+    monkeypatch.delenv("DEMO_TENANT_SLUGS", raising=False)
+    assert resetter.slugs_permitidos() == {"daj-ufmg", "npj-demo"}
+    monkeypatch.setenv("DEMO_TENANT_SLUGS", " daj-ufmg, npj-demo ,npj-ensaio ")
+    assert resetter.slugs_permitidos() == {"daj-ufmg", "npj-demo", "npj-ensaio"}
+
+
+@pytest.mark.parametrize("valor", ["", " , ", "daj-ufmg", "npj-demo,npj-real"])
+def test_slugs_permitidos_precisam_incluir_os_npjs_recriados(monkeypatch, valor):
+    monkeypatch.setenv("DEMO_TENANT_SLUGS", valor)
+    with pytest.raises(ValueError, match="DEMO_TENANT_SLUGS deve incluir"):
+        resetter.slugs_permitidos()
+
+
+def test_tenants_nao_permitidos_sem_tabela_nao_le_slugs():
+    conn = MagicMock()
+    consultas = _banco_com(conn, ["npj-real"], tabela_existe=False)
+    assert resetter.tenants_nao_permitidos(conn, "demo", {"daj-ufmg"}) == []
+    assert not any("tenants" in sql and "information_schema" not in sql for sql in consultas)
+
+
+def test_tenants_nao_permitidos_lista_os_slugs_fora():
+    conn = MagicMock()
+    _banco_com(conn, ["npj-real", "daj-ufmg", "outro-npj"])
+    assert resetter.tenants_nao_permitidos(conn, "demo", {"daj-ufmg", "npj-demo"}) == [
+        "npj-real", "outro-npj"]
+
+
+def test_reset_recusa_banco_com_npj_fora_da_lista(operations):
+    server, _, conn, upgrade, seed, _ = operations
+    _banco_com(conn, ["daj-ufmg", "npj-demo", "npj-real"])
+    with pytest.raises(ValueError, match="npj-real"):
+        resetter.reset(URL.create("mysql+pymysql", database="demo"), "123456", object(),
+                       frozenset({"daj-ufmg", "npj-demo"}))
+    conn.exec_driver_sql.assert_not_called()
+    upgrade.assert_not_called()
+    seed.assert_not_called()
+    assert "RELEASE_LOCK" in str(conn.execute.call_args.args[0])
+    server.dispose.assert_called_once()
+
+
+def test_reset_segue_com_apenas_npjs_de_demonstracao(operations):
+    _, _, conn, upgrade, seed, steps = operations
+    _banco_com(conn, ["daj-ufmg", "npj-demo"])
+    resetter.reset(URL.create("mysql+pymysql", database="demo"), "123456", object(),
+                   frozenset({"daj-ufmg", "npj-demo"}))
+    assert [c[0] for c in steps.mock_calls] == ["ddl", "ddl", "migrate", "seed"]
+
+
+def test_check_recusa_banco_com_npj_fora_da_lista(demo_env, monkeypatch, capsys):
+    server = MagicMock()
+    conn = server.connect.return_value.__enter__.return_value
+    _banco_com(conn, ["daj-ufmg", "npj-real"])
+    factory = MagicMock(return_value=server)
+    monkeypatch.setattr(resetter, "create_engine", factory)
+    monkeypatch.setattr(resetter.sys, "argv", ["reset_demo_database.py", "--check"])
+    assert resetter.main() == 1
+    assert "npj-real" in capsys.readouterr().err
+    assert factory.call_args.args[0].database is None
+    server.dispose.assert_called_once()
+
+
+def test_check_aceita_banco_so_com_npjs_de_demonstracao(demo_env, monkeypatch, capsys):
+    server = MagicMock()
+    _banco_com(server.connect.return_value.__enter__.return_value, ["daj-ufmg", "npj-demo"])
+    monkeypatch.setattr(resetter, "create_engine", MagicMock(return_value=server))
+    monkeypatch.setattr(resetter.sys, "argv", ["reset_demo_database.py", "--check"])
+    assert resetter.main() == 0
+    assert "validada" in capsys.readouterr().out
+
+
+def test_check_sem_conexao_falha_antes_de_parar_a_api(demo_env, monkeypatch, capsys):
+    from sqlalchemy.exc import OperationalError
+
+    server = MagicMock()
+    server.connect.side_effect = OperationalError("SELECT", {}, Exception("senha=p@ss%word"))
+    monkeypatch.setattr(resetter, "create_engine", MagicMock(return_value=server))
+    monkeypatch.setattr(resetter.sys, "argv", ["reset_demo_database.py", "--check"])
+    assert resetter.main() == 1
+    erro = capsys.readouterr().err
+    assert "NPJs do banco" in erro and "p@ss%word" not in erro
+    server.dispose.assert_called_once()

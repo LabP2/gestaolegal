@@ -166,3 +166,147 @@ def test_atualiza_rotulos_antigos_sem_duplicar_ou_alterar_vinculos(engine):
         for row in rows:
             assert all("seed" not in value.lower() for key, value in row._mapping.items()
                        if isinstance(value, str) and key != "senha")
+
+
+DEMOS = ("daj-ufmg", "npj-demo")
+
+
+def _tenant(conn, slug):
+    tenants = metadata.tables["tenants"]
+    return conn.execute(select(tenants).where(tenants.c.slug == slug)).mappings().one_or_none()
+
+
+def test_npj_demo_criado_com_tenant_unidade_e_contas_proprias(engine):
+    criados = seed_database(engine, senha="123456", hoje=date(2026, 10, 13), tenants=DEMOS)
+    assert criados["tenants"] == 1
+    assert criados["unidades"] == 1
+    assert criados["usuarios"] == 8
+    with engine.connect() as conn:
+        demo = _tenant(conn, "npj-demo")
+        assert demo is not None and demo["ativo"] and demo["id"] != 1
+        usuarios = metadata.tables["usuarios"]
+        por_tenant = {}
+        for u in conn.execute(select(usuarios)).mappings():
+            por_tenant.setdefault(u["tenant_id"], {})[u["email"]] = u["urole"]
+            assert bcrypt.checkpw(b"123456", u["senha"].encode())
+        # As contas da DAJ continuam exatamente as documentadas.
+        assert por_tenant[1] == {
+            "admin@ufmg.br": "admin", "orient@ufmg.br": "orient",
+            "estag_direito@ufmg.br": "estag_direito", "colab_ext@ufmg.br": "colab_ext",
+        }
+        assert por_tenant[demo["id"]] == {
+            "admin@npjdemo.br": "admin", "orient@npjdemo.br": "orient",
+            "estag_direito@npjdemo.br": "estag_direito", "colab_ext@npjdemo.br": "colab_ext",
+        }
+        unidades = metadata.tables["unidades"]
+        (sede,) = conn.execute(select(unidades).where(unidades.c.tenant_id == demo["id"])).mappings()
+        assert (sede["nome"], sede["sigla"], sede["ativa"]) == ("Sede", "SEDE", True)
+
+
+def test_npj_demo_nao_aponta_para_registros_da_daj(engine):
+    seed_database(engine, senha="123456", tenants=DEMOS)
+    with engine.connect() as conn:
+        demo_id = _tenant(conn, "npj-demo")["id"]
+        ids = {}
+        for nome in ("usuarios", "unidades", "atendidos", "casos"):
+            tabela = metadata.tables[nome]
+            ids[nome] = {r.id: r.tenant_id for r in conn.execute(select(tabela.c.id, tabela.c.tenant_id))}
+        casos = metadata.tables["casos"]
+        for caso in conn.execute(select(casos).where(casos.c.tenant_id == demo_id)).mappings():
+            assert ids["unidades"][caso["unidade_id"]] == demo_id
+            for coluna in ("id_usuario_responsavel", "id_orientador", "id_estagiario",
+                           "id_colaborador", "id_criado_por"):
+                assert ids["usuarios"][caso[coluna]] == demo_id, coluna
+        links = metadata.tables["casos_atendidos"]
+        for link in conn.execute(select(links)).mappings():
+            assert ids["casos"][link["id_caso"]] == ids["atendidos"][link["id_atendido"]] == link["tenant_id"]
+        vinculos = metadata.tables["usuarios_unidades"]
+        for v in conn.execute(select(vinculos)).mappings():
+            assert ids["usuarios"][v["usuario_id"]] == ids["unidades"][v["unidade_id"]] == v["tenant_id"]
+        # Nomes distintos: um vazamento entre os NPJs aparece na tela.
+        atendidos = metadata.tables["atendidos"]
+        nomes = {}
+        for a in conn.execute(select(atendidos.c.nome, atendidos.c.tenant_id)):
+            nomes.setdefault(a.tenant_id, set()).add(a.nome)
+        assert len(nomes[demo_id]) == 20 and not nomes[demo_id] & nomes[1]
+
+
+def test_dois_npjs_reexecucao_nao_duplica_nem_troca_senha(engine):
+    seed_database(engine, senha="123456", tenants=DEMOS)
+    antes = snapshot(engine)
+    assert not seed_database(engine, senha="OutraSenha123!", tenants=DEMOS)
+    assert snapshot(engine) == antes
+
+
+def test_npj_demo_sozinho_nao_toca_a_daj(engine):
+    criados = seed_database(engine, senha="123456", tenants=("npj-demo",))
+    assert criados["usuarios"] == 4 and criados["casos"] == 2
+    with engine.connect() as conn:
+        for tabela in metadata.sorted_tables:
+            if "tenant_id" in tabela.c and tabela.name != "unidades":
+                assert not conn.execute(select(tabela).where(tabela.c.tenant_id == 1)).first(), tabela.name
+
+
+def test_cpfs_unicos_entre_os_dois_npjs(engine):
+    seed_database(engine, senha="123456", tenants=DEMOS)
+    with engine.connect() as conn:
+        cpfs = [cpf for nome in ("usuarios", "atendidos")
+                for cpf in conn.execute(select(metadata.tables[nome].c.cpf)).scalars()]
+    assert len(cpfs) == len(set(cpfs)) == 8 + 60
+
+
+def test_email_do_npj_demo_em_uso_na_daj_aborta_sem_gravar(engine):
+    seed_database(engine, senha="123456")
+    usuarios = metadata.tables["usuarios"]
+    with engine.begin() as conn:
+        conn.execute(usuarios.update().where(usuarios.c.email == "orient@ufmg.br")
+                     .values(email="orient@npjdemo.br"))
+    antes = snapshot(engine)
+    with pytest.raises(ValueError, match="outro NPJ: orient@npjdemo.br"):
+        seed_database(engine, senha="123456", tenants=("npj-demo",))
+    assert snapshot(engine) == antes
+
+
+@pytest.mark.parametrize("tenants", [(), "npj-demo", ("npj-real",), ("daj-ufmg", "npj-real")])
+def test_recusa_tenant_fora_da_demonstracao(engine, tenants):
+    antes = snapshot(engine)
+    with pytest.raises(ValueError):
+        seed_database(engine, senha="123456", tenants=tenants)
+    assert snapshot(engine) == antes
+
+
+def test_daj_ausente_nao_e_criada_pelo_seed():
+    engine = create_engine("sqlite://")
+    metadata.create_all(engine)
+    with pytest.raises(ValueError, match="daj-ufmg.*migrations"):
+        seed_database(engine, senha="123456")
+    with engine.connect() as conn:
+        assert not conn.execute(select(metadata.tables["tenants"])).first()
+
+
+@pytest.mark.parametrize("argv,esperado", [
+    ([], DEMOS),
+    (["--unidade", "BH"], ("daj-ufmg",)),
+    (["--tenant", "npj-demo"], ("npj-demo",)),
+    (["--tenant", "daj-ufmg", "--tenant", "npj-demo", "--unidade", "BH"], DEMOS),
+])
+def test_cli_escolhe_os_tenants(monkeypatch, argv, esperado):
+    import scripts.seed_database as modulo
+    from collections import Counter
+    from unittest.mock import MagicMock
+
+    for chave, valor in {"FLASK_ENV": "development", "DB_USER": "u", "DB_PASSWORD": "p",
+                         "DB_HOST": "h", "DB_NAME": "n"}.items():
+        monkeypatch.setenv(chave, valor)
+    monkeypatch.setattr(modulo, "load_dotenv", lambda *_: None)
+    monkeypatch.setattr(modulo, "create_engine", MagicMock())
+    chamada = MagicMock(return_value=Counter())
+    monkeypatch.setattr(modulo, "seed_database", chamada)
+    assert main(argv) == 0
+    assert chamada.call_args.kwargs["tenants"] == esperado
+
+
+def test_cli_recusa_tenant_desconhecido():
+    with pytest.raises(SystemExit) as exc:
+        main(["--tenant", "npj-real"])
+    assert exc.value.code == 2

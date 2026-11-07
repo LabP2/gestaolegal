@@ -151,8 +151,9 @@ Após aplicar as migrations, execute o seed direto no banco, sem precisar da API
 
 ```bash
 make seed ARGS="--dry-run"  # simula a carga e faz rollback
-make seed                 # grava os dados
-make seed ARGS="--unidade BH"  # opcional: apenas uma unidade ativa
+make seed                 # grava os dados dos dois NPJs de demonstração
+make seed ARGS="--unidade BH"  # opcional: apenas uma unidade ativa da DAJ
+make seed ARGS="--tenant npj-demo"  # opcional: apenas um NPJ (pode repetir)
 ```
 
 O comando usa `uv` e lê `DB_HOST`, `DB_PORT` (padrão `3306`), `DB_NAME`,
@@ -165,17 +166,29 @@ docker compose -f docker-compose.dev.yml exec api python scripts/seed_database.p
 docker compose -f docker-compose.dev.yml exec api python scripts/seed_database.py
 ```
 
-O script `scripts/seed_database.py` cria quatro usuários compartilhados e,
-por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
+O sistema é multitenant: cada NPJ é um tenant, e os dados de um não aparecem
+para o outro. Sem `--tenant`, o seed semeia dois NPJs de demonstração:
+
+| NPJ (slug) | Origem | Unidades | Contas |
+|---|---|---|---|
+| DAJ/UFMG (`daj-ufmg`) | tenant 1, criado pela migration | as ativas das migrations (BH, Nova Lima) | `admin@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br`, `colab_ext@ufmg.br` |
+| NPJ de Demonstração (`npj-demo`) | criado pelo seed, se faltar | `Sede` (`SEDE`), criada pelo seed | `admin@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_ext@npjdemo.br` |
+
+Os nomes dos atendidos diferem entre os dois NPJs, para que um vazamento fique
+visível na tela. `--unidade` sem `--tenant` semeia só a DAJ, como antes; com
+`--tenant`, a sigla é procurada em cada NPJ informado. Só esses dois slugs são
+aceitos: o seed nunca grava dados fictícios num NPJ real.
+
+Em cada NPJ, o script `scripts/seed_database.py` cria quatro usuários
+compartilhados entre as unidades e, por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
 duas orientações jurídicas, dois lembretes e uma escala com duas marcações.
 Os dados são fictícios. Usuários e atendidos recebem CPFs sintéticos, distintos
 e com dígitos verificadores válidos; isso não comprova inscrição real. Processos
 não têm número judicial real. Os nomes e demais textos exibidos não contêm “Seed”.
-Não são criados anexos nem enviados e-mails. As unidades vêm das migrations.
+Não são criados anexos nem enviados e-mails. As unidades da DAJ vêm das
+migrations.
 
-Contas: `admin@ufmg.br`, `orient@ufmg.br`,
-`estag_direito@ufmg.br` e `colab_ext@ufmg.br`.
-A senha inicial é `123456`, configurável por `SEED_PASSWORD`.
+A senha inicial de todas as contas é `123456`, configurável por `SEED_PASSWORD`.
 Reexecutar reconhece os identificadores da versão antiga, remove seus rótulos
 “Seed” e substitui CPFs zerados pelos sintéticos, preservando IDs, vínculos,
 senhas e outros campos editados. Não é preciso apagar o banco. Datas de
@@ -193,9 +206,16 @@ cenários que precisam exercitar endpoints e uploads.
 
 ### Reset automático do banco de demo
 
-`scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, aplica
-as migrations e executa `seed_database.py`. As contas e senhas voltam aos valores
-do seed a cada execução. O usuário MySQL precisa de permissão para `DROP` e
+`scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, com
+todos os NPJs, aplica as migrations e executa `seed_database.py` nos dois NPJs
+de demonstração. As contas e senhas voltam aos valores do seed a cada execução.
+
+Antes de parar a API (`--check`) e de novo antes do `DROP`, o reset lê a tabela
+`tenants` e **recusa** se houver NPJ com slug fora de `DEMO_TENANT_SLUGS`
+(lista separada por vírgulas; padrão `daj-ufmg,npj-demo`). A lista só pode
+ampliar o padrão, porque o reset recria esses dois NPJs. Um NPJ cadastrado na
+demo por engano, ou um banco real apontado por erro, faz o reset parar sem
+alterar nada. O usuário MySQL precisa de permissão para `DROP` e
 `CREATE` no banco configurado.
 
 Para usar o reset com o Compose de desenvolvimento, defina
