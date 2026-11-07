@@ -126,7 +126,10 @@ def update_me():
 @authorized("admin")
 def delete(id: int):
     user_service = UsuarioService()
-    user_service.soft_delete(id)
+    # Sem linha afetada, o usuário não existe neste NPJ: 404, e não um
+    # "desativado com sucesso" que não desativou nada.
+    if not user_service.soft_delete(id):
+        raise NotFoundException(resource="User", resource_id=id)
 
     return success_response(message="Usuário desativado com sucesso")
 

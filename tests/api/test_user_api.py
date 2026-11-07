@@ -119,6 +119,14 @@ def test_delete_user(
     assert data["status"] is False
 
 
+def test_delete_user_inexistente_responde_404(
+    client: FlaskClient, auth_headers: dict[str, str]
+) -> None:
+    # Antes respondia "Usuário desativado com sucesso" sem desativar nada.
+    response = client.delete("/api/user/987654", headers=auth_headers)
+    assert response.status_code == 404
+
+
 def test_search_users(
     client: FlaskClient, auth_headers: dict[str, str], sample_user_data: dict[str, Any]
 ) -> None:

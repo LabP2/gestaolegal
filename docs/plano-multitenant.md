@@ -508,6 +508,20 @@ central:
 Os ~510 testes atuais continuam verdes com o tenant 1 implícito nas fixtures.
 Nenhuma asserção existente é removida.
 
+**Como ficou (PR 6).** A varredura está em `tests/api/test_tenant_vazamento.py`,
+do ponto de vista do outro NPJ atacando a DAJ (a fixture de dois conjuntos
+completos não coube no banco compartilhado da suíte). `ROTAS` classifica cada
+par método/rota em `publica`, `id`, `colecao` ou `escrita`; as rotas sob
+`/api/plataforma/` ficam para os testes do PR 7, e um token de NPJ nelas tem de
+dar 401/403. Coleções são comparadas com a resposta de antes de a DAJ ter
+dados, o que pega também contagens e relatórios. Sublistas por id (casos do
+atendido, histórico do caso) podem responder lista vazia, desde que igual à de
+um id inexistente. Trechos sem tenant aceitos numa requisição: login e
+recuperação de senha (rotas públicas), a conferência de NPJ ativo na
+autenticação (toda rota com token) e a checagem de e-mail único (criar e editar
+usuário). A criação com ids de outro NPJ no corpo continua aceita; ver
+`docs/known_issues.md`.
+
 ## 11. Impacto no DJEN (`/mnt/dados/gestaolegal-djen/docs/plano-djen.md`)
 
 - `djen_oabs`, `djen_comunicacoes` e `djen_sincronizacoes` recebem
