@@ -13,6 +13,8 @@ _tenant_ativo: ContextVar[int | None] = ContextVar("tenant_ativo", default=None)
 # Motivo declarado de um trecho que roda de propósito sem tenant (CRUD da
 # plataforma, busca do e-mail no login, reset de demo). None = fora desse trecho.
 _sem_tenant: ContextVar[str | None] = ContextVar("sem_tenant", default=None)
+# Administrador da plataforma autenticado (id). Nunca convive com tenant ativo.
+_plataforma_admin: ContextVar[int | None] = ContextVar("plataforma_admin", default=None)
 
 
 def _validar_tenant_id(tenant_id: int) -> int:
@@ -71,7 +73,19 @@ class RequestContext:
         return _sem_tenant.get()
 
     @staticmethod
+    def set_plataforma_admin(admin_id: int) -> None:
+        _plataforma_admin.set(admin_id)
+
+    @staticmethod
+    def get_plataforma_admin() -> int:
+        admin_id = _plataforma_admin.get()
+        if admin_id is None:
+            raise RuntimeError("No platform admin in current request context")
+        return admin_id
+
+    @staticmethod
     def clear() -> None:
+        _plataforma_admin.set(None)
         _current_user.set(None)
         _unidade_ativa.set(None)
         _tenant_ativo.set(None)

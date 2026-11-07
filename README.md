@@ -122,6 +122,29 @@ volumes em [Implantação](docs/implantacao.md). Os serviços antigos se chamam
 
 ---
 
+## Administração da plataforma (vários NPJs)
+
+Cada NPJ atendido pela instalação é um *tenant*, com usuários, unidades e dados
+próprios. Quem cadastra os NPJs é o administrador da plataforma, uma conta
+separada das contas de NPJ, com login em `/plataforma` (veja
+`docs/plano-multitenant.md`, §6).
+
+O primeiro administrador da plataforma é criado pela linha de comando; a senha
+é pedida no terminal:
+
+```bash
+docker compose -f docker-compose.dev.yml run --rm api \
+  flask --app 'gestaolegal:create_app()' plataforma criar-admin \
+  --email voce@exemplo.br --nome "Seu Nome"
+```
+
+Em `/plataforma/novo`, criar um NPJ cria também a unidade inicial e o primeiro
+admin do NPJ. A tela mostra um link de primeiro acesso, válido por 3 dias, para
+ser repassado à pessoa; nenhum e-mail é enviado. Desativar um NPJ impede o
+login dos usuários dele e encerra as sessões abertas. Não há exclusão.
+
+---
+
 ## Dados de demonstração (seed)
 
 Após aplicar as migrations, execute o seed direto no banco, sem precisar da API:

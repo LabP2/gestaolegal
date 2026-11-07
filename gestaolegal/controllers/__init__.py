@@ -9,6 +9,7 @@ from .orientacao_juridica_controller import (
     orientacao_juridica_controller as orientacao_juridica_controller_api,
 )
 from .plantao_controller import plantao_controller
+from .plataforma_controller import plataforma_controller
 from .presenca_controller import presenca_controller
 from .relatorio_controller import relatorio_controller
 from .roteiro_controller import roteiro_controller
@@ -32,4 +33,5 @@ routes = [
     (relatorio_controller, "/api/relatorio"),
     (search_controller, "/api/search"),
     (unidade_controller, "/api/unidades"),
+    (plataforma_controller, "/api/plataforma"),
 ]

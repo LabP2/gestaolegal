@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 MSG_LINK_INVALIDO = "Link inválido ou expirado. Peça um novo link para redefinir a sua senha."
 
+# Validade do link de primeiro acesso do admin de um NPJ novo. É maior que a do
+# "esqueci a senha" porque o link é repassado à mão pela plataforma (D10).
+PRIMEIRO_ACESSO_TTL = timedelta(days=3)
+
 
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
@@ -79,6 +83,20 @@ class PasswordResetService:
         # Fora da transação: um SMTP lento não pode segurar a conexão do banco.
         url = f"{Config.FRONTEND_URL}/redefinir-senha/{token}"
         enviar_link_recuperacao(usuario.email, usuario.nome, url)
+
+    def emitir_primeiro_acesso(self, usuario_id: int) -> str:
+        """Link de definição de senha para uma conta recém-criada.
+
+        Usa o tenant ativo e a mesma tabela do "esqueci a senha", então a tela
+        `/redefinir-senha` serve aos dois casos. Não envia e-mail: quem chama
+        mostra o link (plano §6.3).
+        """
+        token = secrets.token_urlsafe(32)
+        self.repository.invalidate_for_user(usuario_id)
+        self.repository.create(
+            usuario_id, _hash(token), datetime.now() + PRIMEIRO_ACESSO_TTL
+        )
+        return f"{Config.FRONTEND_URL}/redefinir-senha/{token}"
 
     def _registro_valido(self, token: str):
         """Token válido, com o NPJ dele já ativo. None se o link não vale."""

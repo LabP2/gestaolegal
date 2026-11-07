@@ -44,3 +44,10 @@ export type {
 } from './plantao';
 export { CONFIRMACAO } from './plantao';
 export type { ResumoEscala } from './plantao';
+export type {
+	Tenant,
+	PlataformaAdmin,
+	TenantCriacaoInput,
+	TenantEdicaoInput,
+	TenantCriado
+} from './tenant';

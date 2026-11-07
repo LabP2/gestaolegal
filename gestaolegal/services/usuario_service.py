@@ -8,7 +8,6 @@ import bcrypt
 from dateutil import parser as date_parser
 
 from gestaolegal.common import PageParams, PaginatedResult
-from gestaolegal.database.tables import UNIDADE_PADRAO_ID
 from gestaolegal.exceptions import (
     DatabaseException,
     NotFoundException,
@@ -396,40 +395,51 @@ class UsuarioService:
         if user.id:
             user.unidades = self.unidade_repository.unidades_do_usuario(user.id)
 
-    def create_admin(self, email: str, password: str) -> UserInfo:
-        logger.info(f"Creating initial admin user with email: {email}")
+    def create_admin(self, email: str, nome: str, unidade_id: int) -> UserInfo:
+        """Primeiro admin de um NPJ recém-criado pela plataforma (plano §6.3).
 
-        endereco_data = {
-            "logradouro": "N/A",
-            "numero": "S/N",
-            "complemento": None,
-            "bairro": "N/A",
-            "cep": "00000-000",
-            "cidade": "N/A",
-            "estado": "N/A",
-        }
-        endereco_id = self.endereco_repository.create(endereco_data)
+        Roda dentro do tenant novo, que ainda não tem usuários: a conta é
+        vinculada à unidade inicial e registra a si mesma como autora. A senha
+        é aleatória e ninguém a conhece; o admin define a dele pelo link de
+        primeiro acesso que a plataforma gera.
+        """
+        logger.info(f"Criando o primeiro admin do NPJ: {email}")
+        self._exigir_email_livre(email)
 
+        endereco_id = self.endereco_repository.create(
+            {
+                "logradouro": "N/A",
+                "numero": "S/N",
+                "complemento": None,
+                "bairro": "N/A",
+                "cep": "00000-000",
+                "cidade": "N/A",
+                "estado": "N/A",
+            }
+        )
+
+        senha_aleatoria = secrets.token_urlsafe(32)
         hashed_password = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt()
+            senha_aleatoria.encode("utf-8"), bcrypt.gensalt()
         ).decode("utf-8")
 
+        agora = datetime.now()
         user_data = {
             "email": email,
             "senha": hashed_password,
             "urole": "admin",
-            "nome": "Administrator",
+            "nome": nome,
             "sexo": "N/A",
             "rg": "N/A",
             "cpf": "000.000.000-00",
-            "profissao": "Administrator",
+            "profissao": "Administrador",
             "estado_civil": "N/A",
-            "nascimento": datetime.now().date(),
+            "nascimento": agora.date(),
             "telefone": None,
             "celular": "N/A",
             "oab": None,
-            "obs": "Initial admin user created via setup endpoint",
-            "data_entrada": datetime.now().date(),
+            "obs": "Primeiro admin do NPJ, criado pela plataforma",
+            "data_entrada": agora.date(),
             "data_saida": None,
             "matricula": "ADMIN",
             "bolsista": False,
@@ -442,19 +452,17 @@ class UsuarioService:
             "fim_bolsa": None,
             "endereco_id": endereco_id,
             "status": True,
-            "criado": datetime.now(),
-            "criadopor": 1,
-            "modificadopor": 1,
-            "modificado": datetime.now(),
+            "criado": agora,
+            # Ainda não há usuário no NPJ para ser o autor: a conta se registra
+            # como autora logo abaixo, como o seed faz com o primeiro admin.
+            "criadopor": 0,
+            "modificadopor": 0,
+            "modificado": agora,
         }
 
         user_id = self.repository.create(user_data)
-        if self.unidade_repository.find_by_id(UNIDADE_PADRAO_ID):
-            self.unidade_repository.vincular(user_id, [UNIDADE_PADRAO_ID])
-        else:
-            logger.warning(
-                "Unidade padrão inexistente: admin inicial ficou sem vínculo de unidade"
-            )
+        self.repository.update(user_id, {"criadopor": user_id, "modificadopor": user_id})
+        self.unidade_repository.vincular(user_id, [unidade_id])
         user = self.find_by_id(user_id)
         if not user:
             logger.error(f"Failed to create admin user with email: {email}")

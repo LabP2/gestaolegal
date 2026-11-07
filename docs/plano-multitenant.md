@@ -373,6 +373,25 @@ vazio.
 - Marca fixa "DAJ/UFMG" no front (`app-footer.svelte`, `termos-de-uso`,
   formulários) passa a vir do tenant. Fica em PR separado e não bloqueia.
 
+### 6.5 Como ficou (PR 7)
+
+- Token da plataforma: `aud="plataforma"`, `plataforma_admin_id`, 8 h, sem
+  `tenant_id`. Um token de plataforma que traga `tenant_id` é recusado. O
+  decorator `@plataforma_admin` também confere, a cada requisição, que a conta
+  existe e está ativa.
+- `GET /api/plataforma/auth/me` entrou além da tabela de §6.2: é como o layout
+  `(plataforma)` confere a sessão.
+- Criação: `sem_tenant` grava a linha em `tenants`; `contexto_tenant(novo_id)`
+  grava a unidade, o admin (`UsuarioService.create_admin(email, nome,
+  unidade_id)`, que se registra como autor) e o token de primeiro acesso. Em
+  qualquer falha, o service faz `rollback` explícito: erro tratado pelo Flask
+  chega ao teardown sem exceção, e o teardown faria commit do que já foi gravado.
+- Link de primeiro acesso: mesma tabela e tela do "esqueci a senha", com
+  validade de 3 dias (`PRIMEIRO_ACESSO_TTL`).
+- Sigla e slug são comparados sem diferenciar maiúsculas. O slug segue
+  `^[a-z0-9]+(-[a-z0-9]+)*$`.
+- CLI: `flask plataforma criar-admin --email --nome` (senha pedida sem eco).
+
 ## 7. Migração dos dados existentes
 
 O tenant inicial é **id 1, slug `daj-ufmg`, "DAJ/UFMG"**, e recebe todos os

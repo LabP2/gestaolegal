@@ -19,7 +19,7 @@ const resolveConfiguredApiUrl = () => {
 	return isNonEmpty(configured) ? configured!.trim() : null;
 };
 
-const getApiBaseUrl = () => {
+export const getApiBaseUrl = () => {
 	const configuredUrl = resolveConfiguredApiUrl();
 
 	if (dev) {
@@ -85,7 +85,7 @@ export async function apiFetch(
 	return response;
 }
 
-async function unwrapApiResponse<T>(response: Response): Promise<T> {
+export async function unwrapApiResponse<T>(response: Response): Promise<T> {
 	let apiResponse: ApiResponse<T>;
 	try {
 		apiResponse = await response.json();
