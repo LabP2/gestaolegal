@@ -4,6 +4,7 @@ import pytest
 from flask.testing import FlaskClient
 
 from tests.api.conftest import assert_success_response, clean_tables, get_success_data
+from gestaolegal.utils.request_context import sem_tenant
 
 
 @pytest.mark.parametrize("informar_campo", [False, True])
@@ -737,10 +738,11 @@ def test_seletor_nao_duplica_pessoa_com_fichas_legadas_repetidas(
     assert client.post(f'/api/atendido/{aid}/tornar-assistido', json=sample_assistido_data,
                        headers=auth_headers).status_code == 200
     session = get_session()
-    original = dict(session.execute(select(assistidos).where(assistidos.c.id_atendido == aid)).mappings().one())
-    original.pop('id')
-    session.execute(assistidos.insert().values(**original))
-    session.commit()
+    with sem_tenant("teste: acesso direto ao banco"):
+        original = dict(session.execute(select(assistidos).where(assistidos.c.id_atendido == aid)).mappings().one())
+        original.pop('id')
+        session.execute(assistidos.insert().values(**original))
+        session.commit()
     r = client.get('/api/atendido/', query_string={'search': 'SELETOR DUPLICADO', 'tipo_busca': 'assistidos', 'per_page': 1}, headers=auth_headers)
     data = get_success_data(r)
     assert data['total'] == 1

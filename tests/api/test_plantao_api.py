@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from flask.testing import FlaskClient
 
+from gestaolegal.utils.request_context import sem_tenant
 from tests.api.conftest import (
     clean_tables,
     criar_usuario,
@@ -99,7 +100,7 @@ class TestConfiguracao:
         _configurar(client, auth_headers, _dias(1))
         _configurar(client, auth_headers, _dias(2))
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             total = session.execute(select(func.count()).select_from(plantao)).scalar()
         assert total == 1
@@ -113,7 +114,7 @@ class TestConfiguracao:
         a, b, c = _dias(3)
 
         _configurar(client, auth_headers, [a, b])
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             id_b = session.execute(
                 select(dias_plantao.c.id).where(
@@ -128,7 +129,7 @@ class TestConfiguracao:
         )
         assert data["dias"] == [b, c]
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             linhas = {
                 str(row.data): (row.id, row.status)
@@ -153,7 +154,7 @@ class TestConfiguracao:
         _configurar(client, auth_headers, [])
         _configurar(client, auth_headers, [a])
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             total = session.execute(
                 select(func.count()).select_from(dias_plantao)
@@ -387,7 +388,7 @@ class TestMarcacoes:
 
         assert len(_pagina(client, auth_headers)["escala"]) == 1
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             session.execute(
                 update(usuarios)
@@ -499,16 +500,16 @@ class TestEscalas:
         from gestaolegal.database.session import get_session
         from gestaolegal.database.tables import plantao, dias_marcados_plantao, usuarios
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             uid = session.execute(
                 select(usuarios.c.id).where(usuarios.c.email == "admin@gl.com")
             ).scalar_one()
             ident = session.execute(
-                insert(plantao).values(unidade_id=1, nome="Legado", legado=True)
+                insert(plantao).values(tenant_id=1, unidade_id=1, nome="Legado", legado=True)
             ).lastrowid
             session.execute(
-                insert(dias_marcados_plantao).values(
+                insert(dias_marcados_plantao).values(tenant_id=1, 
                     plantao_id=ident,
                     unidade_id=1,
                     id_usuario=uid,

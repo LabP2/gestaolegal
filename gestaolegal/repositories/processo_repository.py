@@ -24,9 +24,13 @@ def _tratar_numero_duplicado(error: IntegrityError) -> NoReturn:
     args = getattr(error.orig, "args", ())
     mysql_duplicate = (
         args and args[0] == 1062
-        and re.search(r"for key ['`](?:processos\.)?numero['`]", message)
+        and re.search(
+            r"for key ['`](?:processos\.)?uq_processos_tenant_numero['`]", message
+        )
     )
-    sqlite_duplicate = message == "UNIQUE constraint failed: processos.numero"
+    sqlite_duplicate = (
+        message == "UNIQUE constraint failed: processos.tenant_id, processos.numero"
+    )
     if mysql_duplicate or sqlite_duplicate:
         raise ValidationException(
             "Já existe um processo cadastrado com esse número.", field="numero"
@@ -41,17 +45,21 @@ class ProcessoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int) -> Processo | None:
-        stmt = select(processos).where(processos.c.id == id)
+        stmt = self.escopo(select(processos).where(processos.c.id == id), processos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Processo, dict(result._mapping)) if result else None
 
     def find_by_caso_id(self, caso_id: int) -> list[Processo]:
-        stmt = select(processos).where(processos.c.id_caso == caso_id)
+        stmt = self.escopo(
+            select(processos).where(processos.c.id_caso == caso_id), processos
+        )
         results = self.session.execute(stmt).all()
         return [from_dict(Processo, dict(row._mapping)) for row in results]
 
     def search(self, params: SearchParams) -> PaginatedResult[Processo]:
-        stmt = select(processos, func.count().over().label("total_count"))
+        stmt = self.escopo(
+            select(processos, func.count().over().label("total_count")), processos
+        )
 
         stmt = self._apply_where_clause(stmt, params.get("where"), processos)
         stmt = stmt.order_by(processos.c.id.desc())
@@ -70,20 +78,20 @@ class ProcessoRepository(BaseRepository):
         )
 
     def find_one(self, params: SearchParams) -> Processo | None:
-        stmt = select(processos)
+        stmt = self.escopo(select(processos), processos)
         stmt = self._apply_where_clause(stmt, params.get("where"), processos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Processo, dict(result._mapping)) if result else None
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(processos)
+        stmt = self.escopo(select(func.count()).select_from(processos), processos)
         stmt = self._apply_where_clause(stmt, params.get("where"), processos)
 
         result = self.session.execute(stmt).scalar()
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(processos).values(**data)
+        stmt = insert(processos).values(**self.valores(data))
         try:
             result = self.session.execute(stmt)
             self.session.flush()
@@ -92,13 +100,17 @@ class ProcessoRepository(BaseRepository):
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(processos).where(processos.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(processos).where(processos.c.id == id), processos
+        ).values(**data)
         try:
             self.session.execute(stmt)
         except IntegrityError as error:
             _tratar_numero_duplicado(error)
 
     def delete(self, id: int) -> bool:
-        stmt = sql_update(processos).where(processos.c.id == id).values(status=False)
+        stmt = self.escopo(
+            sql_update(processos).where(processos.c.id == id), processos
+        ).values(status=False)
         result = self.session.execute(stmt)
         return result.rowcount > 0

@@ -17,16 +17,21 @@ legados ficam como estão.
 ## Seed e reset de demonstração
 
 - `make seed` executa `scripts/seed_database.py` diretamente no banco, após as
-  migrations. `ARGS="--dry-run"` desfaz a carga ao final. As quatro contas são
-  `admin@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br` e `colab_ext@ufmg.br`,
-  com senha padrão `123456`, configurável por `SEED_PASSWORD`. Reexecutar
-  preserva os registros e as senhas existentes.
+  migrations. `ARGS="--dry-run"` desfaz a carga ao final. Semeia dois NPJs
+  (tenants): `daj-ufmg`, com as contas `admin@ufmg.br`, `orient@ufmg.br`,
+  `estag_direito@ufmg.br` e `colab_ext@ufmg.br`, e `npj-demo` (criado pelo seed,
+  unidade `SEDE`), com as mesmas contas em `@npjdemo.br`. Senha padrão
+  `123456`, configurável por `SEED_PASSWORD`. `--tenant SLUG` (repetível)
+  restringe; `--unidade` sem `--tenant` semeia só a DAJ. Reexecutar preserva
+  os registros e as senhas existentes.
 - `scripts/seed_local.py` é o seed via API usado pela esteira Helton. Tem
   credenciais e comportamento próprios; não confundir com `make seed`.
 - `scripts/reset_demo.sh` roda no host Docker: valida a configuração, para a
   API, apaga/recria o banco, aplica migrations, executa o seed e reinicia a API.
   Requer `DEMO_DB_NAME=DB_NAME` (mesmo valor, não o texto literal), ambiente
-  `development` ou `testing`, e imagem da API atualizada. O reset usa a porta
+  `development` ou `testing`, e imagem da API atualizada. Recusa, antes de
+  parar a API e antes do `DROP`, banco com tenant fora de `DEMO_TENANT_SLUGS`
+  (padrão e mínimo `daj-ufmg,npj-demo`). O reset usa a porta
   interna do MySQL em `DB_PORT` e não remove anexos no volume.
 - O reset usa `flock` no host e lock no MySQL para impedir sobreposição. Uma
   falha após a parada mantém a API parada; corrigir e executar novamente.
@@ -60,10 +65,13 @@ legados ficam como estão.
   Fase A e foi removido para que o esquecimento apareça, em vez de gravar calado em
   Belo Horizonte um registro de outra unidade.
 - Uploads vão para o volume privado `PRIVATE_FILES_ROOT` (padrão
-  `/data/gestaolegal/uploads`), nas categorias `casos`, `eventos` e `arquivos`.
+  `/data/gestaolegal/uploads`), em `<tenant_id>/<categoria>`, com as categorias
+  `casos`, `eventos` e `arquivos`. Sem tenant no contexto, nada é lido nem
+  gravado, e o layout antigo sem tenant não é lido (`scripts/mover_arquivos_tenant.py`
+  move os anexos antigos para `1/`).
   A raiz é validada na subida do app: se estiver dentro de `app.static_folder`
-  (ou contendo ela), a API não sobe. Registros herdados da 2.0 não têm
-  `caminho`; o service resolve para a raiz da categoria + `nome`.
+  (ou contendo ela), a API não sobe. Registros de `arquivos` herdados da 2.0
+  sem `caminho` dão 404 no download; o service nunca monta caminho pelo `nome`.
 - Portas publicadas vêm de `APP_PORT`, `DB_PORT`, `WEB_PORT` e
   `MAILPIT_UI_PORT` (padrões 5000, 3306, 5001, 8025). Script que aponte para
   `localhost:5000` fixo fala com o checkout principal e não com um checkout
@@ -104,8 +112,8 @@ antes de entrar no `master`.
    usuários (o serviço `mail`/Postfix e qualquer `MAIL_RELAYHOST`), e qualquer
    script que leia ou escreva no banco de **produção** ou de **QA**
    (`docker-compose.qa.yml`, os dumps em `dumps/`). A importação dos bancos de
-   Belo Horizonte e Nova Lima (`docs/unidades.md`, Fase B) roda contra dados
-   reais de pessoas.
+   Belo Horizonte e Nova Lima já foi concluída; o importador foi descontinuado.
+   `docs/unidades.md`, Fase B, permanece como registro histórico.
 2. **Segredos e o que roda fora daqui**: `.env*` (exceto `.env.example` e
    `.env.worktree`), `.github/workflows/` (executa no push), credenciais do
    MySQL e do GHCR. `docker-compose*.yml` não entra: molda só a stack local.

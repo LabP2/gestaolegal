@@ -119,3 +119,32 @@ def authorized(
         return wrapper
 
     return decorator
+
+
+def plataforma_admin(
+    func: Callable[P, ResponseReturnValue],
+) -> Callable[P, ResponseReturnValue]:
+    """Exige token de administrador da plataforma (aud="plataforma").
+
+    Token de NPJ é recusado com 401, como o `@authenticated` recusa o da
+    plataforma. A conta precisa existir e estar ativa a cada requisição, para
+    que desativar um administrador valha na hora.
+    """
+
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> ResponseReturnValue:
+        from gestaolegal.services.plataforma_service import PlataformaService
+
+        auth_header = request.headers.get("Authorization") or ""
+        partes = auth_header.split(" ", maxsplit=1)
+        if len(partes) != 2 or not partes[1]:
+            return make_response("Authorization token is missing", 401)
+
+        admin_id = JWTAuth.plataforma_admin_id(partes[1])
+        if admin_id is None or not PlataformaService().admin_ativo(admin_id):
+            return make_response("Invalid or expired token", 401)
+
+        RequestContext.set_plataforma_admin(admin_id)
+        return func(*args, **kwargs)
+
+    return wrapper

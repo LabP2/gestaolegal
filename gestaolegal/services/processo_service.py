@@ -14,6 +14,7 @@ from gestaolegal.repositories.repository import (
 )
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existente
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,7 @@ class ProcessoService:
         if not existing:
             logger.error(f"Update failed: processo not found with id: {processo_id}")
             raise NotFoundException(resource="Processo", resource_id=processo_id)
+        exigir_existente("casos", processo_input.id_caso, "id_caso")
 
         processo_data = processo_input.model_dump(exclude_none=True)
         for field in ("numero", "valor_causa_inicial", "valor_causa_atual"):

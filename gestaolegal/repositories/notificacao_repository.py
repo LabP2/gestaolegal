@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import func, insert, or_, select
+from sqlalchemy import and_, func, insert, or_, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,9 @@ class NotificacaoRepository(BaseRepository):
         cond = notificacao.c.id_usu_notificar == user_id
         if inclui_gerais:
             cond = or_(cond, notificacao.c.id_usu_notificar.is_(None))
-        return cond
+        # O tenant fica fora do OR: os avisos gerais (destinatário nulo) são do
+        # NPJ, não da plataforma inteira.
+        return and_(self.no_tenant(notificacao), cond)
 
     @staticmethod
     def _filtro_arquivamento(stmt, arquivadas: Literal["nao", "sim", "todas"]):
@@ -35,7 +37,7 @@ class NotificacaoRepository(BaseRepository):
 
     def find_by_id(self, id: int) -> Notificacao | None:
         row = self.session.execute(
-            select(notificacao).where(notificacao.c.id == id)
+            self.escopo(select(notificacao).where(notificacao.c.id == id), notificacao)
         ).one_or_none()
         return from_dict(Notificacao, dict(row._mapping)) if row else None
 
@@ -54,7 +56,11 @@ class NotificacaoRepository(BaseRepository):
             )
             .select_from(
                 notificacao.outerjoin(
-                    usuarios, usuarios.c.id == notificacao.c.id_executor_acao
+                    usuarios,
+                    and_(
+                        usuarios.c.id == notificacao.c.id_executor_acao,
+                        self.no_tenant(usuarios),
+                    ),
                 )
             )
             .where(self._visiveis_para(user_id, inclui_gerais))
@@ -89,13 +95,15 @@ class NotificacaoRepository(BaseRepository):
         return self.session.execute(stmt).scalar() or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        result = self.session.execute(insert(notificacao).values(**data))
+        result = self.session.execute(insert(notificacao).values(**self.valores(data)))
         self.session.flush()
         return result.lastrowid
 
     def create_many(self, rows: list[dict[str, Any]]) -> None:
         if rows:
-            self.session.execute(insert(notificacao), rows)
+            self.session.execute(
+                insert(notificacao), [self.valores(row) for row in rows]
+            )
             self.session.flush()
 
     def marcar_lida(self, id: int, user_id: int, inclui_gerais: bool) -> bool:

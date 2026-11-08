@@ -22,7 +22,10 @@ user_controller = Blueprint("user", __name__)
 @authenticated(unidade=False)
 def get_me():
     current_user = RequestContext.get_current_user()
-    return success_response(data=asdict(current_user))
+    # O NPJ vem do token; o usuário não o escolhe, só o vê no cabeçalho.
+    return success_response(
+        data={**asdict(current_user), "tenant": UsuarioService().tenant_atual()}
+    )
 
 
 @user_controller.route("/opcoes", methods=["GET"])
@@ -123,7 +126,10 @@ def update_me():
 @authorized("admin")
 def delete(id: int):
     user_service = UsuarioService()
-    user_service.soft_delete(id)
+    # Sem linha afetada, o usuário não existe neste NPJ: 404, e não um
+    # "desativado com sucesso" que não desativou nada.
+    if not user_service.soft_delete(id):
+        raise NotFoundException(resource="User", resource_id=id)
 
     return success_response(message="Usuário desativado com sucesso")
 

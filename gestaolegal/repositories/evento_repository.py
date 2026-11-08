@@ -22,7 +22,7 @@ class EventoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int, unidade_id: int | None = None) -> Evento | None:
-        stmt = select(eventos).where(eventos.c.id == id)
+        stmt = self.escopo(select(eventos).where(eventos.c.id == id), eventos)
         if unidade_id is not None:
             stmt = stmt.where(eventos.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
@@ -30,26 +30,30 @@ class EventoRepository(BaseRepository):
 
     def listar_arquivos(self, evento_id: int) -> list[dict]:
         return [dict(row) for row in self.session.execute(
-            select(arquivos_evento).where(arquivos_evento.c.id_evento == evento_id)
-            .order_by(arquivos_evento.c.id)
+            self.escopo(
+                select(arquivos_evento).where(arquivos_evento.c.id_evento == evento_id),
+                arquivos_evento,
+            ).order_by(arquivos_evento.c.id)
         ).mappings()]
 
     def adicionar_arquivo(self, evento_id: int, caso_id: int, ref: str) -> int:
-        result = self.session.execute(insert(arquivos_evento).values(
-            id_evento=evento_id, id_caso=caso_id, link_arquivo=ref))
+        result = self.session.execute(insert(arquivos_evento).values(**self.valores(
+            {"id_evento": evento_id, "id_caso": caso_id, "link_arquivo": ref})))
         return result.lastrowid
 
     def remover_arquivo(self, arquivo_id: int, evento_id: int) -> None:
-        self.session.execute(delete(arquivos_evento).where(
-            arquivos_evento.c.id == arquivo_id, arquivos_evento.c.id_evento == evento_id))
+        self.session.execute(self.escopo(delete(arquivos_evento).where(
+            arquivos_evento.c.id == arquivo_id, arquivos_evento.c.id_evento == evento_id),
+            arquivos_evento))
 
     def referencia_em_uso(self, ref: str) -> bool:
-        return bool(self.session.execute(select(arquivos_evento.c.id).where(
-            arquivos_evento.c.link_arquivo == ref).limit(1)).first() or
-            self.session.execute(select(eventos.c.id).where(eventos.c.arquivo == ref).limit(1)).first())
+        return bool(self.session.execute(self.escopo(select(arquivos_evento.c.id).where(
+            arquivos_evento.c.link_arquivo == ref), arquivos_evento).limit(1)).first() or
+            self.session.execute(self.escopo(select(eventos.c.id).where(
+                eventos.c.arquivo == ref), eventos).limit(1)).first())
 
     def find_by_caso_id(self, caso_id: int) -> list[Evento]:
-        stmt = select(eventos).where(eventos.c.id_caso == caso_id)
+        stmt = self.escopo(select(eventos).where(eventos.c.id_caso == caso_id), eventos)
         results = self.session.execute(stmt).all()
         return [from_dict(Evento, dict(row._mapping)) for row in results]
 
@@ -67,6 +71,7 @@ class EventoRepository(BaseRepository):
         """
         stmt = select(eventos, func.count().over().label("total_count"))
         stmt = stmt.where(eventos.c.id_caso == caso_id, eventos.c.status.is_(True))
+        stmt = self.escopo(stmt, eventos)
         if unidade_id is not None:
             stmt = stmt.where(eventos.c.unidade_id == unidade_id)
         if tipo:
@@ -87,7 +92,9 @@ class EventoRepository(BaseRepository):
         )
 
     def search(self, params: SearchParams) -> PaginatedResult[Evento]:
-        stmt = select(eventos, func.count().over().label("total_count"))
+        stmt = self.escopo(
+            select(eventos, func.count().over().label("total_count")), eventos
+        )
 
         stmt = self._apply_where_clause(stmt, params.get("where"), eventos)
         stmt = stmt.order_by(eventos.c.data_evento.desc())
@@ -107,30 +114,34 @@ class EventoRepository(BaseRepository):
         )
 
     def find_one(self, params: SearchParams) -> Evento | None:
-        stmt = select(eventos)
+        stmt = self.escopo(select(eventos), eventos)
         stmt = self._apply_where_clause(stmt, params.get("where"), eventos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Evento, dict(result._mapping)) if result else None
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(eventos)
+        stmt = self.escopo(select(func.count()).select_from(eventos), eventos)
         stmt = self._apply_where_clause(stmt, params.get("where"), eventos)
 
         result = self.session.execute(stmt).scalar()
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(eventos).values(**data)
+        stmt = insert(eventos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(eventos).where(eventos.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(eventos).where(eventos.c.id == id), eventos
+        ).values(**data)
         self.session.execute(stmt)
 
     def delete(self, id: int) -> bool:
-        stmt = sql_update(eventos).where(eventos.c.id == id).values(status=False)
+        stmt = self.escopo(
+            sql_update(eventos).where(eventos.c.id == id), eventos
+        ).values(status=False)
         result = self.session.execute(stmt)
         return result.rowcount > 0
 
@@ -140,5 +151,6 @@ class EventoRepository(BaseRepository):
             .select_from(eventos)
             .where(eventos.c.id_caso == caso_id)
         )
+        stmt = self.escopo(stmt, eventos)
         result = self.session.execute(stmt).scalar()
         return result or 0

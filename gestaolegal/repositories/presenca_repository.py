@@ -20,7 +20,10 @@ class PresencaRepository(BaseRepository):
     def find_by_id(
         self, id: int, unidade_id: int | None = None
     ) -> RegistroEntrada | None:
-        stmt = select(registro_entrada).where(registro_entrada.c.id == id)
+        stmt = self.escopo(
+            select(registro_entrada).where(registro_entrada.c.id == id),
+            registro_entrada,
+        )
         if unidade_id is not None:
             stmt = stmt.where(registro_entrada.c.unidade_id == unidade_id)
         row = self.session.execute(stmt).first()
@@ -42,21 +45,25 @@ class PresencaRepository(BaseRepository):
             )
             .order_by(registro_entrada.c.data_entrada.desc())
         )
+        stmt = self.escopo(stmt, registro_entrada)
         if unidade_id is not None:
             stmt = stmt.where(registro_entrada.c.unidade_id == unidade_id)
         row = self.session.execute(stmt).first()
         return from_dict(RegistroEntrada, dict(row._mapping)) if row else None
 
     def create(self, data: dict[str, Any]) -> int:
-        result = self.session.execute(insert(registro_entrada).values(**data))
+        result = self.session.execute(
+            insert(registro_entrada).values(**self.valores(data))
+        )
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
         self.session.execute(
-            sql_update(registro_entrada)
-            .where(registro_entrada.c.id == id)
-            .values(**data)
+            self.escopo(
+                sql_update(registro_entrada).where(registro_entrada.c.id == id),
+                registro_entrada,
+            ).values(**data)
         )
 
     def list_para_confirmacao(
@@ -85,13 +92,15 @@ class PresencaRepository(BaseRepository):
             )
             .order_by(usuarios.c.nome)
         )
+        stmt = self.escopo(stmt, registro_entrada, usuarios)
         if unidade_id is not None:
             stmt = stmt.where(registro_entrada.c.unidade_id == unidade_id)
         return [dict(row) for row in self.session.execute(stmt).mappings().all()]
 
     def update_confirmacao(self, id: int, confirmacao: str) -> None:
         self.session.execute(
-            sql_update(registro_entrada)
-            .where(registro_entrada.c.id == id)
-            .values(confirmacao=confirmacao)
+            self.escopo(
+                sql_update(registro_entrada).where(registro_entrada.c.id == id),
+                registro_entrada,
+            ).values(confirmacao=confirmacao)
         )

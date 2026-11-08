@@ -18,13 +18,13 @@ class UnidadeRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int) -> Unidade | None:
-        stmt = select(unidades).where(unidades.c.id == id)
+        stmt = self.escopo(select(unidades).where(unidades.c.id == id), unidades)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Unidade, dict(result._mapping)) if result else None
 
     def listar(self, incluir_inativas: bool = False) -> list[Unidade]:
         """Unidades ordenadas por nome; só as ativas, salvo pedido explícito."""
-        stmt = select(unidades)
+        stmt = self.escopo(select(unidades), unidades)
         if not incluir_inativas:
             stmt = stmt.where(unidades.c.ativa)
         stmt = stmt.order_by(unidades.c.nome)
@@ -32,21 +32,26 @@ class UnidadeRepository(BaseRepository):
         return [from_dict(Unidade, dict(row._mapping)) for row in results]
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(unidades).values(**data)
+        stmt = insert(unidades).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(unidades).where(unidades.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(unidades).where(unidades.c.id == id), unidades
+        ).values(**data)
         self.session.execute(stmt)
 
     def existe_com_nome_ou_sigla(
         self, nome: str, sigla: str, ignorar_id: int | None = None
     ) -> bool:
-        """`nome` e `sigla` são UNIQUE; checar antes evita IntegrityError (500)."""
-        stmt = select(unidades.c.id).where(
-            or_(unidades.c.nome == nome, unidades.c.sigla == sigla)
+        """`nome` e `sigla` são UNIQUE no tenant; checar antes evita IntegrityError (500)."""
+        stmt = self.escopo(
+            select(unidades.c.id).where(
+                or_(unidades.c.nome == nome, unidades.c.sigla == sigla)
+            ),
+            unidades,
         )
         if ignorar_id is not None:
             stmt = stmt.where(unidades.c.id != ignorar_id)
@@ -67,6 +72,7 @@ class UnidadeRepository(BaseRepository):
             .where(usuarios_unidades.c.usuario_id == usuario_id)
             .order_by(unidades.c.nome)
         )
+        stmt = self.escopo(stmt, unidades, usuarios_unidades)
         results = self.session.execute(stmt).all()
         return [from_dict(Unidade, dict(row._mapping)) for row in results]
 
@@ -77,27 +83,36 @@ class UnidadeRepository(BaseRepository):
         chama usa a lista como cláusula `in` na consulta de usuários — filtrar
         depois da paginação faria o total mentir.
         """
-        stmt = select(usuarios_unidades.c.usuario_id).where(
-            usuarios_unidades.c.unidade_id == unidade_id
+        stmt = self.escopo(
+            select(usuarios_unidades.c.usuario_id).where(
+                usuarios_unidades.c.unidade_id == unidade_id
+            ),
+            usuarios_unidades,
         )
         return [row[0] for row in self.session.execute(stmt).all()]
 
     def vincular(self, usuario_id: int, unidade_ids: list[int]) -> None:
         """Substitui os vínculos do usuário pelos informados."""
-        stmt = sql_delete(usuarios_unidades).where(
-            usuarios_unidades.c.usuario_id == usuario_id
+        stmt = self.escopo(
+            sql_delete(usuarios_unidades).where(
+                usuarios_unidades.c.usuario_id == usuario_id
+            ),
+            usuarios_unidades,
         )
         self.session.execute(stmt)
 
         for unidade_id in unidade_ids:
             stmt = insert(usuarios_unidades).values(
-                usuario_id=usuario_id, unidade_id=unidade_id
+                **self.valores({"usuario_id": usuario_id, "unidade_id": unidade_id})
             )
             self.session.execute(stmt)
 
     def usuario_pertence(self, usuario_id: int, unidade_id: int) -> bool:
-        stmt = select(usuarios_unidades.c.usuario_id).where(
-            usuarios_unidades.c.usuario_id == usuario_id,
-            usuarios_unidades.c.unidade_id == unidade_id,
+        stmt = self.escopo(
+            select(usuarios_unidades.c.usuario_id).where(
+                usuarios_unidades.c.usuario_id == usuario_id,
+                usuarios_unidades.c.unidade_id == unidade_id,
+            ),
+            usuarios_unidades,
         )
         return self.session.execute(stmt).one_or_none() is not None

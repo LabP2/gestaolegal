@@ -3,7 +3,7 @@ export type { ApiResponse, ApiError } from './api-response';
 export { ApiException } from './api-response';
 
 // Domain types
-export type { User, UserOption } from './user';
+export type { Me, TenantIdentificacao, User, UserOption } from './user';
 export type { OrientacaoJuridica } from './orientacao-juridica';
 export type {
 	AssistenciaJudiciaria,
@@ -44,3 +44,10 @@ export type {
 } from './plantao';
 export { CONFIRMACAO } from './plantao';
 export type { ResumoEscala } from './plantao';
+export type {
+	Tenant,
+	PlataformaAdmin,
+	TenantCriacaoInput,
+	TenantEdicaoInput,
+	TenantCriado
+} from './tenant';

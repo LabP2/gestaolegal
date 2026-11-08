@@ -6,15 +6,28 @@ from io import BytesIO
 import pytest
 from flask.testing import FlaskClient
 
-from tests.api.conftest import clean_tables, get_success_data
+from tests.api.conftest import (
+    TENANT_DAJ,
+    TENANT_OUTRO,
+    UNIDADE_OUTRO,
+    clean_tables,
+    criar_usuario,
+    get_success_data,
+    headers_para,
+)
+from tests.api.test_tenant_isolamento import OUTRO_EMAIL, OUTRO_SENHA
 
 
 @pytest.fixture(autouse=True)
 def arquivos_dir(tmp_path, monkeypatch, app):
-    """Aponta a raiz privada para um tmpdir; o service resolve a categoria."""
+    """Aponta a raiz privada para um tmpdir; o service resolve tenant e categoria.
+
+    Devolve a pasta `arquivos` do tenant 1 (DAJ), onde os uploads dos testes
+    caem: `<raiz>/1/arquivos`.
+    """
     monkeypatch.setitem(app.config, "PRIVATE_FILES_ROOT", str(tmp_path))
-    destino = tmp_path / "arquivos"
-    destino.mkdir()
+    destino = tmp_path / str(TENANT_DAJ) / "arquivos"
+    destino.mkdir(parents=True)
     with app.app_context():
         clean_tables("arquivos")
     return destino
@@ -199,11 +212,50 @@ class TestDownload:
             from gestaolegal.database.session import transaction
             from gestaolegal.repositories.arquivo_repository import ArquivoRepository
 
-            with transaction():
+            from gestaolegal.utils.request_context import contexto_tenant
+
+            with contexto_tenant(1), transaction():
                 ArquivoRepository().update(criado["id"], {"caminho": None})
 
         response = client.get(f"/api/arquivo/{criado['id']}/download", headers=auth_headers)
         assert response.status_code == 404
+
+
+class TestTenant:
+    """Cada NPJ grava na sua pasta e não alcança a do outro (PR 8)."""
+
+    def test_upload_vai_para_a_pasta_do_tenant_e_nao_vaza(
+        self, client, app, auth_headers, arquivos_dir
+    ):
+        # Mesma conta do outro NPJ de test_tenant_isolamento: o banco da suíte
+        # é compartilhado, e uma segunda conta no tenant 2 quebraria a
+        # asserção de lá sobre quem existe nesse tenant.
+        with app.app_context():
+            criar_usuario(
+                OUTRO_EMAIL, OUTRO_SENHA, "admin", "Admin Outro NPJ",
+                tenant_id=TENANT_OUTRO,
+            )
+        headers_outro = headers_para(client, OUTRO_EMAIL, OUTRO_SENHA, unidade=UNIDADE_OUTRO)
+
+        do_outro = get_success_data(
+            _criar(client, headers_outro, conteudo=b"sigiloso do outro NPJ")
+        )
+        raiz = arquivos_dir.parent.parent
+        pasta_outro = raiz / str(TENANT_OUTRO) / "arquivos"
+        assert (pasta_outro / do_outro["caminho"]).read_bytes() == b"sigiloso do outro NPJ"
+        assert not (arquivos_dir / do_outro["caminho"]).exists()
+
+        # A DAJ não baixa o arquivo do outro NPJ, nem o vê na lista.
+        download = client.get(f"/api/arquivo/{do_outro['id']}/download", headers=auth_headers)
+        assert download.status_code == 404
+        lista = get_success_data(client.get("/api/arquivo/", headers=auth_headers))
+        itens = lista["items"] if isinstance(lista, dict) else lista
+        assert do_outro["id"] not in {item["id"] for item in itens}
+
+        # O dono continua baixando normalmente.
+        proprio = client.get(f"/api/arquivo/{do_outro['id']}/download", headers=headers_outro)
+        assert proprio.status_code == 200
+        assert proprio.data == b"sigiloso do outro NPJ"
 
 
 class TestVolume:

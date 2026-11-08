@@ -8,7 +8,6 @@ import bcrypt
 from dateutil import parser as date_parser
 
 from gestaolegal.common import PageParams, PaginatedResult
-from gestaolegal.database.tables import UNIDADE_PADRAO_ID
 from gestaolegal.exceptions import (
     DatabaseException,
     NotFoundException,
@@ -20,13 +19,13 @@ from gestaolegal.models.user_input import UserCreateInput, UserUpdateInput
 from gestaolegal.repositories.endereco_repository import EnderecoRepository
 from gestaolegal.repositories.repository import (
     ComplexWhereClause,
-    CountParams,
     SearchParams,
     WhereClause,
 )
+from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.repositories.unidade_repository import UnidadeRepository
 from gestaolegal.repositories.user_repository import UserRepository
-from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.request_context import RequestContext, sem_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +136,47 @@ class UsuarioService:
             per_page=result.per_page,
         )
 
+    def tenant_por_email(self, email: str) -> int | None:
+        """NPJ da conta com este e-mail, se existir e o NPJ estiver ativo.
+
+        O e-mail é único na plataforma, então ele basta para achar o NPJ. É a
+        única leitura de `usuarios` sem tenant no login.
+        """
+        with sem_tenant("login: localizar o NPJ pelo e-mail"):
+            tenant_id = self.repository.tenant_por_email(email)
+            if tenant_id is None or not TenantRepository().ativo(tenant_id):
+                return None
+        return tenant_id
+
+    def entrar_no_tenant(self, tenant_id: int) -> bool:
+        """Ativa o NPJ do token. False se o NPJ não existe ou está inativo."""
+        with sem_tenant("autenticação: conferir se o NPJ do token está ativo"):
+            if not TenantRepository().ativo(tenant_id):
+                return False
+        RequestContext.set_tenant(tenant_id)
+        return True
+
+    def tenant_atual(self) -> dict[str, str] | None:
+        """Nome e sigla do NPJ da requisição, mostrados no cabeçalho do front."""
+        return TenantRepository().identificacao(RequestContext.get_tenant())
+
+    def email_em_uso(self, email: str, ignorar_id: int | None = None) -> bool:
+        with sem_tenant("cadastro: e-mail é único na plataforma"):
+            return self.repository.email_em_uso(email, ignorar_id)
+
+    def _exigir_email_livre(self, email: str, ignorar_id: int | None = None) -> None:
+        # Mensagem genérica: não revela se a conta existe neste ou em outro NPJ.
+        if self.email_em_uso(email, ignorar_id):
+            raise ValidationException("E-mail já está em uso", field="email")
+
     def authenticate(self, email: str, senha: str) -> UserInfo | None:
+        """Confere e-mail e senha e deixa ativo o NPJ da conta."""
         logger.info(f"Authenticating user with email: {email}")
+        tenant_id = self.tenant_por_email(email)
+        if tenant_id is None:
+            logger.warning(f"Authentication failed: no active account for email: {email}")
+            return None
+        RequestContext.set_tenant(tenant_id)
         user = self.repository.find_by_email(email)
         if not user:
             logger.warning(f"Authentication failed: user not found for email: {email}")
@@ -159,6 +197,7 @@ class UsuarioService:
             f"Creating user with email: {user_input.email}, role: {user_input.urole}, created by: {criado_por}"
         )
         user_data = user_input.model_dump()
+        self._exigir_email_livre(user_data["email"])
 
         unidade_ids = user_data.pop("unidade_ids")
         self.__validar_unidades(unidade_ids)
@@ -208,6 +247,8 @@ class UsuarioService:
             raise NotFoundException(resource="User", resource_id=user_id)
 
         user_data = user_input.model_dump(exclude_none=True)
+        if "email" in user_data:
+            self._exigir_email_livre(user_data["email"], ignorar_id=user_id)
 
         unidade_ids: list[int] | None = user_data.pop("unidade_ids", None)
         if unidade_ids is not None:
@@ -354,44 +395,51 @@ class UsuarioService:
         if user.id:
             user.unidades = self.unidade_repository.unidades_do_usuario(user.id)
 
-    def has_any_users(self) -> bool:
-        count = self.repository.count(CountParams(where=None))
-        return count > 0
+    def create_admin(self, email: str, nome: str, unidade_id: int) -> UserInfo:
+        """Primeiro admin de um NPJ recém-criado pela plataforma (plano §6.3).
 
-    def create_admin(self, email: str, password: str) -> UserInfo:
-        logger.info(f"Creating initial admin user with email: {email}")
+        Roda dentro do tenant novo, que ainda não tem usuários: a conta é
+        vinculada à unidade inicial e registra a si mesma como autora. A senha
+        é aleatória e ninguém a conhece; o admin define a dele pelo link de
+        primeiro acesso que a plataforma gera.
+        """
+        logger.info(f"Criando o primeiro admin do NPJ: {email}")
+        self._exigir_email_livre(email)
 
-        endereco_data = {
-            "logradouro": "N/A",
-            "numero": "S/N",
-            "complemento": None,
-            "bairro": "N/A",
-            "cep": "00000-000",
-            "cidade": "N/A",
-            "estado": "N/A",
-        }
-        endereco_id = self.endereco_repository.create(endereco_data)
+        endereco_id = self.endereco_repository.create(
+            {
+                "logradouro": "N/A",
+                "numero": "S/N",
+                "complemento": None,
+                "bairro": "N/A",
+                "cep": "00000-000",
+                "cidade": "N/A",
+                "estado": "N/A",
+            }
+        )
 
+        senha_aleatoria = secrets.token_urlsafe(32)
         hashed_password = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt()
+            senha_aleatoria.encode("utf-8"), bcrypt.gensalt()
         ).decode("utf-8")
 
+        agora = datetime.now()
         user_data = {
             "email": email,
             "senha": hashed_password,
             "urole": "admin",
-            "nome": "Administrator",
+            "nome": nome,
             "sexo": "N/A",
             "rg": "N/A",
             "cpf": "000.000.000-00",
-            "profissao": "Administrator",
+            "profissao": "Administrador",
             "estado_civil": "N/A",
-            "nascimento": datetime.now().date(),
+            "nascimento": agora.date(),
             "telefone": None,
             "celular": "N/A",
             "oab": None,
-            "obs": "Initial admin user created via setup endpoint",
-            "data_entrada": datetime.now().date(),
+            "obs": "Primeiro admin do NPJ, criado pela plataforma",
+            "data_entrada": agora.date(),
             "data_saida": None,
             "matricula": "ADMIN",
             "bolsista": False,
@@ -404,19 +452,17 @@ class UsuarioService:
             "fim_bolsa": None,
             "endereco_id": endereco_id,
             "status": True,
-            "criado": datetime.now(),
-            "criadopor": 1,
-            "modificadopor": 1,
-            "modificado": datetime.now(),
+            "criado": agora,
+            # Ainda não há usuário no NPJ para ser o autor: a conta se registra
+            # como autora logo abaixo, como o seed faz com o primeiro admin.
+            "criadopor": 0,
+            "modificadopor": 0,
+            "modificado": agora,
         }
 
         user_id = self.repository.create(user_data)
-        if self.unidade_repository.find_by_id(UNIDADE_PADRAO_ID):
-            self.unidade_repository.vincular(user_id, [UNIDADE_PADRAO_ID])
-        else:
-            logger.warning(
-                "Unidade padrão inexistente: admin inicial ficou sem vínculo de unidade"
-            )
+        self.repository.update(user_id, {"criadopor": user_id, "modificadopor": user_id})
+        self.unidade_repository.vincular(user_id, [unidade_id])
         user = self.find_by_id(user_id)
         if not user:
             logger.error(f"Failed to create admin user with email: {email}")

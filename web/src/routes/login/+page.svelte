@@ -55,9 +55,7 @@
 					// descobrir quais e-mails existem.
 					erroLogin =
 						err.statusCode === 401
-							? data.needsSetup
-								? 'Nenhum usuário cadastrado ainda. Configure o administrador para acessar o sistema.'
-								: 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
+							? 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
 							: err.message;
 				} else {
 					console.error('Login error:', err);
@@ -100,10 +98,6 @@
 									Esqueci minha senha
 								</a>
 							</p>
-
-							{#if data.needsSetup}
-								<a href="/setup-admin" class="font-medium underline">Configurar administrador</a>
-							{/if}
 						</div>
 					</div>
 				{/if}
@@ -141,17 +135,6 @@
 						Esqueci minha senha
 					</a>
 				</p>
-
-				{#if data.needsSetup}
-					<div class="mt-4 text-center text-sm text-gray-600">
-						<p class="cursor-default">
-							Primeiro acesso?
-							<a href="/setup-admin" class="font-medium text-primary hover:underline">
-								Configure o administrador
-							</a>
-						</p>
-					</div>
-				{/if}
 			</div>
 		</div>
 	</div>

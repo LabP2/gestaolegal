@@ -133,6 +133,7 @@ Os itens abaixo não são mais limitações do código atual:
 | [#183 — múltiplos anexos de evento](https://github.com/gestaolegalufmg/gestaolegal/issues/183) | Criação aceita vários anexos; edição acrescenta arquivos e permite gerenciar os existentes. |
 | [#190 — arquivos privados em pasta pública](https://github.com/gestaolegalufmg/gestaolegal/issues/190) | Raiz privada, downloads autenticados e bloqueio dos caminhos estáticos. |
 | [#205 — número longo de processo](https://github.com/gestaolegalufmg/gestaolegal/issues/205) | Número como texto de até 25 caracteres, preservando pontuação e zeros iniciais. |
+| Referência a id de outro NPJ no corpo (multitenant) | Caso, orientação, fila, lembrete, evento e processo conferem no repositório do tenant cada id recebido no corpo. Id de outro NPJ e id inexistente dão o mesmo 400, com o campo (`tests/api/test_referencias_api.py`, `test_tenant_vazamento.py`). |
 | [#366 — atalho Plantão com 404](https://github.com/gestaolegalufmg/gestaolegal/issues/366) | O atalho usa uma rota existente, que redireciona para a listagem de escalas. |
 
 As mudanças de plantão estão descritas em [Escalas de plantão](escalas-plantao.md).

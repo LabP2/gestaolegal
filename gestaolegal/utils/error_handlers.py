@@ -19,7 +19,6 @@ from gestaolegal.exceptions import (
     ForbiddenException,
     GestaoLegalException,
     NotFoundException,
-    SetupException,
     UnauthorizedException,
     ValidationException,
 )
@@ -106,14 +105,6 @@ def register_error_handlers(app: Flask) -> None:
         logger.error(f"Database error: {e.message}", exc_info=True)
         return error_response(
             message=e.message, error_code=e.error_code, status_code=500
-        )
-
-    @app.errorhandler(SetupException)
-    def handle_setup_error(e: SetupException) -> Response:
-        """Handle setup/configuration errors with 403 status."""
-        logger.warning(f"Setup error: {e.message}")
-        return error_response(
-            message=e.message, error_code=e.error_code, status_code=403
         )
 
     @app.errorhandler(ValidationError)

@@ -25,6 +25,7 @@ from gestaolegal.repositories.caso_repository import CasoRepository
 from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existente
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,7 @@ class EventoService:
         caso = self._caso_da_unidade_ativa(caso_id)
         if not caso:
             raise NotFoundException(resource="Caso", resource_id=caso_id)
+        exigir_existente("usuarios", evento_input.id_usuario_responsavel, "id_usuario_responsavel")
         uploads = list(arquivos or []) + ([arquivo] if arquivo else [])
         for file in uploads:
             self._validar_anexo(file)
@@ -221,6 +223,8 @@ class EventoService:
             evento_id, unidade_id=RequestContext.get_unidade_ativa())
         if not existing or not existing.status:
             raise NotFoundException(resource="Evento", resource_id=evento_id)
+        exigir_existente("usuarios", evento_input.id_usuario_responsavel, "id_usuario_responsavel")
+        exigir_existente("casos", evento_input.id_caso, "id_caso")
         uploads = list(arquivos or []) + ([arquivo] if arquivo else [])
         for file in uploads:
             self._validar_anexo(file)

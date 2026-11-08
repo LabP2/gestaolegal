@@ -70,7 +70,7 @@ combine os dois arquivos. O Compose da fusão fica no
 git clone https://github.com/gestaolegalufmg/gestaolegal.git
 cd gestaolegal
 cp .env.example .env
-# Edite credenciais, JWT_SECRET_KEY e ADMIN_SETUP_TOKEN.
+# Edite credenciais e JWT_SECRET_KEY.
 # Para executar seed pelo host, configure FLASK_ENV=development no .env.
 make up
 # Equivale a:
@@ -81,7 +81,9 @@ Frontend: <http://localhost:5001>; API: <http://localhost:5000>;
 Mailpit: <http://localhost:8025>. As portas são configuradas por `WEB_PORT`,
 `APP_PORT`, `DB_PORT` e `MAILPIT_UI_PORT`. Para manter o frontend em 5002,
 use `WEB_PORT=5002 make up` e a mesma variável nos próximos comandos.
-Crie o administrador em `/setup-admin` com `ADMIN_SETUP_TOKEN`.
+Numa instalação nova, as primeiras contas vêm de `make seed`. O antigo
+`/setup-admin` saiu com o multitenant: o primeiro admin de cada NPJ é criado
+pela administração da plataforma (`docs/plano-multitenant.md`, §6).
 
 O desenvolvimento força o uso do Mailpit e monta os anexos em `./uploads`
 (ou `DEV_UPLOADS_PATH`). O banco fica no volume `<projeto>_mysql_data`.
@@ -120,14 +122,38 @@ volumes em [Implantação](docs/implantacao.md). Os serviços antigos se chamam
 
 ---
 
+## Administração da plataforma (vários NPJs)
+
+Cada NPJ atendido pela instalação é um *tenant*, com usuários, unidades e dados
+próprios. Quem cadastra os NPJs é o administrador da plataforma, uma conta
+separada das contas de NPJ, com login em `/plataforma` (veja
+`docs/plano-multitenant.md`, §6).
+
+O primeiro administrador da plataforma é criado pela linha de comando; a senha
+é pedida no terminal:
+
+```bash
+docker compose -f docker-compose.dev.yml run --rm api \
+  flask --app 'gestaolegal:create_app()' plataforma criar-admin \
+  --email voce@exemplo.br --nome "Seu Nome"
+```
+
+Em `/plataforma/novo`, criar um NPJ cria também a unidade inicial e o primeiro
+admin do NPJ. A tela mostra um link de primeiro acesso, válido por 3 dias, para
+ser repassado à pessoa; nenhum e-mail é enviado. Desativar um NPJ impede o
+login dos usuários dele e encerra as sessões abertas. Não há exclusão.
+
+---
+
 ## Dados de demonstração (seed)
 
 Após aplicar as migrations, execute o seed direto no banco, sem precisar da API:
 
 ```bash
 make seed ARGS="--dry-run"  # simula a carga e faz rollback
-make seed                 # grava os dados
-make seed ARGS="--unidade BH"  # opcional: apenas uma unidade ativa
+make seed                 # grava os dados dos dois NPJs de demonstração
+make seed ARGS="--unidade BH"  # opcional: apenas uma unidade ativa da DAJ
+make seed ARGS="--tenant npj-demo"  # opcional: apenas um NPJ (pode repetir)
 ```
 
 O comando usa `uv` e lê `DB_HOST`, `DB_PORT` (padrão `3306`), `DB_NAME`,
@@ -140,17 +166,29 @@ docker compose -f docker-compose.dev.yml exec api python scripts/seed_database.p
 docker compose -f docker-compose.dev.yml exec api python scripts/seed_database.py
 ```
 
-O script `scripts/seed_database.py` cria quatro usuários compartilhados e,
-por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
+O sistema é multitenant: cada NPJ é um tenant, e os dados de um não aparecem
+para o outro. Sem `--tenant`, o seed semeia dois NPJs de demonstração:
+
+| NPJ (slug) | Origem | Unidades | Contas |
+|---|---|---|---|
+| DAJ/UFMG (`daj-ufmg`) | tenant 1, criado pela migration | as ativas das migrations (BH, Nova Lima) | `admin@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br`, `colab_ext@ufmg.br` |
+| NPJ de Demonstração (`npj-demo`) | criado pelo seed, se faltar | `Sede` (`SEDE`), criada pelo seed | `admin@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_ext@npjdemo.br` |
+
+Os nomes dos atendidos diferem entre os dois NPJs, para que um vazamento fique
+visível na tela. `--unidade` sem `--tenant` semeia só a DAJ, como antes; com
+`--tenant`, a sigla é procurada em cada NPJ informado. Só esses dois slugs são
+aceitos: o seed nunca grava dados fictícios num NPJ real.
+
+Em cada NPJ, o script `scripts/seed_database.py` cria quatro usuários
+compartilhados entre as unidades e, por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
 duas orientações jurídicas, dois lembretes e uma escala com duas marcações.
 Os dados são fictícios. Usuários e atendidos recebem CPFs sintéticos, distintos
 e com dígitos verificadores válidos; isso não comprova inscrição real. Processos
 não têm número judicial real. Os nomes e demais textos exibidos não contêm “Seed”.
-Não são criados anexos nem enviados e-mails. As unidades vêm das migrations.
+Não são criados anexos nem enviados e-mails. As unidades da DAJ vêm das
+migrations.
 
-Contas: `admin@ufmg.br`, `orient@ufmg.br`,
-`estag_direito@ufmg.br` e `colab_ext@ufmg.br`.
-A senha inicial é `123456`, configurável por `SEED_PASSWORD`.
+A senha inicial de todas as contas é `123456`, configurável por `SEED_PASSWORD`.
 Reexecutar reconhece os identificadores da versão antiga, remove seus rótulos
 “Seed” e substitui CPFs zerados pelos sintéticos, preservando IDs, vínculos,
 senhas e outros campos editados. Não é preciso apagar o banco. Datas de
@@ -168,9 +206,16 @@ cenários que precisam exercitar endpoints e uploads.
 
 ### Reset automático do banco de demo
 
-`scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, aplica
-as migrations e executa `seed_database.py`. As contas e senhas voltam aos valores
-do seed a cada execução. O usuário MySQL precisa de permissão para `DROP` e
+`scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, com
+todos os NPJs, aplica as migrations e executa `seed_database.py` nos dois NPJs
+de demonstração. As contas e senhas voltam aos valores do seed a cada execução.
+
+Antes de parar a API (`--check`) e de novo antes do `DROP`, o reset lê a tabela
+`tenants` e **recusa** se houver NPJ com slug fora de `DEMO_TENANT_SLUGS`
+(lista separada por vírgulas; padrão `daj-ufmg,npj-demo`). A lista só pode
+ampliar o padrão, porque o reset recria esses dois NPJs. Um NPJ cadastrado na
+demo por engano, ou um banco real apontado por erro, faz o reset parar sem
+alterar nada. O usuário MySQL precisa de permissão para `DROP` e
 `CREATE` no banco configurado.
 
 Para usar o reset com o Compose de desenvolvimento, defina

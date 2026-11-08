@@ -1,5 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { User } from '$lib/types';
+import type { Me } from '$lib/types';
 import type { LayoutLoad } from './$types';
 import { api } from '$lib/api-client';
 import { ApiException } from '$lib/types';
@@ -7,7 +7,7 @@ import { sincronizarUnidades } from '$lib/stores/unidade';
 
 export const load: LayoutLoad = async ({ url, fetch }) => {
 	try {
-		const me = await api.get<User>('user/me', {}, fetch);
+		const me = await api.get<Me>('user/me', {}, fetch);
 		// A unidade guardada só vale enquanto o vínculo existir: se o admin tirou
 		// o usuário dela, cai para a primeira da lista.
 		sincronizarUnidades(me.unidades);

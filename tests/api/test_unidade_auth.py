@@ -9,8 +9,9 @@ from flask.testing import FlaskClient
 
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.api_decorators import _resolver_unidade_ativa
-from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.request_context import RequestContext, contexto_tenant
 from tests.api.conftest import (
+    TENANT_DAJ,
     TEST_ADMIN_EMAIL,
     UNIDADE_BH,
     UNIDADE_NL,
@@ -63,7 +64,8 @@ def test_unidade_valida_responde_200(
 
 def test_unidade_valida_fica_no_request_context(app: Flask, auth_headers: dict[str, str]):
     """O header não só é aceito: ele é o que o resto da requisição enxerga."""
-    user = UsuarioService().find_by_email(TEST_ADMIN_EMAIL)
+    with contexto_tenant(TENANT_DAJ):
+        user = UsuarioService().find_by_email(TEST_ADMIN_EMAIL)
     assert user is not None
 
     with app.test_request_context(headers={"X-Unidade-Id": str(UNIDADE_NL)}):

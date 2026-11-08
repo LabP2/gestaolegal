@@ -15,6 +15,7 @@ from gestaolegal.repositories.fila_atendimento_repository import (
     FilaAtendimentoRepository,
 )
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existente
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,7 @@ class FilaAtendimentoService:
             f"Incluindo atendido {dados.id_atendido} na fila "
             f"(prioridade={dados.prioridade}, psicologia={dados.psicologia})"
         )
+        exigir_existente("atendidos", dados.id_atendido, "id_atendido")
         numero = self._proximo_numero(dados.prioridade)
         senha = self._formatar_senha(dados.prioridade, numero)
 
