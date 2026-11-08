@@ -76,6 +76,24 @@ def _setup_db_session_module() -> None:
     )
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _djen_sem_rede() -> Generator[None, None, None]:
+    """Nenhum teste fala com a API do DJEN: o transporte padrão falha.
+
+    Os testes do DJEN passam um transporte falso com respostas sintéticas.
+    """
+    from gestaolegal.integrations import djen_client
+
+    def _transporte_proibido(url: str, timeout: float):
+        raise djen_client.DJENError(f"teste tentou acessar a rede: {url}")
+
+    djen_client.definir_transporte(_transporte_proibido)
+    djen_client.definir_dormir(lambda _segundos: None)
+    yield
+    djen_client.definir_transporte(None)
+    djen_client.definir_dormir(None)
+
+
 @pytest.fixture(scope="session")
 def app() -> Generator[Flask, None, None]:
     app = create_app()

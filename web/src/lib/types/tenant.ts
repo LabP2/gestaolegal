@@ -9,6 +9,8 @@ export interface Tenant {
 	ativo: boolean;
 	criado_em: string;
 	id_criado_por: number | null;
+	/** Busca de publicações no DJEN ligada para o NPJ (só a plataforma altera). */
+	djen_ativo: boolean;
 }
 
 /** Administrador da plataforma (sem senha). */
@@ -38,6 +40,7 @@ export interface TenantEdicaoInput {
 	nome?: string;
 	sigla?: string;
 	instituicao?: string | null;
+	djen_ativo?: boolean;
 }
 
 /** Resposta da criação: o link de primeiro acesso é mostrado na tela (D10). */

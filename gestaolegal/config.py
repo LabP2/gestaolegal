@@ -173,3 +173,16 @@ class Config:
     PASSWORD_RESET_MAX_PEDIDOS: ClassVar[int] = 3
     PASSWORD_RESET_JANELA_MINUTES: ClassVar[int] = 15
     PASSWORD_MIN_LENGTH: ClassVar[int] = 8
+
+    # DJEN (docs/plano-djen.md, §4 "Configuração"). DJEN_SYNC_ENABLED é a
+    # trava do ambiente: desligada, a rotina sai sem chamar a API, mesmo para
+    # NPJs com `tenants.djen_ativo` ligado. Ligar em QA ou produção exige
+    # decisão explícita (a rotina gera notificações para usuários reais).
+    DJEN_API_URL: ClassVar[str] = os.environ.get(
+        "DJEN_API_URL", "https://comunicaapi.pje.jus.br"
+    ).rstrip("/")
+    DJEN_SYNC_ENABLED: ClassVar[bool] = _parse_bool(os.environ.get("DJEN_SYNC_ENABLED"))
+    DJEN_JANELA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIAS", "3"))
+    DJEN_MAX_PROCESSOS: ClassVar[int] = int(os.environ.get("DJEN_MAX_PROCESSOS", "15"))
+    # Publicações descartadas e pendentes sem caso são apagadas depois disto.
+    DJEN_RETENCAO_DIAS: ClassVar[int] = 90

@@ -18,6 +18,12 @@ export interface Processo {
 	status: boolean;
 	id_criado_por: number;
 	criado_por?: User;
+	/** DJEN: só os 20 dígitos do número, quando segue o padrão CNJ. */
+	numero_cnj?: string | null;
+	/** DJEN: aguardando a rotina buscar o histórico de publicações. */
+	djen_pendente?: boolean;
+	/** DJEN: última consulta das publicações do processo. */
+	djen_consultado_em?: string | null;
 }
 
 export interface ListProcesso {

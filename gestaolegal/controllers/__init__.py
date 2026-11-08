@@ -3,6 +3,7 @@ from .assistencia_judiciaria_controller import assistencia_judiciaria_controller
 from .atendido_controller import atendido_controller as atendido_controller_api
 from .auth_controller import auth_controller
 from .caso_controller import caso_controller
+from .djen_controller import djen_controller
 from .fila_atendimento_controller import fila_atendimento_controller
 from .notificacao_controller import notificacao_controller
 from .orientacao_juridica_controller import (
@@ -34,4 +35,6 @@ routes = [
     (search_controller, "/api/search"),
     (unidade_controller, "/api/unidades"),
     (plataforma_controller, "/api/plataforma"),
+    # /api/djen/... e /api/processos/<id>/djen/buscar (docs/plano-djen.md, §5).
+    (djen_controller, "/api"),
 ]

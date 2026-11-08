@@ -110,4 +110,6 @@ def test_me_devolve_o_npj_da_conta(client: FlaskClient, auth_headers: dict) -> N
     assert dados["tenant"] == {
         "nome": "Divisão de Assistência Judiciária",
         "sigla": "DAJ",
+        # Chave do DJEN (docs/plano-djen.md, §3.2): desligada por padrão.
+        "djen_ativo": False,
     }

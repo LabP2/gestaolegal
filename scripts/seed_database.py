@@ -22,7 +22,7 @@ from pathlib import Path
 
 import bcrypt
 from dotenv import load_dotenv
-from sqlalchemy import Table, create_engine, select
+from sqlalchemy import Table, create_engine, inspect, select
 from sqlalchemy.engine import Connection, Engine, URL
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -118,9 +118,22 @@ class Seed:
         self.demo = demo
         self.criados: Counter[str] = Counter() if criados is None else criados
 
+    def _colunas(self, tabela: Table):
+        """Colunas de `tabela` que existem no banco.
+
+        O seed também roda numa revisão anterior ao head (o ensaio em MySQL
+        semeia antes da M3), quando colunas mais novas do tables.py ainda não
+        existem.
+        """
+        cache = self.__dict__.setdefault("_colunas_cache", {})
+        if tabela.name not in cache:
+            reais = {c["name"] for c in inspect(self.conn).get_columns(tabela.name)}
+            cache[tabela.name] = [c for c in tabela.c if c.name in reais]
+        return cache[tabela.name]
+
     def buscar(self, tabela: Table, chave: dict):
         # Tudo o que o seed lê ou grava fica no tenant escolhido.
-        stmt = select(tabela).filter_by(**chave, tenant_id=self.tenant_id)
+        stmt = select(*self._colunas(tabela)).filter_by(**chave, tenant_id=self.tenant_id)
         return self.conn.execute(stmt).mappings().one_or_none()
 
     def inserir(self, tabela: Table, dados: dict):

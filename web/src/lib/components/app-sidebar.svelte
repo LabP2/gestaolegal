@@ -4,7 +4,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import type { ComponentProps } from 'svelte';
 	import CompanyLogo from './company-logo.svelte';
-	import type { User } from '$lib/types';
+	import type { Me } from '$lib/types';
 	import { podeVer, type ItemComPapeis } from '$lib/utils/permissoes';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import ClockIcon from '@lucide/svelte/icons/clock';
@@ -13,10 +13,13 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
+	import NewspaperIcon from '@lucide/svelte/icons/newspaper';
 
 	type NavItem = ItemComPapeis & {
 		title: string;
 		url: string;
+		/** Só aparece com o DJEN ligado para o NPJ (`tenant.djen_ativo`). */
+		djen?: boolean;
 	};
 
 	const baseNavMain: (NavItem & { icon: unknown; isActive?: boolean; items: NavItem[] })[] = [
@@ -104,6 +107,18 @@
 			]
 		},
 		{
+			title: 'DJEN',
+			url: '/djen',
+			icon: NewspaperIcon,
+			djen: true,
+			items: [
+				{
+					title: 'Publicações',
+					url: '/djen'
+				}
+			]
+		},
+		{
 			title: 'Notificações',
 			url: '/notificacoes',
 			icon: BellIcon,
@@ -130,15 +145,16 @@
 		collapsible = 'icon',
 		user,
 		...restProps
-	}: ComponentProps<typeof Sidebar.Root> & { user: User } = $props();
+	}: ComponentProps<typeof Sidebar.Root> & { user: Me } = $props();
+
+	const djenAtivo = $derived(user.tenant?.djen_ativo === true);
+	const visivel = (item: NavItem) => podeVer(item, user.urole) && (!item.djen || djenAtivo);
 
 	let navMainItems = $derived(
-		baseNavMain
-			.filter((item) => podeVer(item, user.urole))
-			.map((item) => ({
-				...item,
-				items: item.items.filter((subitem) => podeVer(subitem, user.urole))
-			}))
+		baseNavMain.filter(visivel).map((item) => ({
+			...item,
+			items: item.items.filter(visivel)
+		}))
 	);
 
 	let formattedUser = $derived({

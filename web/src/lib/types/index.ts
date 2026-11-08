@@ -51,3 +51,14 @@ export type {
 	TenantEdicaoInput,
 	TenantCriado
 } from './tenant';
+export type {
+	SituacaoPublicacao,
+	PublicacaoListItem,
+	Publicacao,
+	DestinatarioPublicacao,
+	AdvogadoPublicacao,
+	SincronizacaoDjen,
+	StatusDjen,
+	BuscaProcessoDjen
+} from './djen';
+export { SITUACAO_PUBLICACAO_LABEL, DJEN_PAPEIS_GESTAO } from './djen';

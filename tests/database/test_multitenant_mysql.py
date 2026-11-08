@@ -15,6 +15,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import MetaData, Table, create_engine, inspect, select, text
+from sqlalchemy import bindparam as sa_bindparam
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -215,3 +216,40 @@ def test_api_com_fks_mysql(mysql_descartavel, monkeypatch, tmp_path):
     dados(client.patch(url_ativo, headers=ph, json={"ativo": False}))
     dados(client.get("/api/user/me", headers=novo), 401)
     dados(client.post("/api/auth/login", json={"email": "novo@example.test", "password": "12345678"}), 401)
+
+
+def test_migration_djen(mysql_descartavel):
+    """DJEN (d3e4f5a6b7c8): numero_cnj dos existentes, chave desligada, ida e volta."""
+    from scripts.seed_database import seed_database
+
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, "c2d3e4f5a6b7")
+    seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
+    with engine.begin() as conn:
+        ids = conn.execute(text("SELECT id FROM processos ORDER BY id LIMIT 2")).scalars().all()
+        conn.execute(text("UPDATE processos SET numero = '1000001-11.2026.8.13.0001' WHERE id = :id"), {"id": ids[0]})
+        conn.execute(text("UPDATE processos SET numero = 'ANTIGO 123/99' WHERE id = :id"), {"id": ids[1]})
+    antes = _schema(engine)
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        cnj = dict(conn.execute(text("SELECT id, numero_cnj FROM processos WHERE id IN :ids")
+                                .bindparams(sa_bindparam("ids", expanding=True)), {"ids": ids}).all())
+        assert cnj == {ids[0]: "10000011120268130001", ids[1]: None}
+        assert conn.execute(text("SELECT COUNT(*) FROM processos WHERE djen_pendente = 1")).scalar() == 0
+        assert conn.execute(text("SELECT COUNT(*) FROM tenants WHERE djen_ativo = 1")).scalar() == 0
+    depois = _schema(engine)
+    # Ida e volta: o downgrade devolve o esquema anterior e o upgrade o refaz.
+    command.downgrade(cfg, "c2d3e4f5a6b7")
+    assert _schema(engine) == antes
+    command.upgrade(cfg, "head")
+    assert _schema(engine) == depois
+    # A FK composta impede publicação de um NPJ apontar para caso de outro.
+    with engine.connect() as conn:
+        caso_outro = conn.execute(text("SELECT id FROM casos WHERE tenant_id = 2 LIMIT 1")).scalar_one()
+        unidade_daj = conn.execute(text("SELECT id FROM unidades WHERE tenant_id = 1 LIMIT 1")).scalar_one()
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO djen_comunicacoes (tenant_id, id_djen, numero_processo, data_disponibilizacao,"
+            " situacao, capturada_em, unidade_id, id_caso) VALUES (1, 1, '1', CURDATE(), 'vinculada',"
+            " NOW(), :u, :c)"), {"u": unidade_daj, "c": caso_outro})
+    assert erro.value.orig.args[0] == 1452

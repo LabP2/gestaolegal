@@ -50,6 +50,18 @@
 		}
 	}
 
+	async function alternarDjen() {
+		if (!tenant) return;
+		try {
+			tenant = await plataforma.put<Tenant>(`tenants/${tenant.id}`, {
+				djen_ativo: !tenant.djen_ativo
+			});
+			toast.success(tenant.djen_ativo ? 'Busca no DJEN ligada' : 'Busca no DJEN desligada');
+		} catch (err) {
+			toast.error(err instanceof ApiException ? err.message : 'Erro ao alterar o DJEN.');
+		}
+	}
+
 	async function alternarAtivo() {
 		if (!tenant) return;
 		try {
@@ -104,6 +116,36 @@
 						<Button type="submit" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Button>
 					</div>
 				</form>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<div class="flex flex-wrap items-center gap-2">
+					<Card.Title class="text-base">Busca no DJEN</Card.Title>
+					<Badge variant={tenant.djen_ativo ? 'default' : 'secondary'}>
+						{tenant.djen_ativo ? 'Ligada' : 'Desligada'}
+					</Badge>
+				</div>
+				<Card.Description>
+					{tenant.djen_ativo
+						? 'A rotina captura as publicações do Diário de Justiça Eletrônico Nacional para este NPJ e o menu DJEN aparece para os usuários. Desligar interrompe a captura e esconde o menu; nada é apagado.'
+						: 'Ligada, a rotina passa a capturar as publicações do DJEN dos processos e OABs deste NPJ, cria eventos nos casos e notifica os participantes.'}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<ConfirmAction
+					title={tenant.djen_ativo
+						? `Desligar o DJEN de ${tenant.sigla}?`
+						: `Ligar o DJEN para ${tenant.sigla}?`}
+					description={tenant.djen_ativo
+						? 'A captura para e o menu some. As publicações e os eventos já gravados continuam.'
+						: 'A captura começa na próxima execução da rotina (se a rotina estiver habilitada no servidor).'}
+					triggerText={tenant.djen_ativo ? 'Desligar busca no DJEN' : 'Ligar busca no DJEN'}
+					buttonVariant={tenant.djen_ativo ? 'outline' : 'default'}
+					buttonSize="default"
+					onConfirm={alternarDjen}
+				/>
 			</Card.Content>
 		</Card.Root>
 

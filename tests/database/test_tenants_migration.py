@@ -14,6 +14,13 @@ from gestaolegal.database.tables import TENANT_PADRAO_ID, metadata
 
 RAIZ = Path(__file__).resolve().parents[2]
 MIGRATION = RAIZ / "migrations/versions/a0b1c2d3e4f5_tenants.py"
+MIGRATION_DJEN = RAIZ / "migrations/versions/d3e4f5a6b7c8_djen.py"
+
+# Colunas que migrations posteriores à M1 acrescentam, com a migration que as
+# cria. A M1 não pode mudar; a comparação com o tables.py desconta só estas.
+COLUNAS_POSTERIORES = {
+    "tenants": {"djen_ativo": MIGRATION_DJEN},
+}
 
 
 def _carregar_migration():
@@ -50,8 +57,16 @@ def test_upgrade_cria_tabelas_e_tenant_inicial():
         for tabela in ("tenants", "plataforma_admins"):
             # O esquema criado pela migration bate com o declarado em tables.py
             # (que os testes da API usam via create_all).
-            esperado = {c.name: c.nullable for c in metadata.tables[tabela].columns}
+            posteriores = COLUNAS_POSTERIORES.get(tabela, {})
+            esperado = {
+                c.name: c.nullable
+                for c in metadata.tables[tabela].columns
+                if c.name not in posteriores
+            }
             assert _colunas(connection, tabela) == esperado
+            for coluna, origem in posteriores.items():
+                assert coluna in metadata.tables[tabela].c, (tabela, coluna)
+                assert f"ADD COLUMN {coluna} " in origem.read_text(), (tabela, coluna)
 
         tenant = connection.execute(sa.text("SELECT * FROM tenants")).mappings().one()
         assert tenant["id"] == TENANT_PADRAO_ID

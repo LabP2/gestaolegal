@@ -1,13 +1,16 @@
 import hashlib
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
+    JSON,
     MetaData,
     Numeric,
     String,
@@ -16,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from sqlalchemy.dialects.mysql import VARCHAR, LONGTEXT
+from sqlalchemy.dialects.mysql import VARCHAR, LONGTEXT, MEDIUMTEXT
 
 metadata = MetaData()
 
@@ -127,6 +130,11 @@ tenants = Table(
     Column("ativo", Boolean, nullable=False, default=True),
     Column("criado_em", DateTime, nullable=False),
     Column("id_criado_por", Integer, ForeignKey("plataforma_admins.id"), nullable=True),
+    # Captura de publicações do DJEN para o NPJ (docs/plano-djen.md, §3.2).
+    # Começa desligada; só o admin da plataforma liga.
+    # Só server_default: um INSERT que não cite a coluna (seed numa revisão
+    # anterior, scripts) continua válido.
+    Column("djen_ativo", Boolean, nullable=False, server_default="0"),
 )
 
 enderecos = Table(
@@ -372,7 +380,15 @@ processos = Table(
     Column("id_caso", Integer, nullable=False),
     Column("status", Boolean, nullable=False),
     Column("id_criado_por", Integer, nullable=False),
+    # DJEN: só os 20 dígitos de `numero`, quando tiver exatamente 20 (padrão
+    # CNJ). É por ele que as publicações são casadas com o processo.
+    Column("numero_cnj", String(20), nullable=True),
+    # Processo cadastrado ou com número alterado: a rotina busca o histórico.
+    Column("djen_pendente", Boolean, nullable=False, server_default="0"),
+    Column("djen_consultado_em", DateTime, nullable=True),
     coluna_tenant(),
+    unica_tenant_id("processos"),
+    Index("ix_processos_tenant_numero_cnj", "tenant_id", "numero_cnj"),
     fk_tenant("processos", "id_caso", "casos"),
     fk_tenant("processos", "id_criado_por", "usuarios"),
     # Mesmo número pode existir em NPJs diferentes. O nome é lido por
@@ -678,4 +694,73 @@ password_reset_tokens = Table(
     Column("criado_em", DateTime, nullable=False),
     coluna_tenant(),
     fk_tenant("password_reset_tokens", "usuario_id", "usuarios"),
+)
+
+
+# --- DJEN (docs/plano-djen.md, §3) -------------------------------------------
+
+TEXTO_LONGO = Text().with_variant(MEDIUMTEXT(), "mysql")
+
+# Publicações capturadas do Diário de Justiça Eletrônico Nacional. Uma OAB
+# cadastrada em dois NPJs recebe a mesma publicação nos dois, como registros
+# separados: a unicidade do `id_djen` é por tenant.
+djen_comunicacoes = Table(
+    "djen_comunicacoes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_djen", BigInteger, nullable=False),  # `id` da API
+    Column("hash", String(100), nullable=True),  # link da certidão
+    Column("numero_processo", String(20), nullable=False, index=True),
+    Column("numero_processo_mascara", String(30), nullable=True),
+    Column("data_disponibilizacao", Date, nullable=False, index=True),
+    Column("sigla_tribunal", String(30), nullable=True),
+    Column("nome_orgao", String(300), nullable=True),
+    Column("tipo_comunicacao", String(100), nullable=True),
+    Column("tipo_documento", String(100), nullable=True),
+    Column("nome_classe", String(300), nullable=True),
+    # Original da API: conteúdo de terceiros, nunca vai cru para o front.
+    Column("texto_html", TEXTO_LONGO, nullable=True),
+    Column("texto_plano", TEXTO_LONGO, nullable=True),
+    Column("link", String(1000), nullable=True),
+    Column("destinatarios", JSON, nullable=True),
+    Column("advogados", JSON, nullable=True),
+    # False = publicação cancelada no DJEN.
+    Column("ativo", Boolean, nullable=False, default=True, server_default="1"),
+    Column("motivo_cancelamento", Text, nullable=True),
+    Column("id_processo", Integer, nullable=True),
+    Column("id_caso", Integer, nullable=True),
+    # vinculada | pendente | descartada
+    Column("situacao", String(12), nullable=False),
+    # Quando a situação mudou para vinculada ou descartada (conta a retenção).
+    Column("data_situacao", DateTime, nullable=True),
+    # OAB monitorada ("123456/MG") por onde a publicação chegou, se foi assim.
+    Column("oab_origem", String(12), nullable=True),
+    Column("capturada_em", DateTime, nullable=False),
+    Column("atualizada_em", DateTime, nullable=True),
+    Column("id_vinculado_por", Integer, nullable=True),
+    coluna_unidade(),
+    coluna_tenant(),
+    unica_tenant_id("djen_comunicacoes"),
+    UniqueConstraint("tenant_id", "id_djen", name="uq_djen_comunicacoes_tenant_id_djen"),
+    Index("ix_djen_comunicacoes_tenant_situacao", "tenant_id", "situacao"),
+    fk_tenant("djen_comunicacoes", "id_processo", "processos"),
+    fk_tenant("djen_comunicacoes", "id_caso", "casos"),
+    fk_tenant("djen_comunicacoes", "id_vinculado_por", "usuarios"),
+    fk_tenant("djen_comunicacoes", "unidade_id", "unidades"),
+)
+
+# Uma linha por execução da rotina, por NPJ. A tela mostra a última.
+djen_sincronizacoes = Table(
+    "djen_sincronizacoes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("inicio", DateTime, nullable=False),
+    Column("fim", DateTime, nullable=True),
+    Column("status", String(10), nullable=False),  # ok | parcial | erro
+    Column("parametros", JSON, nullable=True),
+    Column("novas", Integer, nullable=False, default=0),
+    Column("atualizadas", Integer, nullable=False, default=0),
+    Column("vinculadas", Integer, nullable=False, default=0),
+    Column("mensagem", Text, nullable=True),
+    coluna_tenant(),
 )

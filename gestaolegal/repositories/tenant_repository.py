@@ -20,11 +20,29 @@ class TenantRepository(BaseRepository):
         stmt = select(tenants.c.ativo).where(tenants.c.id == tenant_id)
         return bool(self.session.execute(stmt).scalar_one_or_none())
 
-    def identificacao(self, tenant_id: int) -> dict[str, str] | None:
-        """Nome e sigla do NPJ, para o cabeçalho do front."""
-        stmt = select(tenants.c.nome, tenants.c.sigla).where(tenants.c.id == tenant_id)
+    def identificacao(self, tenant_id: int) -> dict[str, Any] | None:
+        """Nome, sigla e recursos do NPJ, para o cabeçalho e o menu do front."""
+        stmt = select(tenants.c.nome, tenants.c.sigla, tenants.c.djen_ativo).where(
+            tenants.c.id == tenant_id
+        )
         row = self.session.execute(stmt).mappings().one_or_none()
-        return dict(row) if row else None
+        if not row:
+            return None
+        return {**dict(row), "djen_ativo": bool(row["djen_ativo"])}
+
+    def djen_ativo(self, tenant_id: int) -> bool:
+        """Se o DJEN está ligado para o NPJ (docs/plano-djen.md, §3.2)."""
+        stmt = select(tenants.c.djen_ativo).where(tenants.c.id == tenant_id)
+        return bool(self.session.execute(stmt).scalar_one_or_none())
+
+    def listar_para_djen(self) -> list[Tenant]:
+        """Todos os NPJs, para a rotina do DJEN decidir quem processar.
+
+        Só roda em `sem_tenant`: a rotina não tem request nem tenant.
+        """
+        self.exigir_sem_tenant()
+        stmt = select(tenants).order_by(tenants.c.id)
+        return [Tenant(**row) for row in self.session.execute(stmt).mappings()]
 
     # --- plataforma -------------------------------------------------------
 

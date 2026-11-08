@@ -14,6 +14,8 @@ class Tenant:
     ativo: bool
     criado_em: datetime
     id_criado_por: int | None = None
+    # Captura do DJEN ligada para o NPJ (docs/plano-djen.md, §3.2).
+    djen_ativo: bool = False
 
 
 @dataclass

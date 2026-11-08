@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,5 +26,8 @@ class Processo:
     data_distribuicao: date | None = None
     data_transito_em_julgado: date | None = None
     obs: str | None = None
+    numero_cnj: str | None = None
+    djen_pendente: bool = False
+    djen_consultado_em: datetime | None = None
     caso: "Caso | None" = None
     criado_por: "UserInfo | None" = None

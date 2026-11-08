@@ -54,6 +54,7 @@
 					<Table.Head>Nome</Table.Head>
 					<Table.Head class="hidden md:table-cell">Identificador</Table.Head>
 					<Table.Head>Situação</Table.Head>
+					<Table.Head class="hidden sm:table-cell">DJEN</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -74,10 +75,15 @@
 								{tenant.ativo ? 'Ativo' : 'Desativado'}
 							</Badge>
 						</Table.Cell>
+						<Table.Cell class="hidden sm:table-cell">
+							<Badge variant={tenant.djen_ativo ? 'outline' : 'secondary'}>
+								{tenant.djen_ativo ? 'Ligado' : 'Desligado'}
+							</Badge>
+						</Table.Cell>
 					</Table.Row>
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={4} class="text-center text-muted-foreground">
+						<Table.Cell colspan={5} class="text-center text-muted-foreground">
 							Nenhum NPJ encontrado.
 						</Table.Cell>
 					</Table.Row>

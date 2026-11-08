@@ -13,6 +13,7 @@ from gestaolegal.repositories.repository import (
     WhereClause,
 )
 from gestaolegal.repositories.user_repository import UserRepository
+from gestaolegal.utils.cnj import normalizar_cnj
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existente
 
@@ -143,6 +144,10 @@ class ProcessoService:
         processo_data = processo_input.model_dump()
         processo_data["id_caso"] = caso_id
         processo_data["id_criado_por"] = criado_por_id
+        # DJEN: o cadastro não chama a API; só marca o processo para a rotina
+        # buscar o histórico (docs/plano-djen.md, §2).
+        processo_data["numero_cnj"] = normalizar_cnj(processo_input.numero)
+        processo_data["djen_pendente"] = processo_data["numero_cnj"] is not None
 
         processo_id = self.repository.create(processo_data)
 
@@ -168,6 +173,11 @@ class ProcessoService:
         for field in ("numero", "valor_causa_inicial", "valor_causa_atual"):
             if field in processo_input.model_fields_set:
                 processo_data[field] = getattr(processo_input, field)
+        if "numero" in processo_input.model_fields_set:
+            numero_cnj = normalizar_cnj(processo_input.numero)
+            if numero_cnj != existing.numero_cnj:
+                processo_data["numero_cnj"] = numero_cnj
+                processo_data["djen_pendente"] = numero_cnj is not None
         self.repository.update(processo_id, processo_data)
 
         logger.info(f"Processo updated successfully with id: {processo_id}")

@@ -33,7 +33,8 @@ def test_tabelas_globais_existem_e_nao_tem_tenant_id():
 
 def test_toda_tabela_de_tenant_tem_tenant_id_obrigatorio_indexado_e_com_fk():
     tabelas = _tabelas_de_tenant()
-    assert len(tabelas) == 28
+    # 28 da multitenancy + as do DJEN (djen_comunicacoes, djen_sincronizacoes).
+    assert len(tabelas) == 30
     for tabela in tabelas:
         assert "tenant_id" in tabela.c, tabela.name
         coluna = tabela.c.tenant_id

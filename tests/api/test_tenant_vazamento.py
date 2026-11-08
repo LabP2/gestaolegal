@@ -340,6 +340,11 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("DELETE", "/api/caso/<int:caso_id>/processos/<int:processo_id>"): Rota(
         "id", {**_CASO, "processo_id": "processo"}
     ),
+    # --- DJEN (docs/plano-djen.md, §5) ---
+    ("GET", "/api/djen/publicacoes"): Rota("colecao", query=f"q={BUSCA}"),
+    ("GET", "/api/djen/publicacoes/<int:id>"): Rota("id", {"id": "publicacao"}),
+    ("GET", "/api/djen/status"): Rota("colecao"),
+    ("POST", "/api/processos/<int:id>/djen/buscar"): Rota("id", {"id": "processo"}),
     # --- fila de atendimento ---
     ("GET", "/api/fila_atendimento/"): Rota("colecao"),
     ("GET", "/api/fila_atendimento/preview"): Rota("colecao"),
@@ -574,6 +579,32 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
                 )
             )
             session.commit()
+            agora = datetime.now()
+            ids["publicacao"] = session.execute(
+                metadata.tables["djen_comunicacoes"].insert().values(
+                    tenant_id=TENANT_DAJ,
+                    id_djen=424242,
+                    numero_processo="99999999920268130001",
+                    data_disponibilizacao=date.today(),
+                    sigla_tribunal=MARCA,
+                    nome_orgao=f"{MARCA} vara",
+                    tipo_comunicacao=MARCA,
+                    texto_html=f"<p>{MARCA} publicação</p>",
+                    texto_plano=f"{MARCA} publicação",
+                    situacao="vinculada",
+                    id_caso=ids["caso"],
+                    id_processo=ids["processo"],
+                    unidade_id=UNIDADE_BH,
+                    capturada_em=agora,
+                )
+            ).lastrowid
+            session.execute(
+                metadata.tables["djen_sincronizacoes"].insert().values(
+                    tenant_id=TENANT_DAJ, inicio=agora, fim=agora, status="erro",
+                    novas=0, atualizadas=0, vinculadas=0, mensagem=f"{MARCA} falha",
+                )
+            )
+            session.commit()
             registro = metadata.tables["registro_entrada"]
             ids["presenca"] = session.execute(
                 select(registro.c.id)
@@ -686,6 +717,16 @@ def cenario(app: Flask, client: FlaskClient, create_admin_user: None, banco_pres
         criar_usuario(OUTRO_EMAIL, OUTRO_SENHA, "admin", "Admin Outro NPJ", tenant_id=TENANT_OUTRO)
     outro = headers_para(client, OUTRO_EMAIL, OUTRO_SENHA, unidade=UNIDADE_OUTRO)
     daj = headers_para(client, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    # DJEN ligado nos dois NPJs: a varredura prova que um não vê as
+    # publicações do outro (com ele desligado, as rotas só dariam 403).
+    with sem_tenant("teste: ligar o DJEN nos dois NPJs"):
+        session = db_session_module.get_session()
+        try:
+            tabela = metadata.tables["tenants"]
+            session.execute(tabela.update().values(djen_ativo=True))
+            session.commit()
+        finally:
+            session.close()
 
     # Registros do próprio outro NPJ, referenciados pelas escritas dele. Criados
     # antes de fotografar as coleções, para não mudarem a comparação.
@@ -882,6 +923,7 @@ def test_dono_continua_lendo_os_proprios_dados(client, cenario):
         f"/api/assistencia_judiciaria/{ids['assistencia']}",
         f"/api/arquivo/{ids['arquivo']}",
         f"/api/user/{ids['usuario']}",
+        f"/api/djen/publicacoes/{ids['publicacao']}",
     ):
         assert client.get(url, headers=h).status_code == 200, url
     busca = client.get(f"/api/search/?q={BUSCA}", headers=h)

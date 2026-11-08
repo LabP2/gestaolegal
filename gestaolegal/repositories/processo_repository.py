@@ -90,6 +90,31 @@ class ProcessoRepository(BaseRepository):
         result = self.session.execute(stmt).scalar()
         return result or 0
 
+    def find_by_numero_cnj(self, numero_cnj: str) -> list[Processo]:
+        """Processos ativos do tenant com este número CNJ (casamento do DJEN)."""
+        stmt = self.escopo(
+            select(processos).where(
+                processos.c.numero_cnj == numero_cnj, processos.c.status.is_(True)
+            ),
+            processos,
+        )
+        return [from_dict(Processo, dict(r._mapping)) for r in self.session.execute(stmt)]
+
+    def pendentes_djen(self, limite: int) -> list[Processo]:
+        """Processos marcados para a busca do histórico no DJEN."""
+        stmt = self.escopo(
+            select(processos)
+            .where(
+                processos.c.djen_pendente.is_(True),
+                processos.c.numero_cnj.is_not(None),
+                processos.c.status.is_(True),
+            )
+            .order_by(processos.c.id)
+            .limit(limite),
+            processos,
+        )
+        return [from_dict(Processo, dict(r._mapping)) for r in self.session.execute(stmt)]
+
     def create(self, data: dict[str, Any]) -> int:
         stmt = insert(processos).values(**self.valores(data))
         try:

@@ -228,10 +228,14 @@ class PlataformaService:
         }
 
     def atualizar(self, tenant_id: int, data: dict[str, Any]) -> Tenant:
-        """Nome, sigla e instituição. O slug não muda depois de criado."""
+        """Nome, sigla, instituição e a chave do DJEN. O slug não muda."""
         if "slug" in data:
             raise ValidationException("O identificador não pode ser alterado", field="slug")
         valores: dict[str, Any] = {}
+        if "djen_ativo" in data:
+            if not isinstance(data["djen_ativo"], bool):
+                raise ValidationException("Informe true ou false", field="djen_ativo")
+            valores["djen_ativo"] = data["djen_ativo"]
         if "nome" in data:
             valores["nome"] = _texto(data, "nome")
         if "sigla" in data:
@@ -247,6 +251,11 @@ class PlataformaService:
                 self.tenants.atualizar(tenant_id, valores)
             tenant = self.tenants.find(tenant_id)
         assert tenant is not None
+        if "djen_ativo" in valores:
+            logger.info(
+                f"DJEN {'ligado' if valores['djen_ativo'] else 'desligado'} "
+                f"para o NPJ {tenant_id}"
+            )
         return tenant
 
     def definir_ativo(self, tenant_id: int, ativo: Any) -> Tenant:

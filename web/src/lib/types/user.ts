@@ -47,6 +47,8 @@ export type UserOption = Pick<User, 'id' | 'nome' | 'urole'>;
 export type TenantIdentificacao = {
 	nome: string;
 	sigla: string;
+	/** DJEN ligado para o NPJ: mostra o menu "DJEN" (docs/plano-djen.md, §3.2). */
+	djen_ativo: boolean;
 };
 
 /** Resposta de `GET /api/user/me`: o usuário e o NPJ em que ele está. */
