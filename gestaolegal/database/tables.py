@@ -774,3 +774,25 @@ djen_sincronizacoes = Table(
     Column("mensagem", Text, nullable=True),
     coluna_tenant(),
 )
+
+# OABs monitoradas pela rotina (plano, §3), mantidas pelo admin do NPJ. A
+# unidade é a das publicações que chegarem por ela sem casar com um processo.
+djen_oabs = Table(
+    "djen_oabs",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("numero_oab", String(10), nullable=False),  # só dígitos
+    Column("uf_oab", String(2), nullable=False),
+    Column("id_usuario", Integer, nullable=True),  # dono da OAB, se usuário
+    Column("ativo", Boolean, nullable=False, server_default="1"),
+    Column("criado_em", DateTime, nullable=False),
+    Column("id_criado_por", Integer, nullable=True),
+    coluna_unidade(),
+    coluna_tenant(),
+    UniqueConstraint(
+        "tenant_id", "numero_oab", "uf_oab", name="uq_djen_oabs_tenant_oab"
+    ),
+    fk_tenant("djen_oabs", "id_usuario", "usuarios"),
+    fk_tenant("djen_oabs", "id_criado_por", "usuarios"),
+    fk_tenant("djen_oabs", "unidade_id", "unidades"),
+)

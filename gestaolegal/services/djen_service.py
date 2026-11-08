@@ -34,6 +34,7 @@ from gestaolegal.models.djen import (
     SITUACOES,
     ComunicacaoDJEN,
     ComunicacaoListItem,
+    OabMonitorada,
     ResultadoCaptura,
 )
 from gestaolegal.models.processo import Processo
@@ -41,12 +42,14 @@ from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.caso_repository import CasoRepository
 from gestaolegal.repositories.djen_repository import (
     DjenComunicacaoRepository,
+    DjenOabRepository,
     DjenSincronizacaoRepository,
 )
 from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.processo_repository import ProcessoRepository
 from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.services.notificacao_service import NotificacaoService
+from gestaolegal.services.referencias import exigir_existente
 from gestaolegal.utils.cnj import mascarar_cnj
 
 logger = logging.getLogger(__name__)
@@ -55,6 +58,14 @@ logger = logging.getLogger(__name__)
 PAPEIS_GESTAO = ("admin", "prof", "orient")  # sem caso, vincular, descartar
 PAPEIS_UNIDADE = PAPEIS_GESTAO + ("colab_proj",)  # lista de toda a unidade
 PAPEIS_PARTICIPANTE = ("estag_direito", "colab_ext")  # só casos de que participam
+
+# Só o admin do NPJ mantém a lista de OABs monitoradas (plano, Decisões, 1).
+PAPEIS_OABS = ("admin",)
+# De quem o `usuarios.oab` aparece como sugestão na tela das OABs.
+PAPEIS_SUGESTAO_OAB = ("orient", "prof", "admin")
+UFS = frozenset(
+    "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split()
+)
 
 MSG_DESLIGADO = "A busca no DJEN não está habilitada para este NPJ."
 
@@ -68,6 +79,20 @@ def dias_uteis_entre(inicio: date, fim: date) -> int:
         if atual.weekday() < 5:
             dias += 1
     return dias
+
+
+def separar_oab(valor: str | None) -> tuple[str, str] | None:
+    """`123456/MG`, `MG 123.456` ou `123456MG` -> ("123456", "MG"); senão None.
+
+    `usuarios.oab` é texto livre: o que não couber no padrão não vira sugestão.
+    """
+    if not valor:
+        return None
+    digitos = "".join(c for c in valor if c.isdigit())
+    letras = "".join(c for c in valor if c.isalpha()).upper()
+    if not digitos or len(digitos) > 10 or letras not in UFS:
+        return None
+    return digitos.lstrip("0") or "0", letras
 
 
 def link_certidao(hash_: str | None) -> str | None:
@@ -85,6 +110,7 @@ class DJENService:
         self.casos = CasoRepository()
         self.tenants = TenantRepository()
         self.eventos = EventoRepository()
+        self.oabs = DjenOabRepository()
         # Avisos da captura em curso, agregados por caso até o commit da fonte:
         # {caso_id: (caso, eventos, executor)}.
         self._avisos: dict[int, tuple[Caso, list[Evento], int | None]] = {}
@@ -409,6 +435,209 @@ class DJENService:
         logger.info(f"DJEN: publicação {id} vinculada ao processo {processo_id} por {user.id}")
         return self.detalhe(id, user, unidade_id)
 
+    def descartar(self, id: int, user: UserInfo, unidade_id: int) -> dict[str, Any]:
+        """Marca como não pertencente ao NPJ. A retenção apaga depois (plano, §8)."""
+        if user.urole not in PAPEIS_GESTAO:
+            raise ForbiddenException()
+        comunicacao = self._visivel(id, user, unidade_id)
+        if comunicacao.situacao == "vinculada":
+            raise ValidationException(
+                "Publicação vinculada a um caso não pode ser descartada"
+            )
+        if comunicacao.situacao == "descartada":
+            raise ValidationException("A publicação já foi descartada")
+        try:
+            self.repo.atualizar(
+                comunicacao.id,
+                {
+                    "situacao": "descartada",
+                    "data_situacao": datetime.now(),
+                    "id_vinculado_por": user.id,
+                },
+            )
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        logger.info(f"DJEN: publicação {id} descartada por {user.id}")
+        return self.detalhe(id, user, unidade_id)
+
+    # --- OABs monitoradas ---------------------------------------------------
+
+    @staticmethod
+    def _oab_dict(oab: OabMonitorada) -> dict[str, Any]:
+        return {**oab.__dict__, "rotulo": oab.rotulo}
+
+    def listar_oabs(self, unidade_id: int) -> list[dict[str, Any]]:
+        return [self._oab_dict(o) for o in self.oabs.listar(unidade_id)]
+
+    def _oab_da_unidade(self, id: int, unidade_id: int) -> OabMonitorada:
+        oab = self.oabs.find_by_id(id)
+        if oab is None or oab.unidade_id != unidade_id:
+            raise NotFoundException(resource="OAB", resource_id=id)
+        return oab
+
+    @staticmethod
+    def _numero_uf(dados: dict[str, Any]) -> tuple[str, str]:
+        numero = dados.get("numero_oab")
+        uf = dados.get("uf_oab")
+        if isinstance(numero, int) and not isinstance(numero, bool):
+            numero = str(numero)
+        if not isinstance(numero, str):
+            raise ValidationException("Informe o número da OAB", field="numero_oab")
+        # Aceita pontuação de digitação ("123.456"); qualquer outra coisa é erro.
+        digitos = "".join(c for c in numero if c not in " .-").lstrip("0")
+        if not (digitos.isascii() and digitos.isdigit()) or len(digitos) > 10:
+            raise ValidationException(
+                "Número da OAB inválido (só dígitos)", field="numero_oab"
+            )
+        if not isinstance(uf, str) or uf.strip().upper() not in UFS:
+            raise ValidationException("UF da OAB inválida", field="uf_oab")
+        return digitos, uf.strip().upper()
+
+    @staticmethod
+    def _unidade_escolhida(dados: dict[str, Any], user: UserInfo, padrao: int) -> int:
+        if "unidade_id" not in dados or dados["unidade_id"] is None:
+            return padrao
+        valor = dados["unidade_id"]
+        # Só as unidades do próprio admin: id de outra unidade ou de outro NPJ
+        # recebe a mesma resposta.
+        if (
+            isinstance(valor, bool)
+            or not isinstance(valor, int)
+            or valor not in {u.id for u in user.unidades}
+        ):
+            raise ValidationException("Unidade não encontrada", field="unidade_id")
+        return valor
+
+    @staticmethod
+    def _id_usuario(dados: dict[str, Any]) -> int | None:
+        valor = dados.get("id_usuario")
+        if valor is None:
+            return None
+        if isinstance(valor, bool) or not isinstance(valor, int):
+            raise ValidationException("Usuário não encontrado", field="id_usuario")
+        exigir_existente("usuarios", valor, "id_usuario")
+        return valor
+
+    def criar_oab(
+        self, dados: dict[str, Any], user: UserInfo, unidade_id: int
+    ) -> dict[str, Any]:
+        numero, uf = self._numero_uf(dados)
+        ativo = dados.get("ativo", True)
+        if not isinstance(ativo, bool):
+            raise ValidationException("Valor inválido", field="ativo")
+        registro = {
+            "numero_oab": numero,
+            "uf_oab": uf,
+            "id_usuario": self._id_usuario(dados),
+            "unidade_id": self._unidade_escolhida(dados, user, unidade_id),
+            "ativo": ativo,
+            "criado_em": datetime.now(),
+            "id_criado_por": user.id,
+        }
+        if self.oabs.existe(numero, uf):
+            raise ValidationException(
+                f"A OAB {numero}/{uf} já está cadastrada", field="numero_oab"
+            )
+        try:
+            novo_id = self.oabs.criar(registro)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        logger.info(f"DJEN: OAB {numero}/{uf} cadastrada por {user.id}")
+        oab = self.oabs.find_by_id(novo_id)
+        assert oab is not None
+        return self._oab_dict(oab)
+
+    def atualizar_oab(
+        self, id: int, dados: dict[str, Any], user: UserInfo, unidade_id: int
+    ) -> dict[str, Any]:
+        atual = self._oab_da_unidade(id, unidade_id)
+        mudancas: dict[str, Any] = {}
+        if "numero_oab" in dados or "uf_oab" in dados:
+            numero, uf = self._numero_uf(
+                {
+                    "numero_oab": dados.get("numero_oab", atual.numero_oab),
+                    "uf_oab": dados.get("uf_oab", atual.uf_oab),
+                }
+            )
+            if self.oabs.existe(numero, uf, ignorar_id=id):
+                raise ValidationException(
+                    f"A OAB {numero}/{uf} já está cadastrada", field="numero_oab"
+                )
+            mudancas.update(numero_oab=numero, uf_oab=uf)
+        if "id_usuario" in dados:
+            mudancas["id_usuario"] = self._id_usuario(dados)
+        if "unidade_id" in dados:
+            mudancas["unidade_id"] = self._unidade_escolhida(dados, user, atual.unidade_id)
+        if "ativo" in dados:
+            if not isinstance(dados["ativo"], bool):
+                raise ValidationException("Valor inválido", field="ativo")
+            mudancas["ativo"] = dados["ativo"]
+        if mudancas:
+            try:
+                self.oabs.atualizar(id, mudancas)
+                self.session.commit()
+            except Exception:
+                self.session.rollback()
+                raise
+            logger.info(f"DJEN: OAB {id} alterada por {user.id}: {sorted(mudancas)}")
+        oab = self.oabs.find_by_id(id)
+        assert oab is not None
+        return self._oab_dict(oab)
+
+    def remover_oab(self, id: int, user: UserInfo, unidade_id: int) -> None:
+        """Apaga só o cadastro; as publicações já capturadas ficam."""
+        oab = self._oab_da_unidade(id, unidade_id)
+        try:
+            self.oabs.apagar(id)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        logger.info(f"DJEN: OAB {oab.rotulo} removida por {user.id}")
+
+    def sugestoes_oab(self, unidade_id: int) -> list[dict[str, Any]]:
+        """`usuarios.oab` de orientadores, professores e admins da unidade.
+
+        É texto livre: só entra o que tiver número e UF reconhecíveis.
+        """
+        cadastradas = {(o.numero_oab, o.uf_oab) for o in self.oabs.listar()}
+        sugestoes = []
+        for usuario in self.oabs.usuarios_com_oab(unidade_id, PAPEIS_SUGESTAO_OAB):
+            separada = separar_oab(usuario["oab"])
+            if separada is None:
+                continue
+            sugestoes.append(
+                {
+                    "id_usuario": usuario["id"],
+                    "nome": usuario["nome"],
+                    "urole": usuario["urole"],
+                    "oab": usuario["oab"],
+                    "numero_oab": separada[0],
+                    "uf_oab": separada[1],
+                    "cadastrada": separada in cadastradas,
+                }
+            )
+        return sugestoes
+
+    # --- captura ------------------------------------------------------------
+
+    def _consultar_oab(
+        self, oab: OabMonitorada, janela_dias: int, resultado: ResultadoCaptura
+    ) -> None:
+        fim = date.today()
+        inicio = fim - timedelta(days=janela_dias)
+        for item in self.client.buscar_por_oab(oab.numero_oab, oab.uf_oab, inicio, fim):
+            self.registrar(
+                item,
+                resultado,
+                unidade_padrao=oab.unidade_id,
+                oab_origem=oab.rotulo,
+            )
+
     def _consultar_processo(
         self, processo: Processo, resultado: ResultadoCaptura, executor_id: int | None
     ) -> None:
@@ -532,12 +761,36 @@ class DJENService:
         return registro
 
     def _fontes(self, janela_dias: int, max_processos: int):
-        """(rótulo, função) de cada fonte a consultar nesta execução."""
+        """(rótulo, função) de cada fonte a consultar nesta execução.
+
+        Primeiro as OABs ativas (de todas as unidades do NPJ), depois os
+        processos pendentes (plano, §4).
+        """
+        for oab in self.oabs.listar(so_ativas=True):
+            yield (
+                f"OAB {oab.rotulo}",
+                lambda resultado, o=oab: self._consultar_oab(o, janela_dias, resultado),
+            )
         for processo in self.processos.pendentes_djen(max_processos):
             yield (
                 f"processo {processo.id}",
                 lambda resultado, p=processo: self._consultar_processo(p, resultado, None),
             )
 
-    def _aplicar_retencao(self) -> None:
-        pass
+    def _aplicar_retencao(self) -> int:
+        """Apaga descartadas e pendentes sem caso com mais de N dias (plano, §8).
+
+        Pendentes contam de `capturada_em`; descartadas, da data do descarte.
+        Uma falha aqui não derruba a execução: fica para a próxima.
+        """
+        limite = datetime.now() - timedelta(days=Config.DJEN_RETENCAO_DIAS)
+        try:
+            apagadas = self.repo.apagar_vencidas(limite)
+            self.session.commit()
+        except Exception as erro:
+            self.session.rollback()
+            logger.warning(f"DJEN: retenção falhou: {erro}")
+            return 0
+        if apagadas:
+            logger.info(f"DJEN: retenção apagou {apagadas} publicação(ões)")
+        return apagadas

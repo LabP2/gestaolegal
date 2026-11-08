@@ -87,3 +87,23 @@ class ResultadoCaptura:
         self.atualizadas += outro.atualizadas
         self.vinculadas += outro.vinculadas
         self.erros.extend(outro.erros)
+
+
+@dataclass
+class OabMonitorada:
+    """Linha de `djen_oabs`: uma OAB que a rotina consulta no DJEN."""
+
+    id: int
+    numero_oab: str
+    uf_oab: str
+    ativo: bool
+    unidade_id: int
+    criado_em: datetime
+    id_usuario: int | None = None
+    id_criado_por: int | None = None
+    usuario_nome: str | None = None
+    unidade_nome: str | None = None
+
+    @property
+    def rotulo(self) -> str:
+        return f"{self.numero_oab}/{self.uf_oab}"

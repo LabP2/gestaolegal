@@ -253,6 +253,25 @@ def test_migration_djen(mysql_descartavel):
             " situacao, capturada_em, unidade_id, id_caso) VALUES (1, 1, '1', CURDATE(), 'vinculada',"
             " NOW(), :u, :c)"), {"u": unidade_daj, "c": caso_outro})
     assert erro.value.orig.args[0] == 1452
+    # djen_oabs: a mesma OAB nos dois NPJs (unicidade por tenant), mas nunca
+    # com a unidade do outro NPJ.
+    with engine.connect() as conn:
+        unidade_outro = conn.execute(text("SELECT id FROM unidades WHERE tenant_id = 2 LIMIT 1")).scalar_one()
+    with engine.begin() as conn:
+        for tenant, unidade in ((1, unidade_daj), (2, unidade_outro)):
+            conn.execute(text(
+                "INSERT INTO djen_oabs (tenant_id, numero_oab, uf_oab, unidade_id, criado_em)"
+                " VALUES (:t, '123456', 'MG', :u, NOW())"), {"t": tenant, "u": unidade})
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO djen_oabs (tenant_id, numero_oab, uf_oab, unidade_id, criado_em)"
+            " VALUES (1, '654321', 'MG', :u, NOW())"), {"u": unidade_outro})
+    assert erro.value.orig.args[0] == 1452
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO djen_oabs (tenant_id, numero_oab, uf_oab, unidade_id, criado_em)"
+            " VALUES (1, '123456', 'MG', :u, NOW())"), {"u": unidade_daj})
+    assert erro.value.orig.args[0] == 1062
     # Evento do DJEN (sem autor) impede o downgrade, que não apaga eventos.
     with engine.begin() as conn:
         caso, unidade = conn.execute(

@@ -4,8 +4,8 @@
 - `processos`: `numero_cnj` (só os 20 dígitos do número, quando seguir o
   padrão CNJ), `djen_pendente` e `djen_consultado_em`, mais
   `UNIQUE (tenant_id, id)`, alvo da FK composta das publicações.
-- Tabelas novas `djen_comunicacoes` e `djen_sincronizacoes`, com `tenant_id`
-  e FKs compostas, como as da M3.
+- Tabelas novas `djen_comunicacoes`, `djen_sincronizacoes` e `djen_oabs`
+  (OABs monitoradas), com `tenant_id` e FKs compostas, como as da M3.
 - `eventos`: `origem` (`manual` | `djen`), `id_djen_comunicacao` (FK composta,
   no máximo um evento por publicação) e `id_criado_por` passa a aceitar nulo
   (só para o evento criado pela rotina, que roda sem usuário).
@@ -139,6 +139,42 @@ def _criar_sincronizacoes() -> None:
     )
 
 
+def _criar_oabs() -> None:
+    op.create_table(
+        "djen_oabs",
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("numero_oab", sa.String(10), nullable=False),
+        sa.Column("uf_oab", sa.String(2), nullable=False),
+        sa.Column("id_usuario", sa.Integer, nullable=True),
+        sa.Column("ativo", sa.Boolean, nullable=False, server_default="1"),
+        sa.Column("criado_em", sa.DateTime, nullable=False),
+        sa.Column("id_criado_por", sa.Integer, nullable=True),
+        sa.Column("unidade_id", sa.Integer, nullable=False),
+        sa.Column("tenant_id", sa.Integer, nullable=False),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name="fk_djen_oabs_tenant"),
+        sa.UniqueConstraint(
+            "tenant_id", "numero_oab", "uf_oab", name="uq_djen_oabs_tenant_oab"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "id_usuario"],
+            ["usuarios.tenant_id", "usuarios.id"],
+            name="fkt_djen_oabs_id_usuario",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "id_criado_por"],
+            ["usuarios.tenant_id", "usuarios.id"],
+            name="fkt_djen_oabs_id_criado_por",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "unidade_id"],
+            ["unidades.tenant_id", "unidades.id"],
+            name="fkt_djen_oabs_unidade_id",
+        ),
+    )
+    op.create_index("ix_djen_oabs_tenant_id", "djen_oabs", ["tenant_id"])
+    op.create_index("ix_djen_oabs_unidade_id", "djen_oabs", ["unidade_id"])
+
+
 def upgrade() -> None:
     bind = op.get_bind()
     op.execute(
@@ -172,6 +208,7 @@ def upgrade() -> None:
 
     _criar_comunicacoes()
     _criar_sincronizacoes()
+    _criar_oabs()
 
     # Como na M2: a checagem de FK fica desligada durante o ALTER para o MySQL
     # criar a FK sem copiar a tabela. É seguro: a coluna nova nasce nula.
@@ -212,6 +249,7 @@ def downgrade() -> None:
         "DROP COLUMN origem, "
         "MODIFY COLUMN id_criado_por INT NOT NULL"
     )
+    op.drop_table("djen_oabs")
     op.drop_table("djen_sincronizacoes")
     op.drop_table("djen_comunicacoes")
     op.execute(

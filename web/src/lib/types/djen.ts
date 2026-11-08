@@ -88,3 +88,40 @@ export interface BuscaProcessoDjen {
 	vinculadas: number;
 	djen_consultado_em: string | null;
 }
+
+/** Linha de `GET /api/djen/oabs` (só admin). */
+export interface OabMonitorada {
+	id: number;
+	numero_oab: string;
+	uf_oab: string;
+	/** `numero/UF`, como fica em `oab_origem` das publicações. */
+	rotulo: string;
+	ativo: boolean;
+	unidade_id: number;
+	unidade_nome: string | null;
+	id_usuario: number | null;
+	usuario_nome: string | null;
+	criado_em: string;
+	id_criado_por: number | null;
+}
+
+/** Corpo de `POST /api/djen/oabs` e `PUT /api/djen/oabs/<id>`. */
+export interface OabMonitoradaInput {
+	numero_oab?: string;
+	uf_oab?: string;
+	id_usuario?: number | null;
+	unidade_id?: number;
+	ativo?: boolean;
+}
+
+/** `GET /api/djen/oabs/sugestoes`: `usuarios.oab` reconhecível. */
+export interface SugestaoOab {
+	id_usuario: number;
+	nome: string;
+	urole: string;
+	/** Texto livre do cadastro do usuário. */
+	oab: string;
+	numero_oab: string;
+	uf_oab: string;
+	cadastrada: boolean;
+}

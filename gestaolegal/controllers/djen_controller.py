@@ -15,6 +15,7 @@ from gestaolegal.common import PageParams
 from gestaolegal.exceptions import ValidationException
 from gestaolegal.services.djen_service import (
     PAPEIS_GESTAO,
+    PAPEIS_OABS,
     PAPEIS_PARTICIPANTE,
     PAPEIS_UNIDADE,
     DJENService,
@@ -113,6 +114,72 @@ def vincular_publicacao(id: int):
         RequestContext.get_unidade_ativa(),
     )
     return success_response(data=dados, message="Publicação vinculada ao processo")
+
+
+@djen_controller.route("/djen/publicacoes/<int:id>/descartar", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def descartar_publicacao(id: int):
+    dados = DJENService().descartar(
+        id, RequestContext.get_current_user(), RequestContext.get_unidade_ativa()
+    )
+    return success_response(data=dados, message="Publicação descartada")
+
+
+def _corpo() -> dict[str, Any]:
+    corpo = request.get_json(silent=True)
+    if not isinstance(corpo, dict):
+        raise ValidationException("Corpo da requisição inválido")
+    return corpo
+
+
+@djen_controller.route("/djen/oabs", methods=["GET"])
+@authorized(*PAPEIS_OABS)
+@djen_habilitado
+def listar_oabs():
+    dados = DJENService().listar_oabs(RequestContext.get_unidade_ativa())
+    return success_response(data=dados)
+
+
+@djen_controller.route("/djen/oabs/sugestoes", methods=["GET"])
+@authorized(*PAPEIS_OABS)
+@djen_habilitado
+def sugestoes_oab():
+    dados = DJENService().sugestoes_oab(RequestContext.get_unidade_ativa())
+    return success_response(data=dados)
+
+
+@djen_controller.route("/djen/oabs", methods=["POST"])
+@authorized(*PAPEIS_OABS)
+@djen_habilitado
+def criar_oab():
+    dados = DJENService().criar_oab(
+        _corpo(), RequestContext.get_current_user(), RequestContext.get_unidade_ativa()
+    )
+    return success_response(data=dados, message="OAB cadastrada", status_code=201)
+
+
+@djen_controller.route("/djen/oabs/<int:id>", methods=["PUT"])
+@authorized(*PAPEIS_OABS)
+@djen_habilitado
+def atualizar_oab(id: int):
+    dados = DJENService().atualizar_oab(
+        id,
+        _corpo(),
+        RequestContext.get_current_user(),
+        RequestContext.get_unidade_ativa(),
+    )
+    return success_response(data=dados, message="OAB atualizada")
+
+
+@djen_controller.route("/djen/oabs/<int:id>", methods=["DELETE"])
+@authorized(*PAPEIS_OABS)
+@djen_habilitado
+def remover_oab(id: int):
+    DJENService().remover_oab(
+        id, RequestContext.get_current_user(), RequestContext.get_unidade_ativa()
+    )
+    return success_response(message="OAB removida")
 
 
 @djen_controller.route("/djen/status", methods=["GET"])

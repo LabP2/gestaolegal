@@ -346,7 +346,20 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("POST", "/api/djen/publicacoes/<int:id>/vincular"): Rota(
         "id", {"id": "publicacao"}, json=lambda ids: {"processo_id": ids["processo"]}
     ),
+    ("POST", "/api/djen/publicacoes/<int:id>/descartar"): Rota("id", {"id": "publicacao"}),
     ("GET", "/api/djen/status"): Rota("colecao"),
+    ("GET", "/api/djen/oabs"): Rota("colecao"),
+    ("GET", "/api/djen/oabs/sugestoes"): Rota("colecao"),
+    # Dono da OAB vindo da DAJ: recusado como inexistente.
+    ("POST", "/api/djen/oabs"): Rota(
+        "escrita",
+        status=(400,),
+        json=lambda ids: {"numero_oab": "424243", "uf_oab": "MG", "id_usuario": ids["usuario"]},
+    ),
+    ("PUT", "/api/djen/oabs/<int:id>"): Rota(
+        "id", {"id": "oab"}, json=lambda _: {"ativo": False}
+    ),
+    ("DELETE", "/api/djen/oabs/<int:id>"): Rota("id", {"id": "oab"}),
     ("POST", "/api/processos/<int:id>/djen/buscar"): Rota("id", {"id": "processo"}),
     # --- fila de atendimento ---
     ("GET", "/api/fila_atendimento/"): Rota("colecao"),
@@ -599,6 +612,16 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
                     id_processo=ids["processo"],
                     unidade_id=UNIDADE_BH,
                     capturada_em=agora,
+                )
+            ).lastrowid
+            ids["oab"] = session.execute(
+                metadata.tables["djen_oabs"].insert().values(
+                    tenant_id=TENANT_DAJ,
+                    numero_oab="424242",
+                    uf_oab="MG",
+                    id_usuario=ids["usuario"],
+                    unidade_id=UNIDADE_BH,
+                    criado_em=agora,
                 )
             ).lastrowid
             session.execute(

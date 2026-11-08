@@ -1,4 +1,5 @@
-"""Acesso a `djen_comunicacoes` e `djen_sincronizacoes`, sempre no tenant ativo."""
+"""Acesso a `djen_comunicacoes`, `djen_sincronizacoes` e `djen_oabs`, sempre no
+tenant ativo."""
 
 from datetime import date, datetime
 from typing import Any
@@ -8,10 +9,19 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy import update as sql_update
 
 from gestaolegal.common import PageParams, PaginatedResult
-from gestaolegal.database.tables import casos, djen_comunicacoes, djen_sincronizacoes
+from gestaolegal.database.tables import (
+    casos,
+    djen_comunicacoes,
+    djen_oabs,
+    djen_sincronizacoes,
+    unidades,
+    usuarios,
+    usuarios_unidades,
+)
 from gestaolegal.models.djen import (
     ComunicacaoDJEN,
     ComunicacaoListItem,
+    OabMonitorada,
     SincronizacaoDJEN,
 )
 from gestaolegal.repositories.repository import BaseRepository
@@ -201,3 +211,90 @@ class DjenSincronizacaoRepository(BaseRepository):
         )
         row = self.session.execute(stmt).mappings().one_or_none()
         return from_dict(SincronizacaoDJEN, dict(row)) if row else None
+
+
+class DjenOabRepository(BaseRepository):
+    """OABs monitoradas. Os JOINs com usuário e unidade só dão o nome."""
+
+    def _select(self):
+        return self.escopo(
+            select(
+                djen_oabs,
+                usuarios.c.nome.label("usuario_nome"),
+                unidades.c.nome.label("unidade_nome"),
+            ).select_from(
+                djen_oabs.outerjoin(
+                    usuarios,
+                    (usuarios.c.id == djen_oabs.c.id_usuario) & self.no_tenant(usuarios),
+                ).outerjoin(
+                    unidades,
+                    (unidades.c.id == djen_oabs.c.unidade_id) & self.no_tenant(unidades),
+                )
+            ),
+            djen_oabs,
+        )
+
+    @staticmethod
+    def _converter(row) -> OabMonitorada:
+        return from_dict(OabMonitorada, dict(row))
+
+    def listar(self, unidade_id: int | None = None, so_ativas: bool = False) -> list[OabMonitorada]:
+        stmt = self._select()
+        if unidade_id is not None:
+            stmt = stmt.where(djen_oabs.c.unidade_id == unidade_id)
+        if so_ativas:
+            stmt = stmt.where(djen_oabs.c.ativo.is_(True))
+        stmt = stmt.order_by(djen_oabs.c.uf_oab, djen_oabs.c.numero_oab)
+        return [self._converter(r) for r in self.session.execute(stmt).mappings()]
+
+    def find_by_id(self, id: int) -> OabMonitorada | None:
+        row = self.session.execute(
+            self._select().where(djen_oabs.c.id == id)
+        ).mappings().one_or_none()
+        return self._converter(row) if row else None
+
+    def existe(self, numero_oab: str, uf_oab: str, ignorar_id: int | None = None) -> bool:
+        stmt = self.escopo(
+            select(djen_oabs.c.id).where(
+                djen_oabs.c.numero_oab == numero_oab, djen_oabs.c.uf_oab == uf_oab
+            ),
+            djen_oabs,
+        )
+        if ignorar_id is not None:
+            stmt = stmt.where(djen_oabs.c.id != ignorar_id)
+        return self.session.execute(stmt).first() is not None
+
+    def criar(self, data: dict[str, Any]) -> int:
+        result = self.session.execute(insert(djen_oabs).values(**self.valores(data)))
+        self.session.flush()
+        return result.lastrowid
+
+    def atualizar(self, id: int, data: dict[str, Any]) -> None:
+        self.session.execute(
+            self.escopo(
+                sql_update(djen_oabs).where(djen_oabs.c.id == id), djen_oabs
+            ).values(**data)
+        )
+
+    def apagar(self, id: int) -> None:
+        self.session.execute(
+            self.escopo(sql_delete(djen_oabs).where(djen_oabs.c.id == id), djen_oabs)
+        )
+
+    def usuarios_com_oab(self, unidade_id: int, papeis: tuple[str, ...]) -> list[dict[str, Any]]:
+        """Usuários ativos da unidade com `oab` preenchido: só sugestão."""
+        stmt = self.escopo(
+            select(usuarios.c.id, usuarios.c.nome, usuarios.c.oab, usuarios.c.urole)
+            .join(usuarios_unidades, usuarios_unidades.c.usuario_id == usuarios.c.id)
+            .where(
+                usuarios_unidades.c.unidade_id == unidade_id,
+                usuarios.c.status.is_(True),
+                usuarios.c.urole.in_(papeis),
+                usuarios.c.oab.is_not(None),
+                usuarios.c.oab != "",
+            )
+            .order_by(usuarios.c.nome),
+            usuarios,
+            usuarios_unidades,
+        )
+        return [dict(r) for r in self.session.execute(stmt).mappings()]

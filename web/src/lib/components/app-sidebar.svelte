@@ -115,6 +115,16 @@
 				{
 					title: 'Publicações',
 					url: '/djen'
+				},
+				{
+					title: 'Sem caso',
+					url: '/djen/sem-caso',
+					roles: ['admin', 'prof', 'orient']
+				},
+				{
+					title: 'OABs monitoradas',
+					url: '/djen/oabs',
+					roles: ['admin']
 				}
 			]
 		},

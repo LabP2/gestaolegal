@@ -431,3 +431,79 @@ Tomadas em 2026-11-06 e 2026-11-07:
 6. **Chave por NPJ:** `tenants.djen_ativo`, ligada pelo admin da plataforma,
    começando desligada para todos; `DJEN_SYNC_ENABLED` continua como trava do
    ambiente. Decidido em 2026-11-08.
+
+## Pendências para revisão
+
+Escolhas feitas na implementação das fases 1 a 3 (branch `feat/djen`) onde o
+plano não decidia, sempre pelo caminho mais conservador. Revisar antes do merge.
+
+**Migration (`d3e4f5a6b7c8_djen.py`, única, `down_revision = c2d3e4f5a6b7`)**
+
+1. Uma migration só, editada a cada fase: os commits intermediários não são
+   pontos de deploy. Se as fases forem para produção em separado, ela precisa
+   ser dividida.
+2. Processos existentes **não** são marcados `djen_pendente`: o histórico deles
+   só é buscado pelo botão da tela do processo ou depois de uma alteração do
+   número. Marcar todos faria a primeira execução da rotina consultar centenas
+   de processos e gerar uma onda de eventos e notificações antigas.
+3. Colunas além das listadas no §3: `djen_comunicacoes.numero_processo_mascara`,
+   `data_situacao` (data do vínculo ou do descarte, usada na retenção) e
+   `oab_origem` (`numero/UF` da OAB por onde chegou, para o filtro `oab` e para
+   a tela de detalhe).
+4. `eventos`: a unicidade é `(tenant_id, id_djen_comunicacao)`, e não só a
+   coluna, por causa da regra de unicidade por tenant do teste estrutural.
+5. O downgrade recusa (RuntimeError) quando existem eventos do DJEN: sem a
+   coluna `origem`, eles virariam eventos manuais sem autor e `id_criado_por`
+   não voltaria a `NOT NULL`. Apagar eventos fica para decisão humana.
+6. `djen_oabs.uf_oab` é `VARCHAR(2)`, não `CHAR(2)`, como as demais colunas de
+   UF do esquema; a validação aceita só as 27 UFs.
+7. `scripts/seed_database.py` passou a inserir só as colunas que existem na
+   tabela (`Seed._colunas`), para o teste MySQL semear o banco numa revisão
+   anterior à do DJEN.
+
+**Permissões e escopo**
+
+8. `colab_proj`, `estag_direito` e `colab_ext` veem só publicações
+   **vinculadas** (o §7 diz "toda a unidade" para `colab_proj`, mas a caixa
+   "Sem caso" é só de quem vincula; pendentes e descartadas ficam fora da lista
+   geral desses papéis).
+9. O botão "Buscar publicações agora" (`POST /processos/<id>/djen/buscar`) é
+   só de `admin`, `prof` e `orient`: ele cria eventos e dispara notificações.
+10. OABs monitoradas: só `admin` do NPJ. A lista e a edição são filtradas pela
+    unidade ativa (a OAB de outra unidade dá 404); no cadastro, `unidade_id` é
+    a unidade ativa ou outra unidade do próprio admin. A rotina consulta as
+    OABs ativas de todas as unidades do NPJ. `DELETE` apaga o cadastro (as
+    publicações capturadas ficam); para só pausar, `PUT {ativo: false}`.
+11. Sugestões de OAB: `usuarios.oab` de `orient`, `prof` e `admin` ativos da
+    unidade ativa, só quando o texto livre tem número e UF reconhecíveis.
+12. Publicação descartada ainda pode ser vinculada manualmente (desfaz o
+    descarte). A rotina não revincula sozinha uma descartada, mesmo que depois
+    apareça um processo com o número dela.
+
+**Comportamento**
+
+13. Notificações agregadas: uma por caso a cada fonte da rotina (OAB ou
+    processo), com "N novas publicações…", em vez de uma por publicação.
+14. No evento do DJEN, `id_caso` também é travado, além de `tipo`,
+    `data_evento` e `descricao`. Enviar um desses campos com valor diferente
+    dá 400 com o campo; o mesmo valor é aceito e ignorado.
+15. Status "atrasada" também quando nunca houve sincronização.
+16. DJEN fora do ar no botão do processo: 422 com código `DJEN_INDISPONIVEL`,
+    sem gravar nada.
+17. A janela da busca por OAB vai de `hoje − DJEN_JANELA_DIAS` até hoje
+    (inclusive), um dia a mais que "os últimos 3 dias", para não perder a
+    borda.
+18. Retenção: roda no fim de cada execução da rotina, só no NPJ da execução;
+    uma falha nela não muda o status da sincronização (fica no log e é
+    refeita na próxima). Prazo de 90 dias fixo (`Config.DJEN_RETENCAO_DIAS`),
+    sem variável de ambiente.
+
+**Testes existentes adaptados (nenhuma asserção removida ou afrouxada)**
+
+19. `tests/database/test_tenant_schema.py`: contagem de tabelas de tenant de 28
+    para 31 (as três do DJEN).
+20. `tests/database/test_tenants_migration.py`: `tenants.djen_ativo` entra em
+    `COLUNAS_POSTERIORES`, fora da comparação com a M1, e é conferida na
+    migration do DJEN.
+21. `tests/api/test_jwt_tenant.py`: o dicionário esperado do tenant ganhou
+    `"djen_ativo": False`.

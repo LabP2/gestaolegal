@@ -59,6 +59,9 @@ export type {
 	AdvogadoPublicacao,
 	SincronizacaoDjen,
 	StatusDjen,
-	BuscaProcessoDjen
+	BuscaProcessoDjen,
+	OabMonitorada,
+	OabMonitoradaInput,
+	SugestaoOab
 } from './djen';
 export { SITUACAO_PUBLICACAO_LABEL, DJEN_PAPEIS_GESTAO } from './djen';

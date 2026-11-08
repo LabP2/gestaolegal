@@ -254,6 +254,49 @@ script novamente. A exclusão do banco não tem rollback. Os arquivos de anexos
 no volume permanecem no disco, mas seus registros no banco são apagados.
 O script não instala o cron automaticamente.
 
+## Rotina do DJEN
+
+A integração com o DJEN (Comunica PJe, `docs/plano-djen.md`) captura as
+publicações das OABs monitoradas e dos processos cadastrados. A captura roda
+pelo comando `flask djen sincronizar`, que precisa ser agendado no host: o
+sistema não tem agendador próprio.
+
+São duas chaves, e as duas precisam estar ligadas:
+
+- `DJEN_SYNC_ENABLED=true` no `.env` do ambiente. Desligada (padrão), o comando
+  sai sem chamar a API. Ligar em QA ou produção exige decisão explícita: a
+  rotina gera notificações para usuários reais.
+- `djen_ativo` do NPJ, ligada pelo admin da plataforma na edição do NPJ. NPJ
+  com a chave desligada é pulado.
+
+As OABs consultadas são cadastradas pelo admin do NPJ em DJEN > OABs
+monitoradas. Cada execução busca a janela dos últimos `DJEN_JANELA_DIAS`
+dias de cada OAB ativa e até `DJEN_MAX_PROCESSOS` processos pendentes, e apaga
+as publicações descartadas e as pendentes sem caso com mais de 90 dias
+(retenção fixa, decidida no plano; não é variável de ambiente).
+
+Execução manual, no host, com a stack iniciada:
+
+```bash
+docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar
+# Um NPJ só:
+docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar --tenant daj-ufmg
+```
+
+Para agendar em dias úteis às 8h e às 14h, no fuso do servidor, adicione ao
+`crontab` de um usuário com acesso ao Docker e escrita no checkout/log. O
+`flock` impede que duas execuções se sobreponham:
+
+```cron
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 8,14 * * 1-5 cd /opt/gestaolegal && flock -n /tmp/gestaolegal-djen.lock docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar >> /opt/gestaolegal/djen.log 2>&1
+```
+
+Ajuste o caminho ao checkout do ambiente (e o nome do serviço, se não for
+`api`). Feriados não são tratados: a execução só não encontra nada. Cada
+execução grava o resultado em `djen_sincronizacoes`, exibido no topo da lista
+de publicações. Nenhum script instala esse cron.
+
 ---
 
 ## Documentação

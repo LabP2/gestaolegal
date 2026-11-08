@@ -7,10 +7,24 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import VincularPublicacao from '$lib/components/djen/vincular-publicacao.svelte';
 	import { invalidateAll } from '$app/navigation';
+	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api } from '$lib/api-client';
+	import { mensagemDeErro } from '$lib/utils/erros';
+	import { toast } from 'svelte-sonner';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 	const publicacao = $derived(data.publicacao);
+
+	async function descartar() {
+		try {
+			await api.post(`djen/publicacoes/${publicacao.id}/descartar`);
+			toast.success('Publicação descartada');
+			await invalidateAll();
+		} catch (err) {
+			toast.error(mensagemDeErro(err, 'Não foi possível descartar a publicação.'));
+		}
+	}
 
 	const POLOS: Record<string, string> = { A: 'Polo ativo', P: 'Polo passivo' };
 
@@ -52,12 +66,28 @@
 			</p>
 		</div>
 		<div class="flex flex-wrap gap-2">
-			<Button variant="outline" href="/djen">Voltar</Button>
+			<Button
+				variant="outline"
+				href={publicacao.situacao === 'pendente' && publicacao.pode_vincular
+					? '/djen/sem-caso'
+					: '/djen'}>Voltar</Button
+			>
 			{#if publicacao.id_caso}
 				<Button variant="outline" href="/casos/{publicacao.id_caso}">Abrir caso</Button>
 			{/if}
 			{#if publicacao.pode_vincular && publicacao.situacao !== 'vinculada'}
 				<VincularPublicacao {publicacao} onVinculada={() => invalidateAll()} />
+			{/if}
+			{#if publicacao.pode_vincular && publicacao.situacao === 'pendente'}
+				<ConfirmAction
+					title="Descartar esta publicação?"
+					description="Use para publicações que não são do NPJ. Ela sai da caixa Sem caso e é apagada pela rotina depois de 90 dias. Até lá, ainda pode ser vinculada a um processo."
+					confirmText="Descartar"
+					cancelText="Voltar"
+					triggerText="Descartar"
+					buttonSize="default"
+					onConfirm={descartar}
+				/>
 			{/if}
 		</div>
 	</div>
