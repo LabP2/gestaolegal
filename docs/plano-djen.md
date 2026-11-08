@@ -1,19 +1,18 @@
 # Plano — integração com o DJEN (Comunica PJe)
 
-Base: `master` em `b8f2f8d`, branch `feat/djen`. Este documento só traz o
+Branch `feat/djen`, rebaseada sobre `feat/multitenant` (PRs 1 a 9 do
+multitenant, head de migration `c2d3e4f5a6b7`). Este documento só traz o
 planejamento: nada foi implementado nem migrado.
 
-**Depende do multitenant.** A implementação começa depois que a
-multitenancy (plano em `feat/multitenant`) entrar no `master`. Tabelas novas
-deste plano (`djen_oabs`, `djen_comunicacoes`, `djen_sincronizacoes`)
-recebem a chave de tenant pelo mecanismo que aquele plano definir. A rotina
-agendada roda sem request e percorre os tenants um por um, sempre com tenant e
-unidade explícitos.
+**Depende do multitenant.** O DJEN é construído sobre a multitenancy já
+implementada; as regras estão na seção 3.1. Se `feat/multitenant` mudar antes
+do merge (achados da verificação em andamento), `feat/djen` é rebaseada de
+novo.
 
 ## Resultado esperado
 
 O sistema captura do Diário de Justiça Eletrônico Nacional (DJEN) as
-publicações dos processos da DAJ e:
+publicações dos processos de cada NPJ (tenant) e:
 
 1. mostra todas elas num menu **DJEN**, com filtros e uma caixa de
    publicações ainda sem caso;
@@ -98,8 +97,37 @@ levariam uns 25 minutos por causa do limite.
 
 ## 3. Banco de dados
 
-Migration nova (revisão humana; conferir `alembic -c migrations/alembic.ini
-heads` antes do PR).
+Migration nova, com `down_revision = "c2d3e4f5a6b7"` (M3 do multitenant).
+Revisão humana; conferir `alembic -c migrations/alembic.ini heads` antes do PR.
+
+### 3.1 Regras do multitenant que o DJEN segue
+
+Valem para tudo abaixo (detalhes em `docs/plano-multitenant.md`):
+
+- **Coluna e FKs.** As três tabelas novas recebem `coluna_tenant()`, e não
+  entram em `TABELAS_GLOBAIS`. Toda FK para tabela de tenant (`casos`,
+  `processos`, `usuarios`, `unidades`, `eventos`, `djen_*`) é composta,
+  declarada com `fk_tenant(...)`, e toda tabela referenciada ganha
+  `unica_tenant_id(...)`. Os testes estruturais
+  (`tests/database/test_tenant_schema.py`, `test_fk_composta.py`) falham se
+  isso faltar.
+- **Unicidades por tenant.** `djen_oabs (tenant_id, numero_oab, uf_oab)` e
+  `djen_comunicacoes (tenant_id, id_djen)`: uma OAB cadastrada em dois NPJs
+  recebe a mesma publicação nos dois, como registros separados.
+  `eventos.id_djen_comunicacao` continua `UNIQUE` (aponta para o id local).
+- **Repositórios.** Toda consulta passa por `self.escopo(...)` e todo INSERT
+  por `self.valores(...)`, como os 21 repositórios atuais. `text()` e
+  `.execute()` fora de `gestaolegal/repositories/` são barrados pelo lint de
+  `tests/api/test_tenant_guarda.py`; a guarda de execução recusa em runtime
+  qualquer consulta a tabela de tenant sem critério de tenant.
+- **Casamento dentro do tenant.** `processos.numero_cnj` é casado só com
+  processos do mesmo tenant da publicação.
+- **Ids referenciados** (`processo_id` no vínculo, `id_usuario` e `unidade_id`
+  da OAB) são conferidos no repositório antes de gravar, com 400 genérico,
+  como em `gestaolegal/services/referencias.py`.
+- **Rotas novas** entram classificadas em `ROTAS` de
+  `tests/api/test_tenant_vazamento.py`; sem isso a suíte falha. A varredura
+  passa então a provar que um NPJ não vê publicações do outro.
 
 ### `processos`
 - `numero_cnj CHAR(20) NULL`, com índice: só os dígitos de `numero`, quando
@@ -191,14 +219,18 @@ rotina parou.
   atualiza `ativo` e o cancelamento;
 - `vincular(comunicacao, processo)`: grava o vínculo, cria o evento e notifica
   na mesma transação, como `EventoService.create` já faz;
-- `descartar(comunicacao, usuario)`: para publicações que não são da DAJ;
+- `descartar(comunicacao, usuario)`: para publicações que não são do NPJ;
 - casamento automático: `numero_processo` igual a `processos.numero_cnj` e
   processo ativo.
 
 Pontos que diferem do fluxo de requisição:
-- A rotina roda **sem request**: `RequestContext.get_unidade_ativa()` não
-  existe nesse contexto. O service recebe a unidade explicitamente, e todo
-  INSERT passa `unidade_id`.
+- A rotina roda **sem request**: não há tenant nem unidade ativos. O comando
+  lista os tenants ativos dentro de `sem_tenant("djen: listar NPJs ativos")` e
+  processa **um de cada vez** dentro de `contexto_tenant(id)`. Cada tenant
+  grava sua própria linha em `djen_sincronizacoes`; a falha de um não
+  interrompe os outros. NPJ inativo é pulado. `--tenant SLUG` roda um só.
+- Dentro do tenant, `RequestContext.get_unidade_ativa()` também não existe: o
+  service recebe a unidade explicitamente, e todo INSERT passa `unidade_id`.
 - `NotificacaoService.notificar` hoje recebe `executor_id: int` e pula o
   destinatário que for igual ao executor. Na rotina, o executor é `None`. Já
   num vínculo manual, quem vinculou não recebe a notificação.
@@ -257,7 +289,7 @@ produção exige decisão explícita.
 | GET | `/api/djen/publicacoes` | Lista. Filtros: `inicio`, `fim`, `tribunal`, `tipo`, `oab`, `situacao`, `caso_id`, `q` (texto) e paginação |
 | GET | `/api/djen/publicacoes/<id>` | Detalhe com `texto_html_seguro`, links do tribunal e da certidão |
 | POST | `/api/djen/publicacoes/<id>/vincular` | `{processo_id}`: cria o evento e notifica |
-| POST | `/api/djen/publicacoes/<id>/descartar` | Marca como não pertencente à DAJ |
+| POST | `/api/djen/publicacoes/<id>/descartar` | Marca como não pertencente ao NPJ |
 | POST | `/api/processos/<id>/djen/buscar` | Busca imediata do histórico do processo |
 | GET | `/api/djen/status` | Última sincronização e resultado |
 
@@ -317,6 +349,10 @@ sintéticas, montadas a partir da estrutura real, com nomes fictícios.
 - Sanitização: `<script>`, `onerror` e `javascript:` não sobrevivem em
   `texto_html_seguro`.
 - Permissões por papel e por unidade em todas as rotas da seção 5.
+- Tenant: a mesma publicação capturada em dois NPJs vira dois registros; o
+  casamento não cruza NPJs; a rotina processa cada tenant ativo no seu
+  contexto, pula os inativos e segue quando um falha; as rotas novas entram na
+  varredura de vazamento.
 - `DJEN_SYNC_ENABLED=false` sai sem chamar a API.
 - Evento DJEN: campos travados no update; eventos manuais não mudam.
 
