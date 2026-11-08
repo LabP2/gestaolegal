@@ -13,6 +13,7 @@
 	import { formatDateTime } from '$lib/utils/date';
 	import type { Unidade } from '$lib/types';
 	import type { PageProps } from './$types';
+	import { siglaNpj } from '$lib/utils/npj';
 	import Edit from '@lucide/svelte/icons/edit';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 
@@ -98,8 +99,8 @@
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">Unidades</h1>
 			<p class="mt-2 text-muted-foreground">
-				Locais de atendimento da DAJ. Cada usuário enxerga apenas os dados da unidade ativa.
-				Unidades desativadas continuam listadas aqui, e só aqui, para poderem ser reativadas.
+				Locais de atendimento do {siglaNpj()}. Cada usuário enxerga apenas os dados da unidade
+				ativa. Unidades desativadas continuam listadas aqui, e só aqui, para poderem ser reativadas.
 			</p>
 		</div>
 		<Button onclick={abrirNova}>Nova Unidade</Button>

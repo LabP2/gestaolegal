@@ -122,6 +122,24 @@ A validação precisa conferir também `ativa`, com teste de acesso após a
 desativação. Administradores também dependem de vínculo; o papel não concede
 acesso automático a todas as unidades.
 
+## Recuperação de senha: NPJ desativado não avisa a pessoa
+
+`POST /api/auth/forgot-password` para conta de um NPJ desativado responde
+200 com a mesma mensagem genérica e não envia e-mail, como faz para conta
+inexistente. É proposital: avisar "seu NPJ está inativo" revelaria que a conta
+existe. O custo é que a pessoa não recebe nenhum sinal do motivo. Se a
+coordenação preferir avisar, o caminho é um e-mail informativo apenas quando
+a conta existe e o NPJ está inativo, sem mudar a resposta HTTP.
+
+## Termos de uso: texto fixo da DAJ/UFMG
+
+`web/src/routes/(dashboard)/termos-de-uso/+page.svelte` cita a DAJ, a
+Diretoria Adjunta e a URL da UFMG, e aparece igual em qualquer NPJ. Os demais
+textos de tela que diziam "DAJ" já usam a sigla do NPJ ativo
+(`$lib/utils/npj.ts`). Os termos são texto jurídico e precisam de versão por
+NPJ, ou de redação genérica definida pela coordenação, antes de serem
+parametrizados.
+
 ## Correções já entregues
 
 Os itens abaixo não são mais limitações do código atual:

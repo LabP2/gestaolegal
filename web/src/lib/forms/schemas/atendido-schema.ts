@@ -71,7 +71,7 @@ const baseAtendidoFormSchema = z
 		como_conheceu: z.enum(
 			['assist', 'integ', 'orgaos_pub', 'meios_com', 'nucleos', 'conhec', 'outros'],
 			{
-				error: 'Selecione como conheceu o DAJ'
+				error: 'Selecione como conheceu o núcleo'
 			}
 		),
 

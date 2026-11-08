@@ -39,6 +39,15 @@
 		if (!slugEditado) dados.slug = sugerirSlug(dados.sigla);
 	});
 
+	// Mesma regra do servidor (SLUG_RE em plataforma_service.py), para o aviso
+	// aparecer antes do envio. O servidor continua sendo a validação final.
+	const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+	const slugInvalido = $derived(dados.slug !== '' && !SLUG_RE.test(dados.slug));
+	const erroSlug = $derived(
+		erros.slug ??
+			(slugInvalido ? 'Use letras minúsculas, números e hífens (ex.: npj-puc-minas)' : undefined)
+	);
+
 	const secoes: { titulo: string; campos: { campo: Campo; rotulo: string; ajuda?: string }[] }[] = [
 		{
 			titulo: 'NPJ',
@@ -150,14 +159,20 @@
 									id={campo}
 									bind:value={dados[campo]}
 									oninput={() => {
-										if (campo === 'slug') slugEditado = true;
+										if (campo === 'slug') {
+											slugEditado = true;
+											// Maiúsculas e espaços viram o que o servidor aceita.
+											dados.slug = dados.slug.toLowerCase().replace(/[\s_]+/g, '-');
+										}
 									}}
-									aria-invalid={erros[campo] ? 'true' : undefined}
+									aria-invalid={(campo === 'slug' ? erroSlug : erros[campo]) ? 'true' : undefined}
 									type={campo === 'admin_email' ? 'email' : 'text'}
 									required={campo !== 'instituicao'}
 								/>
-								{#if erros[campo]}
-									<p class="text-sm text-destructive">{erros[campo]}</p>
+								{#if campo === 'slug' ? erroSlug : erros[campo]}
+									<p class="text-sm text-destructive">
+										{campo === 'slug' ? erroSlug : erros[campo]}
+									</p>
 								{:else if ajuda}
 									<p class="text-xs text-muted-foreground">{ajuda}</p>
 								{/if}
@@ -170,7 +185,9 @@
 			{#if erroGeral}
 				<p role="alert" class="text-sm text-destructive">{erroGeral}</p>
 			{/if}
-			<Button type="submit" disabled={enviando}>{enviando ? 'Criando…' : 'Criar NPJ'}</Button>
+			<Button type="submit" disabled={enviando || slugInvalido}
+				>{enviando ? 'Criando…' : 'Criar NPJ'}</Button
+			>
 		</form>
 	{/if}
 </div>

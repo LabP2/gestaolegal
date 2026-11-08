@@ -6,8 +6,16 @@
 
 	let { error }: { error: App.Error } = $props();
 
-	const errorMessage = $derived(error?.message || 'Ocorreu um erro inesperado');
 	const status = $derived($page.status);
+	// Sem mensagem da API, o texto segue o status: um 404 não é "erro inesperado".
+	const fallback = $derived(
+		status === 404
+			? 'O endereço não existe ou o registro não pertence a este NPJ.'
+			: status === 403
+				? 'Você não tem permissão para acessar esta página.'
+				: 'Ocorreu um erro inesperado'
+	);
+	const errorMessage = $derived(error?.message || fallback);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">

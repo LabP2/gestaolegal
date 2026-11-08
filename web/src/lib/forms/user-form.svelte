@@ -28,6 +28,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import type { Unidade, User } from '$lib/types';
+	import { siglaNpj } from '$lib/utils/npj';
 
 	let {
 		data,
@@ -416,12 +417,12 @@
 		</FormSection>
 	{/if}
 	<FormSection
-		title="Certificado de Atuação DAJ"
+		title="Certificado de atuação no {siglaNpj()}"
 		description="Informações sobre certificação e observações"
 		columns="1"
 	>
 		<SimpleSelect
-			label="Usuário faz jus ao certificado de atuação na DAJ?"
+			label="Usuário faz jus ao certificado de atuação no {siglaNpj()}?"
 			name="cert_atuacao_DAJ"
 			form={userForm}
 			bind:value={$formData.cert_atuacao_DAJ}

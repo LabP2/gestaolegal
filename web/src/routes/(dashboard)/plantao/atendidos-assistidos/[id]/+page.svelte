@@ -11,6 +11,7 @@
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import SenhaModal from '$lib/components/senha-modal.svelte';
 	import { formatDateOnly } from '$lib/utils/date';
+	import { siglaNpj } from '$lib/utils/npj';
 
 	let { data }: { data: PageData } = $props();
 	let { atendido } = data;
@@ -256,7 +257,7 @@
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Como Conheceu o DAJ</Card.Title>
+					<Card.Title>Como conheceu o {siglaNpj()}</Card.Title>
 				</Card.Header>
 				<Card.Content class="grid gap-4 md:grid-cols-2">
 					<div>

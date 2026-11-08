@@ -17,6 +17,7 @@
 	import { api } from '$lib/api-client';
 	import { goto } from '$app/navigation';
 	import type { Atendido } from '$lib/types';
+	import { siglaNpj } from '$lib/utils/npj';
 
 	let {
 		data,
@@ -284,7 +285,7 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Como Conheceu o DAJ</Card.Title>
+			<Card.Title>Como conheceu o {siglaNpj()}</Card.Title>
 		</Card.Header>
 		<Card.Content class="grid gap-4">
 			<SimpleSelect
