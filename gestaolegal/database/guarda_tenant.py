@@ -184,10 +184,14 @@ def conferir(stmt: Any, multiparams: Any = None, params: Any = None, *, dialect=
             "consulta global, sem_tenant(motivo)."
         )
 
-    # Os nomes compilados incluem binds anônimos (tenant_id_1, tenant_id etc.).
-    # Validar só effective_value ignora o override passado a execute().
-    nomes = stmt.compile(dialect=dialect).bind_names
     lotes = multiparams or [params or {}]
+    # Valores passados a execute() substituem os do statement, e só a
+    # compilação diz a que bind (inclusive anônimo, como tenant_id_1) cada
+    # nome se refere. Compilar custa ~100 µs; sem parâmetros externos, que é o
+    # caso dos repositórios, o valor efetivo de cada bind já é o que vai ao
+    # banco e a compilação é dispensada.
+    externos = any(valores for valores in lotes)
+    nomes = stmt.compile(dialect=dialect).bind_names if externos else {}
     for valores in lotes:
         if not isinstance(valores, dict):
             raise TenantLeakError("Parâmetros posicionais não são suportados")

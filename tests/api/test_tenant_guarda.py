@@ -12,6 +12,9 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Integer, and_, bindparam, create_engine, delete, exists, insert, select, text, update, union, union_all
 
+from sqlalchemy.sql.selectable import Select
+
+from gestaolegal.database import guarda_tenant
 from gestaolegal.database.guarda_tenant import (
     TenantLeakError,
     instalar_guarda,
@@ -79,6 +82,26 @@ class TestSelect:
         with contexto_tenant(1):
             _recusa(conn, stmt, {chave: 2}, mensagem="tenant ativo é 1")
             conn.execute(stmt, {chave: 1})
+
+    def test_sem_parametros_externos_nao_compila(self, conn, monkeypatch):
+        # Compilar custa ~100 µs por statement; só vale quando execute() traz
+        # valores que podem substituir os do statement.
+        compilacoes = []
+        original = Select.compile
+
+        def contar(self, *args, **kwargs):
+            compilacoes.append(self)
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(Select, "compile", contar)
+        stmt = select(unidades).where(unidades.c.tenant_id == 1)
+        with contexto_tenant(1):
+            guarda_tenant.conferir(stmt, [], {})
+            assert compilacoes == []
+            guarda_tenant.conferir(stmt, [], {"tenant_id_1": 1})
+            assert compilacoes == [stmt]
+            with pytest.raises(guarda_tenant.TenantLeakError):
+                guarda_tenant.conferir(stmt, [], {"tenant_id_1": 2})
 
     def test_statement_desconhecido_e_recusado(self, conn):
         with contexto_tenant(1):
