@@ -253,3 +253,14 @@ def test_migration_djen(mysql_descartavel):
             " situacao, capturada_em, unidade_id, id_caso) VALUES (1, 1, '1', CURDATE(), 'vinculada',"
             " NOW(), :u, :c)"), {"u": unidade_daj, "c": caso_outro})
     assert erro.value.orig.args[0] == 1452
+    # Evento do DJEN (sem autor) impede o downgrade, que não apaga eventos.
+    with engine.begin() as conn:
+        caso, unidade = conn.execute(
+            text("SELECT id, unidade_id FROM casos WHERE tenant_id = 1 LIMIT 1")).one()
+        conn.execute(text(
+            "INSERT INTO eventos (tenant_id, id_caso, tipo, data_evento, data_criacao, status,"
+            " unidade_id, origem) VALUES (1, :c, 'Intimação', CURDATE(), NOW(), 1, :u, 'djen')"),
+            {"c": caso, "u": unidade})
+    with pytest.raises(RuntimeError, match="Remova-os antes do downgrade"):
+        command.downgrade(cfg, "c2d3e4f5a6b7")
+    assert _schema(engine) == depois

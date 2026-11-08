@@ -343,6 +343,9 @@ ROTAS: dict[tuple[str, str], Rota] = {
     # --- DJEN (docs/plano-djen.md, §5) ---
     ("GET", "/api/djen/publicacoes"): Rota("colecao", query=f"q={BUSCA}"),
     ("GET", "/api/djen/publicacoes/<int:id>"): Rota("id", {"id": "publicacao"}),
+    ("POST", "/api/djen/publicacoes/<int:id>/vincular"): Rota(
+        "id", {"id": "publicacao"}, json=lambda ids: {"processo_id": ids["processo"]}
+    ),
     ("GET", "/api/djen/status"): Rota("colecao"),
     ("POST", "/api/processos/<int:id>/djen/buscar"): Rota("id", {"id": "processo"}),
     # --- fila de atendimento ---

@@ -6,8 +6,11 @@
   `UNIQUE (tenant_id, id)`, alvo da FK composta das publicações.
 - Tabelas novas `djen_comunicacoes` e `djen_sincronizacoes`, com `tenant_id`
   e FKs compostas, como as da M3.
+- `eventos`: `origem` (`manual` | `djen`), `id_djen_comunicacao` (FK composta,
+  no máximo um evento por publicação) e `id_criado_por` passa a aceitar nulo
+  (só para o evento criado pela rotina, que roda sem usuário).
 
-Os ALTERs em tabelas com dados (`tenants`, `processos`) juntam todas as
+Os ALTERs em tabelas com dados (`tenants`, `processos`, `eventos`) juntam todas as
 operações num único `ALTER TABLE` por tabela, como a M2: uma reconstrução em
 vez de uma por operação.
 
@@ -170,8 +173,45 @@ def upgrade() -> None:
     _criar_comunicacoes()
     _criar_sincronizacoes()
 
+    # Como na M2: a checagem de FK fica desligada durante o ALTER para o MySQL
+    # criar a FK sem copiar a tabela. É seguro: a coluna nova nasce nula.
+    bind.execute(sa.text("SET SESSION foreign_key_checks = 0"))
+    try:
+        op.execute(
+            "ALTER TABLE `eventos` "
+            "MODIFY COLUMN id_criado_por INT NULL, "
+            "ADD COLUMN origem VARCHAR(10) NOT NULL DEFAULT 'manual', "
+            "ADD COLUMN id_djen_comunicacao INT NULL, "
+            "ADD CONSTRAINT `uq_eventos_tenant_djen_comunicacao` "
+            "UNIQUE (tenant_id, id_djen_comunicacao), "
+            "ADD CONSTRAINT `fkt_eventos_id_djen_comunicacao` "
+            "FOREIGN KEY (tenant_id, id_djen_comunicacao) "
+            "REFERENCES djen_comunicacoes (tenant_id, id)"
+        )
+    finally:
+        bind.execute(sa.text("SET SESSION foreign_key_checks = 1"))
+
 
 def downgrade() -> None:
+    # Sem a coluna de origem, um evento do DJEN viraria um evento manual sem
+    # autor, e id_criado_por não poderia voltar a NOT NULL. Apagar eventos é
+    # decisão humana, não da migration.
+    bind = op.get_bind()
+    do_djen = bind.execute(
+        sa.text("SELECT COUNT(*) FROM eventos WHERE origem <> 'manual' OR id_criado_por IS NULL")
+    ).scalar()
+    if do_djen:
+        raise RuntimeError(
+            f"Há {do_djen} evento(s) criados pelo DJEN. Remova-os antes do downgrade."
+        )
+    op.execute(
+        "ALTER TABLE `eventos` "
+        "DROP FOREIGN KEY `fkt_eventos_id_djen_comunicacao`, "
+        "DROP INDEX `uq_eventos_tenant_djen_comunicacao`, "
+        "DROP COLUMN id_djen_comunicacao, "
+        "DROP COLUMN origem, "
+        "MODIFY COLUMN id_criado_por INT NOT NULL"
+    )
     op.drop_table("djen_sincronizacoes")
     op.drop_table("djen_comunicacoes")
     op.execute(

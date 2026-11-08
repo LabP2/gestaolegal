@@ -26,6 +26,9 @@
 	let { data }: PageProps = $props();
 	const { evento, caso } = $derived(data);
 	const initialForm = data.form;
+	// Evento criado de uma publicação do DJEN: tipo, data e descrição vêm da
+	// publicação e a API recusa alteração (docs/plano-djen.md, §5).
+	const doDjen = $derived(evento.origem === 'djen');
 
 	let fileInputValue = $state('');
 
@@ -39,12 +42,12 @@
 				const submission = new FormData();
 
 				const tipo = formData.get('tipo');
-				if (typeof tipo === 'string') {
+				if (!doDjen && typeof tipo === 'string') {
 					submission.append('tipo', tipo);
 				}
 
 				const dataEvento = formData.get('data_evento');
-				if (typeof dataEvento === 'string') {
+				if (!doDjen && typeof dataEvento === 'string') {
 					submission.append('data_evento', dataEvento);
 				}
 
@@ -54,7 +57,7 @@
 				}
 
 				const descricao = formData.get('descricao');
-				if (typeof descricao === 'string' && descricao.trim() !== '') {
+				if (!doDjen && typeof descricao === 'string' && descricao.trim() !== '') {
 					submission.append('descricao', descricao);
 				}
 
@@ -136,28 +139,44 @@
 		</Card.Header>
 		<Card.Content>
 			<form method="POST" enctype="multipart/form-data" use:enhance class="space-y-6">
-				<SimpleSelect
-					label="Tipo de Evento"
-					name="tipo"
-					{form}
-					bind:value={$formData.tipo}
-					options={TIPO_EVENTO_OPTIONS}
-				/>
+				{#if doDjen}
+					<div class="space-y-2 rounded-md border bg-muted/50 p-4 text-sm">
+						<p class="font-medium">Evento criado de uma publicação do DJEN</p>
+						<p class="text-muted-foreground">
+							Tipo, data e descrição vêm da publicação e não podem ser alterados. Responsável,
+							status e anexos continuam editáveis.
+						</p>
+						<p><span class="font-medium">Tipo:</span> {getTipoLabel(evento.tipo)}</p>
+						<p><span class="font-medium">Data:</span> {evento.data_evento}</p>
+						<p class="whitespace-pre-line">
+							<span class="font-medium">Descrição:</span>
+							{evento.descricao || '--'}
+						</p>
+					</div>
+				{:else}
+					<SimpleSelect
+						label="Tipo de Evento"
+						name="tipo"
+						{form}
+						bind:value={$formData.tipo}
+						options={TIPO_EVENTO_OPTIONS}
+					/>
 
-				<SimpleTextArea
-					label="Descrição"
-					name="descricao"
-					{form}
-					bind:value={$formData.descricao}
-				/>
+					<SimpleTextArea
+						label="Descrição"
+						name="descricao"
+						{form}
+						bind:value={$formData.descricao}
+					/>
 
-				<SimpleDatePicker
-					label="Data do Evento"
-					placeholder="Selecione a data"
-					name="data_evento"
-					{form}
-					bind:value={$formData.data_evento}
-				/>
+					<SimpleDatePicker
+						label="Data do Evento"
+						placeholder="Selecione a data"
+						name="data_evento"
+						{form}
+						bind:value={$formData.data_evento}
+					/>
+				{/if}
 
 				<div class="space-y-2">
 					<p class="text-sm font-medium">Usuário Responsável</p>

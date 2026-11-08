@@ -63,6 +63,7 @@ class EventoRepository(BaseRepository):
         page_params: PageParams,
         tipo: str | None = None,
         unidade_id: int | None = None,
+        origem: str | None = None,
     ) -> PaginatedResult[Evento]:
         """Eventos ativos do caso, opcionalmente filtrados por tipo.
 
@@ -76,6 +77,8 @@ class EventoRepository(BaseRepository):
             stmt = stmt.where(eventos.c.unidade_id == unidade_id)
         if tipo:
             stmt = stmt.where(eventos.c.tipo == tipo)
+        if origem:
+            stmt = stmt.where(eventos.c.origem == origem)
         stmt = stmt.order_by(eventos.c.data_evento.desc())
         stmt = self._apply_pagination(stmt, page_params)
 
@@ -144,6 +147,13 @@ class EventoRepository(BaseRepository):
         ).values(status=False)
         result = self.session.execute(stmt)
         return result.rowcount > 0
+
+    def find_by_djen_comunicacao(self, comunicacao_id: int) -> Evento | None:
+        stmt = self.escopo(
+            select(eventos).where(eventos.c.id_djen_comunicacao == comunicacao_id), eventos
+        )
+        result = self.session.execute(stmt).one_or_none()
+        return from_dict(Evento, dict(result._mapping)) if result else None
 
     def count_by_caso_id(self, caso_id: int) -> int:
         stmt = (

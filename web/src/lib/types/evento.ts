@@ -1,5 +1,7 @@
 import type { User } from './user';
 
+export type OrigemEvento = 'manual' | 'djen';
+
 export interface ArquivoEvento {
 	id: number;
 	nome: string;
@@ -15,11 +17,17 @@ export interface Evento {
 	arquivos: ArquivoEvento[];
 	data_evento: string;
 	data_criacao: string;
-	id_criado_por: number;
-	criado_por?: User;
+	/** Nulo só em evento criado pela rotina do DJEN. */
+	id_criado_por: number | null;
+	criado_por?: User | null;
 	id_usuario_responsavel?: number;
 	usuario_responsavel?: User;
 	status: boolean;
+	/** `djen`: veio de uma publicação; tipo, data e descrição não são editáveis. */
+	origem: OrigemEvento;
+	id_djen_comunicacao?: number | null;
+	/** Falso = a publicação de origem foi cancelada no DJEN. */
+	djen_ativa?: boolean | null;
 }
 
 export interface ListEvento {
@@ -33,6 +41,9 @@ export interface ListEvento {
 	descricao?: string;
 	usuario_responsavel?: string;
 	status: boolean;
+	origem: OrigemEvento;
+	id_djen_comunicacao?: number | null;
+	djen_ativa?: boolean | null;
 }
 
 export interface EventoCreateInput {

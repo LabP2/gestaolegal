@@ -407,16 +407,26 @@ eventos = Table(
     Column("arquivo", String(300), nullable=True),
     Column("data_evento", Date, nullable=False),
     Column("data_criacao", DateTime, nullable=False),
-    Column("id_criado_por", Integer, nullable=False),
+    # Nulo só em evento criado pela rotina do DJEN (origem='djen'), que roda
+    # sem usuário. Um usuário "sistema" foi descartado (docs/plano-djen.md §3).
+    Column("id_criado_por", Integer, nullable=True),
     Column("id_usuario_responsavel", Integer, nullable=True),
     Column("status", Boolean, nullable=False),
+    # manual | djen. O evento do DJEN tem tipo, data e descrição travados.
+    Column("origem", String(10), nullable=False, server_default="manual"),
+    # Publicação de origem; no máximo um evento por publicação.
+    Column("id_djen_comunicacao", Integer, nullable=True),
     coluna_unidade(),
     coluna_tenant(),
     unica_tenant_id("eventos"),
+    UniqueConstraint(
+        "tenant_id", "id_djen_comunicacao", name="uq_eventos_tenant_djen_comunicacao"
+    ),
     fk_tenant("eventos", "id_caso", "casos"),
     fk_tenant("eventos", "id_criado_por", "usuarios"),
     fk_tenant("eventos", "id_usuario_responsavel", "usuarios"),
     fk_tenant("eventos", "unidade_id", "unidades"),
+    fk_tenant("eventos", "id_djen_comunicacao", "djen_comunicacoes"),
 )
 
 # Relação 1:N, preservando a tabela e os IDs das instalações legadas.
@@ -472,7 +482,7 @@ notificacao = Table(
     Column("acao", String(200), nullable=False),
     Column("data", Date, nullable=False),
     # Colunas abaixo não existiam na v2 (nulas em registros herdados).
-    Column("tipo", String(30), nullable=True),  # caso | evento | lembrete | plantao
+    Column("tipo", String(30), nullable=True),  # caso | evento | lembrete | plantao | djen
     Column("id_caso", Integer, nullable=True),
     Column("id_referencia", Integer, nullable=True),  # id do evento ou lembrete
     # Resumo do conteúdo do aviso (cliente do caso, descrição do lembrete etc.).

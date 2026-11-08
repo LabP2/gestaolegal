@@ -17,6 +17,7 @@ from gestaolegal.database.tables import (
     eventos,
     metadata,
     notificacao,
+    processos,
     tenants,
 )
 from gestaolegal.integrations.djen_client import DJENError, RespostaHTTP
@@ -171,6 +172,8 @@ def limpar_djen() -> None:
             session.execute(djen_comunicacoes.delete())
             session.execute(djen_sincronizacoes.delete())
             session.execute(update(tenants).values(djen_ativo=False))
+            # Processos de outros testes não podem ocupar a fila da rotina.
+            session.execute(update(processos).values(djen_pendente=False))
             session.commit()
     finally:
         session.close()

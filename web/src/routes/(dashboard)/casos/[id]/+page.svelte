@@ -28,7 +28,7 @@
 	import LembreteDialog from '$lib/components/lembrete-dialog.svelte';
 	import type { Lembrete } from '$lib/types';
 	import { invalidateAll } from '$app/navigation';
-	import { Bell, History } from '@lucide/svelte';
+	import { Bell, History, Newspaper } from '@lucide/svelte';
 	import { formatDateOnly } from '$lib/utils/date';
 
 	let { data }: PageProps = $props();
@@ -134,9 +134,22 @@
 		[TIPO_EVENTO.OUTROS]: { text: 'Outros', variant: 'default' }
 	};
 
+	// Selo de origem: evento vindo do DJEN (e se a publicação foi cancelada).
+	const origemBadges: Record<string, { text: string; variant: BadgeVariant }> = {
+		djen: { text: 'DJEN', variant: 'outline' },
+		djen_cancelada: { text: 'DJEN · cancelada', variant: 'destructive' }
+	};
+
 	const eventoColumns: Column[] = [
 		{ header: 'Nº', key: 'num_evento', class: 'w-[60px] whitespace-nowrap' },
 		{ header: 'Tipo', key: 'tipo', type: 'badge', badgeMap: badges, class: 'w-[200px]' },
+		{
+			header: 'Origem',
+			key: 'origem_selo',
+			type: 'badge',
+			badgeMap: origemBadges,
+			class: 'w-[130px]'
+		},
 		{ header: 'Descrição', key: 'descricao', type: 'preview', previewClass: 'max-w-[520px]' },
 		{ header: 'Data', key: 'data_evento', type: 'date', class: 'w-[120px] whitespace-nowrap' },
 		{ header: 'Responsável', key: 'usuario_responsavel.nome', class: 'w-[200px]' }
@@ -160,8 +173,16 @@
 		}
 	}
 
+	const djenAtivo = $derived(data.me?.tenant?.djen_ativo === true);
+
 	const eventoButtons = [
 		{ title: 'Ver', icon: Eye, href: (v: Evento) => `/casos/${caso.id}/eventos/${v.id}` },
+		{
+			title: 'Ver publicação no DJEN',
+			icon: Newspaper,
+			show: (v: Evento) => djenAtivo && !!v.id_djen_comunicacao,
+			href: (v: Evento) => `/djen/publicacoes/${v.id_djen_comunicacao}`
+		},
 		{
 			title: 'Excluir',
 			icon: Trash2,
@@ -180,14 +201,29 @@
 
 	let eventos = $state(initialEventos);
 	let eventoTipoFiltro = $state('todos');
+	let eventoOrigemFiltro = $state('todos');
 
 	const eventoTipoOptions = [{ value: 'todos', label: 'Todos os tipos' }, ...TIPO_EVENTO_OPTIONS];
+	const eventoOrigemOptions = [
+		{ value: 'todos', label: 'Todas as origens' },
+		{ value: 'manual', label: 'Cadastrados à mão' },
+		{ value: 'djen', label: 'Vindos do DJEN' }
+	];
+
+	const eventosListados = $derived({
+		...eventos,
+		items: eventos.items.map((e) => ({
+			...e,
+			origem_selo: e.origem === 'djen' ? (e.djen_ativa === false ? 'djen_cancelada' : 'djen') : ''
+		}))
+	});
 
 	async function refreshEventos() {
 		// api.get already unwraps the response body — it returns the paginated
 		// data directly, so there is no Response.json() to call here.
 		const params = new URLSearchParams();
 		if (eventoTipoFiltro !== 'todos') params.set('tipo', eventoTipoFiltro);
+		if (eventoOrigemFiltro !== 'todos') params.set('origem', eventoOrigemFiltro);
 		const query = params.toString();
 		eventos = await api.get<Paginated<Evento>>(
 			`caso/${caso.id}/eventos${query ? `?${query}` : ''}`
@@ -534,6 +570,20 @@
 							{/each}
 						</Select.Content>
 					</Select.Root>
+					<Select.Root
+						type="single"
+						bind:value={eventoOrigemFiltro}
+						onValueChange={() => refreshEventos()}
+					>
+						<Select.Trigger class="w-[180px]" aria-label="Filtrar eventos por origem">
+							{eventoOrigemOptions.find((o) => o.value === eventoOrigemFiltro)?.label}
+						</Select.Trigger>
+						<Select.Content>
+							{#each eventoOrigemOptions as option (option.value)}
+								<Select.Item value={option.value}>{option.label}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
 					<Button variant="default" size="sm" onclick={() => (eventoDialogOpen = true)}>
 						<Plus class="h-4 w-4" /> Novo Evento
 					</Button>
@@ -542,7 +592,7 @@
 		</Card.Header>
 		<Card.Content>
 			<DataTable
-				data={eventos}
+				data={eventosListados}
 				columns={eventoColumns}
 				actions={{ buttons: eventoButtons }}
 				emptyText="Nenhum evento associado a este caso."

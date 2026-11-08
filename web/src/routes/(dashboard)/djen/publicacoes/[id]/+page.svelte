@@ -5,6 +5,8 @@
 	import { SITUACAO_PUBLICACAO_LABEL } from '$lib/types';
 	import { formatDateOnly, formatDateTime } from '$lib/utils/date';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import VincularPublicacao from '$lib/components/djen/vincular-publicacao.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -53,6 +55,9 @@
 			<Button variant="outline" href="/djen">Voltar</Button>
 			{#if publicacao.id_caso}
 				<Button variant="outline" href="/casos/{publicacao.id_caso}">Abrir caso</Button>
+			{/if}
+			{#if publicacao.pode_vincular && publicacao.situacao !== 'vinculada'}
+				<VincularPublicacao {publicacao} onVinculada={() => invalidateAll()} />
 			{/if}
 		</div>
 	</div>

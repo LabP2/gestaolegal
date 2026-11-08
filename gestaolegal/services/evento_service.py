@@ -22,6 +22,7 @@ from gestaolegal.models.user import UserInfo
 from gestaolegal.services import private_file_storage
 from gestaolegal.services.notificacao_service import NotificacaoService
 from gestaolegal.repositories.caso_repository import CasoRepository
+from gestaolegal.repositories.djen_repository import DjenComunicacaoRepository
 from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
@@ -43,6 +44,10 @@ documento e o .docx que já se anexa hoje. O que a lista barra é o que não tem
 por que virar anexo de um prazo ou de uma audiência: executável, script,
 arquivo sem extensão.
 """
+
+
+# Campos que vêm da publicação do DJEN e não mudam no evento (plano, §6).
+CAMPOS_TRAVADOS_DJEN: Final[tuple[str, ...]] = ("tipo", "data_evento", "descricao", "id_caso")
 
 
 def _max_arquivo_bytes() -> int:
@@ -69,12 +74,21 @@ class EventoService:
             caso_id, unidade_id=RequestContext.get_unidade_ativa()
         )
 
+    def _marcar_djen(self, eventos: list) -> None:
+        """Selo de "cancelada" lido da publicação de origem (plano, §4)."""
+        ids = {e.id_djen_comunicacao for e in eventos if e.id_djen_comunicacao}
+        ativos = DjenComunicacaoRepository().ativos_por_ids(ids)
+        for e in eventos:
+            if e.id_djen_comunicacao:
+                e.djen_ativa = ativos.get(e.id_djen_comunicacao, True)
+
     def find_by_id(self, id: int) -> Evento | None:
         logger.info(f"Finding evento by id: {id}")
         evento = self.repository.find_by_id(
             id, unidade_id=RequestContext.get_unidade_ativa()
         )
         if evento:
+            self._marcar_djen([evento])
             self._carregar_arquivos(evento)
             user_map = self.__get_user_map([evento])
             evento.usuario_responsavel = (
@@ -91,7 +105,11 @@ class EventoService:
         return evento
 
     def find_by_caso_id(
-        self, caso_id: int, page_params: PageParams, tipo: str | None = None
+        self,
+        caso_id: int,
+        page_params: PageParams,
+        tipo: str | None = None,
+        origem: str | None = None,
     ) -> PaginatedResult[ListEvento]:
         logger.info(f"Finding eventos for caso id: {caso_id}, tipo: {tipo}")
         if not self._caso_da_unidade_ativa(caso_id):
@@ -103,8 +121,10 @@ class EventoService:
             page_params,
             tipo,
             unidade_id=RequestContext.get_unidade_ativa(),
+            origem=origem,
         )
 
+        self._marcar_djen(result.items)
         user_map = self.__get_user_map(result.items)
 
         list_eventos: list[ListEvento] = []
@@ -114,7 +134,9 @@ class EventoService:
                 if evento.id_usuario_responsavel
                 else None
             )
-            criado_por = user_map.get(evento.id_criado_por)
+            criado_por = (
+                user_map.get(evento.id_criado_por) if evento.id_criado_por else None
+            )
 
             list_eventos.append(
                 ListEvento(
@@ -130,6 +152,9 @@ class EventoService:
                     criado_por=criado_por.nome if criado_por else None,
                     id_criado_por=evento.id_criado_por,
                     descricao=evento.descricao,
+                    origem=evento.origem,
+                    id_djen_comunicacao=evento.id_djen_comunicacao,
+                    djen_ativa=evento.djen_ativa,
                 )
             )
 
@@ -158,11 +183,14 @@ class EventoService:
             logger.warning(f"Evento {evento_id} does not belong to caso {caso_id}")
             return None
 
+        self._marcar_djen([evento])
         self._carregar_arquivos(evento)
         user_map = self.__get_user_map([evento])
         if evento.id_usuario_responsavel:
             evento.usuario_responsavel = user_map.get(evento.id_usuario_responsavel)
-        evento.criado_por = user_map.get(evento.id_criado_por)
+        evento.criado_por = (
+            user_map.get(evento.id_criado_por) if evento.id_criado_por else None
+        )
 
         logger.info(f"Evento validated successfully with id: {evento_id}")
         return evento
@@ -228,9 +256,11 @@ class EventoService:
         uploads = list(arquivos or []) + ([arquivo] if arquivo else [])
         for file in uploads:
             self._validar_anexo(file)
+        data = evento_input.model_dump(exclude_none=True)
+        if existing.origem == "djen":
+            self._exigir_campos_djen_intactos(existing, data)
         refs: list[str] = []
         try:
-            data = evento_input.model_dump(exclude_none=True)
             if data:
                 self.repository.update(evento_id, data)
             # Adicionar arquivos nunca substitui os anexos já existentes.
@@ -245,6 +275,21 @@ class EventoService:
             if isinstance(error, GestaoLegalException):
                 raise
             raise FileOperationException("Falha ao salvar evento e anexos", operation="upload") from error
+
+    @staticmethod
+    def _exigir_campos_djen_intactos(existing: Evento, data: dict) -> None:
+        """Tipo, data, descrição e caso do evento do DJEN vêm da publicação.
+
+        Mandar o mesmo valor (o formulário reenvia tudo) é aceito; mudar, não.
+        Responsável e anexos continuam editáveis.
+        """
+        for campo in CAMPOS_TRAVADOS_DJEN:
+            if campo in data and data[campo] != getattr(existing, campo):
+                raise ValidationException(
+                    "Este campo vem da publicação do DJEN e não pode ser alterado",
+                    field=campo,
+                )
+            data.pop(campo, None)
 
     def _autorizar_exclusao(self, evento_id: int, caso_id: int, user: UserInfo) -> Evento:
         evento = self.validate_evento_for_caso(evento_id, caso_id)

@@ -101,6 +101,20 @@ def detalhe_publicacao(id: int):
     return success_response(data=dados)
 
 
+@djen_controller.route("/djen/publicacoes/<int:id>/vincular", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def vincular_publicacao(id: int):
+    corpo = request.get_json(silent=True) or {}
+    dados = DJENService().vincular(
+        id,
+        corpo.get("processo_id") if isinstance(corpo, dict) else None,
+        RequestContext.get_current_user(),
+        RequestContext.get_unidade_ativa(),
+    )
+    return success_response(data=dados, message="Publicação vinculada ao processo")
+
+
 @djen_controller.route("/djen/status", methods=["GET"])
 @authorized(*PAPEIS_LEITURA)
 @djen_habilitado

@@ -29,6 +29,7 @@ from gestaolegal.exceptions import (
 from gestaolegal.integrations import djen_html
 from gestaolegal.integrations.djen_client import Comunicacao, DJENClient, DJENError
 from gestaolegal.models.caso import Caso
+from gestaolegal.models.evento import Evento
 from gestaolegal.models.djen import (
     SITUACOES,
     ComunicacaoDJEN,
@@ -42,8 +43,10 @@ from gestaolegal.repositories.djen_repository import (
     DjenComunicacaoRepository,
     DjenSincronizacaoRepository,
 )
+from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.processo_repository import ProcessoRepository
 from gestaolegal.repositories.tenant_repository import TenantRepository
+from gestaolegal.services.notificacao_service import NotificacaoService
 from gestaolegal.utils.cnj import mascarar_cnj
 
 logger = logging.getLogger(__name__)
@@ -81,6 +84,10 @@ class DJENService:
         self.processos = ProcessoRepository()
         self.casos = CasoRepository()
         self.tenants = TenantRepository()
+        self.eventos = EventoRepository()
+        # Avisos da captura em curso, agregados por caso até o commit da fonte:
+        # {caso_id: (caso, eventos, executor)}.
+        self._avisos: dict[int, tuple[Caso, list[Evento], int | None]] = {}
 
     @property
     def session(self):
@@ -304,7 +311,12 @@ class DJENService:
         caso: Caso,
         executor_id: int | None,
         manual: bool,
-    ) -> None:
+    ) -> Evento:
+        """Grava o vínculo e cria o evento no caso, na transação em curso.
+
+        O vínculo manual notifica na hora; o da captura agrega os avisos por
+        caso até o fim da fonte (`_depois_da_fonte`).
+        """
         self.repo.atualizar(
             comunicacao_id,
             {
@@ -316,10 +328,86 @@ class DJENService:
                 "id_vinculado_por": executor_id if manual else None,
             },
         )
+        evento, novo = self._criar_evento(comunicacao_id, caso, executor_id)
+        if novo:
+            if manual:
+                NotificacaoService().djen_publicacoes(caso, [evento], executor_id)
+            else:
+                _, lista, _ = self._avisos.setdefault(caso.id, (caso, [], executor_id))
+                lista.append(evento)
+        return evento
+
+    def _criar_evento(
+        self, comunicacao_id: int, caso: Caso, executor_id: int | None
+    ) -> tuple[Evento, bool]:
+        """Evento `origem='djen'` da publicação (plano, §4). Um por publicação."""
+        existente = self.eventos.find_by_djen_comunicacao(comunicacao_id)
+        if existente is not None:
+            return existente, False
+        comunicacao = self.repo.find_by_id(comunicacao_id)
+        assert comunicacao is not None
+        cabecalho = " — ".join(
+            p for p in (comunicacao.nome_orgao, comunicacao.nome_classe) if p
+        )
+        corpo = djen_html.resumo(comunicacao.texto_plano or "", 500)
+        descricao = "\n\n".join(p for p in (cabecalho, corpo) if p) or None
+        evento_id = self.eventos.create(
+            {
+                "id_caso": caso.id,
+                "num_evento": self.eventos.count_by_caso_id(caso.id) + 1,
+                "tipo": (comunicacao.tipo_comunicacao or "Publicação no DJEN")[:50],
+                "descricao": descricao,
+                "data_evento": comunicacao.data_disponibilizacao,
+                "data_criacao": datetime.now(),
+                "id_criado_por": executor_id,
+                "id_usuario_responsavel": caso.id_estagiario or caso.id_orientador,
+                "status": True,
+                "origem": "djen",
+                "id_djen_comunicacao": comunicacao_id,
+                "unidade_id": caso.unidade_id,
+            }
+        )
+        evento = self.eventos.find_by_id(evento_id)
+        assert evento is not None
+        return evento, True
 
     def _ao_cancelar(self, comunicacao: ComunicacaoDJEN, executor_id: int | None) -> None:
-        """Publicação cancelada depois do vínculo: nada é apagado."""
+        """Publicação cancelada depois do vínculo: o evento fica, com o selo de
+        cancelada (lido de `djen_comunicacoes.ativo`), e o caso é avisado."""
         logger.info(f"DJEN: publicação {comunicacao.id} cancelada no DJEN")
+        evento = self.eventos.find_by_djen_comunicacao(comunicacao.id)
+        caso = self.casos.find_by_id(comunicacao.id_caso) if comunicacao.id_caso else None
+        if evento is not None and caso is not None:
+            NotificacaoService().djen_cancelada(caso, evento, executor_id)
+
+    def vincular(
+        self, id: int, processo_id: Any, user: UserInfo, unidade_id: int
+    ) -> dict[str, Any]:
+        """Vínculo manual: grava, cria o evento e notifica na mesma transação."""
+        if user.urole not in PAPEIS_GESTAO:
+            raise ForbiddenException()
+        comunicacao = self._visivel(id, user, unidade_id)
+        if comunicacao.situacao == "vinculada":
+            raise ValidationException("A publicação já está vinculada a um caso")
+        if isinstance(processo_id, bool) or not isinstance(processo_id, int):
+            raise ValidationException("Informe o processo", field="processo_id")
+        processo = self.processos.find_by_id(processo_id)
+        caso = (
+            self.casos.find_by_id(processo.id_caso, unidade_id=unidade_id)
+            if processo
+            else None
+        )
+        if processo is None or caso is None:
+            # Mesma resposta para id inexistente, de outra unidade ou de outro NPJ.
+            raise ValidationException("Processo não encontrado", field="processo_id")
+        try:
+            self._vincular(comunicacao.id, processo, caso, user.id, manual=True)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        logger.info(f"DJEN: publicação {id} vinculada ao processo {processo_id} por {user.id}")
+        return self.detalhe(id, user, unidade_id)
 
     def _consultar_processo(
         self, processo: Processo, resultado: ResultadoCaptura, executor_id: int | None
@@ -375,12 +463,15 @@ class DJENService:
             "djen_consultado_em": atualizado.djen_consultado_em if atualizado else None,
         }
 
-    # Ganchos das fases seguintes (eventos e notificações agregadas).
     def _depois_da_fonte(self) -> None:
-        pass
+        """Avisos agregados da fonte, na mesma transação que os eventos."""
+        avisos, self._avisos = self._avisos, {}
+        servico = NotificacaoService()
+        for caso, eventos, executor in avisos.values():
+            servico.djen_publicacoes(caso, eventos, executor)
 
     def _descartar_pendencias(self) -> None:
-        pass
+        self._avisos = {}
 
     def sincronizar(
         self, janela_dias: int | None = None, max_processos: int | None = None

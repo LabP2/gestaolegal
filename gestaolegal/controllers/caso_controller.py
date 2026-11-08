@@ -306,11 +306,17 @@ def get_eventos_by_caso(caso_id: int):
     tipo = request.args.get("tipo", default=None, type=str)
     if tipo == "todos":
         tipo = None
+    origem = request.args.get("origem", default=None, type=str)
+    if origem in (None, "", "todos"):
+        origem = None
+    elif origem not in ("manual", "djen"):
+        raise ValidationException("Origem inválida", field="origem")
 
     result = evento_service.find_by_caso_id(
         caso_id=caso_id,
         page_params=PageParams(page=page, per_page=per_page),
         tipo=tipo,
+        origem=origem,
     )
 
     return success_response(data=result.to_dict())

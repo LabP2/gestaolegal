@@ -7,7 +7,7 @@ export type Notificacao = {
 	id_executor_acao: number | null;
 	/** Nulo = aviso geral (abertura do plantão). */
 	id_usu_notificar: number | null;
-	tipo: 'caso' | 'evento' | 'lembrete' | 'plantao' | null;
+	tipo: 'caso' | 'evento' | 'lembrete' | 'plantao' | 'djen' | null;
 	id_caso: number | null;
 	id_referencia: number | null;
 	/** Resumo do conteúdo: clientes do caso, descrição do lembrete etc. */
@@ -29,6 +29,8 @@ export function destinoDaNotificacao(n: Notificacao): string | null {
 		case 'caso':
 			return n.id_caso ? `/casos/${n.id_caso}` : null;
 		case 'evento':
+		case 'djen':
+			// Publicação do DJEN: leva ao evento criado no caso.
 			return n.id_caso && n.id_referencia ? `/casos/${n.id_caso}/eventos/${n.id_referencia}` : null;
 		case 'lembrete':
 			return n.id_caso ? `/casos/${n.id_caso}` : null;

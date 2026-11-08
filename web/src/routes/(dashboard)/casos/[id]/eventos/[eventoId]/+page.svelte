@@ -12,6 +12,8 @@
 	import { ApiException } from '$lib/types';
 	import ConfirmAction from '$lib/components/confirm-action.svelte';
 	import { goto } from '$app/navigation';
+	import { Badge } from '$lib/components/ui/badge';
+	import Newspaper from '@lucide/svelte/icons/newspaper';
 
 	let { data }: PageProps = $props();
 	const { evento, caso } = $derived(data);
@@ -69,8 +71,13 @@
 		{ label: 'Status', value: evento.status ? 'Ativo' : 'Inativo' }
 	]);
 
+	const doDjen = $derived(evento.origem === 'djen');
+
 	const auditInfoData = $derived([
-		{ label: 'Criado Por', value: evento.criado_por?.nome || '--' },
+		{
+			label: 'Criado Por',
+			value: evento.criado_por?.nome || (doDjen ? 'Rotina do DJEN' : '--')
+		},
 		{ label: 'Data de Criação', value: evento.data_criacao, formatter: formatDateTime }
 	]);
 </script>
@@ -78,9 +85,17 @@
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold tracking-tight">
-				Evento #{evento.num_evento || evento.id}
-			</h1>
+			<div class="flex flex-wrap items-center gap-2">
+				<h1 class="text-3xl font-bold tracking-tight">
+					Evento #{evento.num_evento || evento.id}
+				</h1>
+				{#if doDjen}
+					<Badge variant="outline">DJEN</Badge>
+					{#if evento.djen_ativa === false}
+						<Badge variant="destructive">Publicação cancelada no DJEN</Badge>
+					{/if}
+				{/if}
+			</div>
 			<p class="text-muted-foreground">
 				<a href="/casos/{caso.id}" class="hover:underline">Caso #{caso.id}</a>
 				/ {getTipoLabel(evento.tipo)}
@@ -88,6 +103,12 @@
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" href="/casos/{caso.id}">Voltar</Button>
+			{#if doDjen && evento.id_djen_comunicacao && data.me?.tenant?.djen_ativo}
+				<Button variant="outline" href="/djen/publicacoes/{evento.id_djen_comunicacao}">
+					<Newspaper class="mr-2 h-4 w-4" />
+					Ver publicação
+				</Button>
+			{/if}
 
 			<Button href="/casos/{caso.id}/eventos/{evento.id}/editar">
 				<Edit class="mr-2 h-4 w-4" />

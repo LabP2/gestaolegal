@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
 
-TipoNotificacao = Literal["caso", "evento", "lembrete", "plantao"]
+TipoNotificacao = Literal["caso", "evento", "lembrete", "plantao", "djen"]
 
 
 @dataclass
