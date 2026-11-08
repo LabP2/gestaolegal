@@ -116,7 +116,9 @@ class PlataformaService:
             )
         senha_hash = bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt()).decode()
         with sem_tenant("plataforma: criar administrador"):
-            if self.admins.find_by_email(email):
+            # O e-mail é único na plataforma inteira: nem outro admin da
+            # plataforma nem uma conta de NPJ podem tê-lo.
+            if self.admins.find_by_email(email) or UsuarioService().email_em_uso(email):
                 raise ValidationException("E-mail já está em uso", field="email")
             return self.admins.criar(nome, email, senha_hash)
 
@@ -165,6 +167,10 @@ class PlataformaService:
         try:
             with sem_tenant("plataforma: criar NPJ"):
                 self._exigir_unicos(sigla, slug)
+                # As contas de NPJ são conferidas em create_admin; aqui só a
+                # plataforma, que tem tabela própria.
+                if self.admins.find_by_email(admin_email):
+                    raise ValidationException("E-mail já está em uso", field="admin_email")
                 tenant_id = self.tenants.criar(
                     {
                         "nome": nome,

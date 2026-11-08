@@ -4,8 +4,10 @@ from typing import cast
 
 from gestaolegal.common import PageParams, PaginatedResult
 from gestaolegal.database.session import transaction
+from gestaolegal.exceptions import NotFoundException
 from gestaolegal.models.historico import HistoricoListItem
 from gestaolegal.models.user import User
+from gestaolegal.repositories.caso_repository import CasoRepository
 from gestaolegal.repositories.historico_repository import HistoricoRepository
 from gestaolegal.repositories.repository import (
     GetParams,
@@ -13,6 +15,7 @@ from gestaolegal.repositories.repository import (
     WhereClause,
 )
 from gestaolegal.repositories.user_repository import UserRepository
+from gestaolegal.utils.request_context import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,12 @@ class HistoricoService:
         self, caso_id: int, page_params: PageParams | None = None
     ) -> PaginatedResult[HistoricoListItem]:
         logger.info(f"Fetching historico for caso {caso_id}")
+        # Mesma regra dos eventos: caso de outro NPJ ou de outra unidade não
+        # existe para quem pergunta, e a resposta é 404, não lista vazia.
+        if not CasoRepository().find_by_id(
+            caso_id, unidade_id=RequestContext.get_unidade_ativa()
+        ):
+            raise NotFoundException(resource="Caso", resource_id=caso_id)
         result = self.repository.get_by_caso(
             caso_id, SearchParams(page_params=page_params, where=None)
         )

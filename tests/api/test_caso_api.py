@@ -83,6 +83,15 @@ def test_get_caso_not_found(client: FlaskClient, auth_headers: dict[str, str]) -
     assert response.status_code == 404
 
 
+def test_get_historico_caso_not_found(
+    client: FlaskClient, auth_headers: dict[str, str]
+) -> None:
+    """Histórico de caso inexistente responde 404, como eventos e processos."""
+    response = client.get("/api/caso/99999/historico", headers=auth_headers)
+
+    assert response.status_code == 404
+
+
 def test_update_caso(
     client: FlaskClient,
     auth_headers: dict[str, str],

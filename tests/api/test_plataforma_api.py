@@ -286,6 +286,14 @@ class TestCriacao:
         assert _campo(response) == "admin_email"
         assert _consulta("SELECT id FROM tenants WHERE slug = :s", {"s": dados["slug"]}) == []
 
+    def test_email_do_admin_da_plataforma_nao_vira_admin_de_npj(
+        self, client, plat_headers
+    ):
+        dados, response = _criar(client, plat_headers, admin_email=PLAT_EMAIL.upper())
+        assert response.status_code == 400, response.get_json()
+        assert _campo(response) == "admin_email"
+        assert _consulta("SELECT id FROM tenants WHERE slug = :s", {"s": dados["slug"]}) == []
+
     @pytest.mark.parametrize("campo", ["slug", "sigla"])
     def test_slug_e_sigla_unicos(self, client, plat_headers, campo):
         primeiro, response = _criar(client, plat_headers)
@@ -405,6 +413,26 @@ class TestCli:
         assert len(
             _consulta("SELECT id FROM plataforma_admins WHERE email = :e", {"e": PLAT_EMAIL})
         ) == 1
+
+    def test_email_de_conta_de_npj_recusado(self, app, create_admin_user):
+        resultado = app.test_cli_runner().invoke(
+            args=[
+                "plataforma",
+                "criar-admin",
+                "--email",
+                TEST_ADMIN_EMAIL,
+                "--nome",
+                "Admin de NPJ",
+                "--senha",
+                "outra-senha-123",
+            ]
+        )
+        assert resultado.exit_code != 0
+        assert "já está em uso" in resultado.output
+        assert (
+            _consulta("SELECT id FROM plataforma_admins WHERE email = :e", {"e": TEST_ADMIN_EMAIL})
+            == []
+        )
 
     def test_senha_curta_recusada(self, app):
         resultado = app.test_cli_runner().invoke(

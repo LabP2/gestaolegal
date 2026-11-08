@@ -643,6 +643,35 @@ def test_atendido_de_outra_unidade_responde_404(
     )
 
 
+def test_sublistas_de_atendido_fora_do_escopo_respondem_404(
+    client: FlaskClient,
+    auth_headers: dict[str, str],
+    auth_headers_nl: dict[str, str],
+    sample_atendido_data: dict[str, Any],
+) -> None:
+    """Casos e orientações de um atendido inexistente ou de outra unidade dão
+    404, como a ficha, e não lista vazia."""
+    clean_tables("atendidos")
+
+    id_bh = get_success_data(
+        client.post("/api/atendido/", json=sample_atendido_data, headers=auth_headers)
+    )["id"]
+
+    for sub in ("casos", "orientacoes"):
+        assert (
+            client.get(f"/api/atendido/{id_bh}/{sub}", headers=auth_headers).status_code
+            == 200
+        )
+        assert (
+            client.get(f"/api/atendido/{id_bh}/{sub}", headers=auth_headers_nl).status_code
+            == 404
+        )
+        assert (
+            client.get(f"/api/atendido/999999/{sub}", headers=auth_headers).status_code
+            == 404
+        )
+
+
 def test_atendido_create_grava_unidade_ativa(
     client: FlaskClient,
     auth_headers_nl: dict[str, str],

@@ -20,6 +20,13 @@ from gestaolegal.utils.api_response import success_response
 atendido_controller = Blueprint("atendido_api", __name__)
 
 
+def _exigir_atendido(id: int) -> None:
+    """Sublistas de um atendido fora do escopo (outro NPJ ou outra unidade)
+    respondem 404, como a ficha, em vez de lista vazia."""
+    if not AtendidoService().find_by_id(id):
+        raise NotFoundException(resource="Atendido", resource_id=id)
+
+
 @atendido_controller.route("/", methods=["GET"])
 @authenticated
 def get():
@@ -56,6 +63,7 @@ def find_by_id(id: int):
 @authenticated
 def get_casos(id: int):
     """Casos vinculados a um atendido/assistido (partes envolvidas)."""
+    _exigir_atendido(id)
     caso_service = CasoService()
     result = caso_service.search(
         page_params=PageParams(page=1, per_page=100),
@@ -69,6 +77,7 @@ def get_casos(id: int):
 @authenticated
 def get_orientacoes(id: int):
     """Orientações jurídicas vinculadas a um atendido/assistido."""
+    _exigir_atendido(id)
     orientacao_service = OrientacaoJuridicaService()
     result = orientacao_service.search(
         page_params=PageParams(page=1, per_page=100),
