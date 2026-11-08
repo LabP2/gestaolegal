@@ -140,29 +140,41 @@ def upgrade() -> None:
             "Corrija os dados antes da M3:\n  " + "\n  ".join(problemas)
         )
 
-    for pai in PAIS:
-        op.create_unique_constraint(_nome_unica(pai), pai, ["tenant_id", "id"])
+    # Um ALTER TABLE por tabela, e não um por FK: cada ALTER pode reconstruir
+    # a tabela. A checagem de FK fica desligada para o MySQL trocar as FKs sem
+    # copiar a tabela (ALGORITHM=COPY); os dados já foram conferidos acima,
+    # com a API parada.
+    bind.execute(sa.text("SET SESSION foreign_key_checks = 0"))
+    try:
+        # As unicidades dos pais vêm antes: são o alvo das FKs compostas.
+        for pai in PAIS:
+            op.execute(
+                f"ALTER TABLE `{pai}` ADD CONSTRAINT `{_nome_unica(pai)}` UNIQUE (tenant_id, id)"
+            )
 
-    insp = sa.inspect(bind)
-    for tabela, coluna, pai, ondelete, nome in FKS:
-        antiga = _fk(insp, tabela, [coluna], pai)
-        if antiga is None:
-            # Bancos herdados da 2.0 podem não ter a FK simples. A composta
-            # entra do mesmo jeito; os dados já foram conferidos acima.
-            print(f"M3: {tabela}.{coluna} não tinha FK simples para {pai}")
-        else:
-            # O ON DELETE do banco vale mais que a lista: a composta herda o
-            # comportamento que a produção já tem.
-            ondelete = _ondelete(antiga)
-            op.drop_constraint(antiga["name"], tabela, type_="foreignkey")
-        op.create_foreign_key(
-            nome,
-            tabela,
-            pai,
-            ["tenant_id", coluna],
-            ["tenant_id", "id"],
-            ondelete=ondelete,
-        )
+        insp = sa.inspect(bind)
+        por_tabela: dict[str, list[str]] = {}
+        for tabela, coluna, pai, ondelete, nome in FKS:
+            partes = por_tabela.setdefault(tabela, [])
+            antiga = _fk(insp, tabela, [coluna], pai)
+            if antiga is None:
+                # Bancos herdados da 2.0 podem não ter a FK simples. A composta
+                # entra do mesmo jeito; os dados já foram conferidos acima.
+                print(f"M3: {tabela}.{coluna} não tinha FK simples para {pai}")
+            else:
+                # O ON DELETE do banco vale mais que a lista: a composta herda
+                # o comportamento que a produção já tem.
+                ondelete = _ondelete(antiga)
+                partes.append(f"DROP FOREIGN KEY `{antiga['name']}`")
+            acao = f" ON DELETE {ondelete}" if ondelete else ""
+            partes.append(
+                f"ADD CONSTRAINT `{nome}` FOREIGN KEY (tenant_id, `{coluna}`) "
+                f"REFERENCES `{pai}` (tenant_id, id){acao}"
+            )
+        for tabela, partes in por_tabela.items():
+            op.execute(f"ALTER TABLE `{tabela}` " + ", ".join(partes))
+    finally:
+        bind.execute(sa.text("SET SESSION foreign_key_checks = 1"))
 
 
 def downgrade() -> None:

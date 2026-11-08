@@ -87,18 +87,41 @@ def _unica_de_uma_coluna(tabela: str, coluna: str) -> str:
 
 
 def upgrade() -> None:
-    for tabela in TABELAS:
-        op.add_column(tabela, sa.Column("tenant_id", sa.Integer(), nullable=True))
-        op.execute(f"UPDATE `{tabela}` SET tenant_id = {TENANT_INICIAL_ID}")
-        op.alter_column(
-            tabela, "tenant_id", existing_type=sa.Integer(), nullable=False
-        )
-        op.create_index(_ix(tabela), tabela, ["tenant_id"])
-        op.create_foreign_key(_fk(tabela), tabela, "tenants", ["tenant_id"], ["id"])
+    # Um único ALTER TABLE por tabela: coluna, índice, FK e unicidades juntos
+    # custam uma reconstrução, em vez de uma por operação. O DEFAULT preenche
+    # as linhas existentes sem UPDATE e sai em seguida (só metadados), para
+    # que todo INSERT continue obrigado a informar o tenant.
+    #
+    # A checagem de FK fica desligada durante o ALTER para o MySQL criar a FK
+    # sem copiar a tabela (ALGORITHM=COPY). É seguro: toda linha recebe o
+    # tenant inicial, cuja existência é conferida antes.
+    bind = op.get_bind()
+    existe = bind.execute(
+        sa.text("SELECT COUNT(*) FROM tenants WHERE id = :id"), {"id": TENANT_INICIAL_ID}
+    ).scalar()
+    if not existe:
+        raise RuntimeError(f"Tenant {TENANT_INICIAL_ID} não existe; aplique a M1 antes.")
 
+    unicidades: dict[str, list[str]] = {}
     for tabela, coluna, nova, _ in UNICIDADES:
-        op.drop_constraint(_unica_de_uma_coluna(tabela, coluna), tabela, type_="unique")
-        op.create_unique_constraint(nova, tabela, ["tenant_id", coluna])
+        antiga = _unica_de_uma_coluna(tabela, coluna)
+        unicidades.setdefault(tabela, []).extend(
+            [f"DROP INDEX `{antiga}`", f"ADD CONSTRAINT `{nova}` UNIQUE (tenant_id, `{coluna}`)"]
+        )
+
+    bind.execute(sa.text("SET SESSION foreign_key_checks = 0"))
+    try:
+        for tabela in TABELAS:
+            partes = [
+                f"ADD COLUMN tenant_id INT NOT NULL DEFAULT {TENANT_INICIAL_ID}",
+                f"ADD INDEX `{_ix(tabela)}` (tenant_id)",
+                f"ADD CONSTRAINT `{_fk(tabela)}` FOREIGN KEY (tenant_id) REFERENCES tenants (id)",
+                *unicidades.get(tabela, []),
+            ]
+            op.execute(f"ALTER TABLE `{tabela}` " + ", ".join(partes))
+            op.execute(f"ALTER TABLE `{tabela}` ALTER COLUMN tenant_id DROP DEFAULT")
+    finally:
+        bind.execute(sa.text("SET SESSION foreign_key_checks = 1"))
 
 
 def downgrade() -> None:
