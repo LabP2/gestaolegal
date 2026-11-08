@@ -129,6 +129,32 @@ Valem para tudo abaixo (detalhes em `docs/plano-multitenant.md`):
   `tests/api/test_tenant_vazamento.py`; sem isso a suíte falha. A varredura
   passa então a provar que um NPJ não vê publicações do outro.
 
+### 3.2 Chave do DJEN por NPJ
+
+Duas chaves, em camadas. A captura só roda para um NPJ com as duas ligadas.
+
+| Chave | Onde | Quem controla | Para quê |
+|---|---|---|---|
+| `DJEN_SYNC_ENABLED` | `.env` do servidor | quem implanta | Trava do ambiente: em QA e demo fica desligada, para não gerar notificações reais por engano |
+| `tenants.djen_ativo` | banco; interruptor na área da plataforma | admin da plataforma | Liga o DJEN por NPJ |
+
+Com `djen_ativo` desligado:
+- a rotina pula o NPJ e registra o motivo no log, sem gravar linha em
+  `djen_sincronizacoes`;
+- o menu DJEN não aparece, e as rotas `/api/djen/*` e
+  `/api/processos/<id>/djen/buscar` respondem 403;
+- nada é apagado: publicações já capturadas ficam no banco, e os eventos DJEN
+  já vinculados continuam visíveis no caso. Religar retoma a captura de onde
+  parou.
+
+Uma tabela genérica de recursos e limites por NPJ fica para a fase futura
+prevista no plano do multitenant. Se outros recursos opcionais surgirem, esta
+coluna migra para lá.
+
+### `tenants`
+- `djen_ativo BOOLEAN NOT NULL DEFAULT 0`: liga o DJEN para o NPJ (seção
+  3.2). Todos os NPJs começam desligados, inclusive a DAJ.
+
 ### `processos`
 - `numero_cnj CHAR(20) NULL`, com índice: só os dígitos de `numero`, quando
   tiver exatamente 20. É preenchido pelo service ao salvar e calculado para os
@@ -226,7 +252,8 @@ rotina parou.
 Pontos que diferem do fluxo de requisição:
 - A rotina roda **sem request**: não há tenant nem unidade ativos. O comando
   lista os tenants ativos dentro de `sem_tenant("djen: listar NPJs ativos")` e
-  processa **um de cada vez** dentro de `contexto_tenant(id)`. Cada tenant
+  processa **um de cada vez** dentro de `contexto_tenant(id)`. Só entram os
+  NPJs com `djen_ativo` ligado (seção 3.2). Cada tenant
   grava sua própria linha em `djen_sincronizacoes`; a falha de um não
   interrompe os outros. NPJ inativo é pulado. `--tenant SLUG` roda um só.
 - Dentro do tenant, `RequestContext.get_unidade_ativa()` também não existe: o
@@ -293,13 +320,23 @@ produção exige decisão explícita.
 | POST | `/api/processos/<id>/djen/buscar` | Busca imediata do histórico do processo |
 | GET | `/api/djen/status` | Última sincronização e resultado |
 
-Todas as rotas filtram por unidade. A certidão usa o link público direto;
-não há proxy.
+Todas as rotas filtram por unidade e respondem 403 se o NPJ estiver com o
+DJEN desligado. A certidão usa o link público direto; não há proxy.
+
+Mudanças em rotas que já existem:
+
+| Rota | Mudança |
+|---|---|
+| `GET /api/user/me` | `tenant` ganha `djen_ativo`, que o front usa para mostrar o menu |
+| `GET`/`PUT /api/plataforma/tenants/<id>` e `GET /api/plataforma/tenants` | passam a ler e gravar `djen_ativo` |
 
 ## 6. Frontend
 
 - **Menu "DJEN"** no `app-sidebar.svelte`, com os subitens "Publicações" e
-  "Sem caso". O "Sem caso" só aparece para os papéis que podem vincular.
+  "Sem caso". Só aparece se `tenant.djen_ativo`. O "Sem caso" só aparece para
+  os papéis que podem vincular.
+- **Área da plataforma:** interruptor "Busca no DJEN" na edição do NPJ e
+  coluna na lista de NPJs.
 - **Lista:** data, tribunal, vara, tipo, processo com máscara, caso (link) e
   situação. Os filtros ficam na URL, no mesmo padrão adotado na lista de
   casos em `b8f2f8d`. No topo, aviso de "Última sincronização: …", com alerta
@@ -354,13 +391,17 @@ sintéticas, montadas a partir da estrutura real, com nomes fictícios.
   contexto, pula os inativos e segue quando um falha; as rotas novas entram na
   varredura de vazamento.
 - `DJEN_SYNC_ENABLED=false` sai sem chamar a API.
+- `djen_ativo` desligado: a rotina pula o NPJ sem chamar a API; rotas DJEN dão
+  403; o menu some; publicações e eventos já gravados continuam. Só o admin da
+  plataforma altera a chave; token de NPJ não consegue.
 - Evento DJEN: campos travados no update; eventos manuais não mudam.
 
 ## 10. Fases e PRs
 
 1. **Captura e lista.**
-   - Migration (`processos.numero_cnj`, `djen_comunicacoes`,
-     `djen_sincronizacoes`).
+   - Migration (`tenants.djen_ativo`, `processos.numero_cnj`,
+     `djen_comunicacoes`, `djen_sincronizacoes`).
+   - Interruptor por NPJ na área da plataforma (seção 3.2).
    - Cliente, service, comando `flask djen sincronizar` e busca por número do
      processo.
    - Rotas de leitura e menu DJEN só com a lista e o detalhe.
@@ -387,3 +428,6 @@ Tomadas em 2026-11-06 e 2026-11-07:
 5. **Dependências:** `nh3` para filtrar o HTML do campo `texto` (mantém
    negrito, parágrafos e tabelas) e `urllib` da biblioteca padrão para chamar a
    API, sem `httpx`. Decidido em 2026-11-07.
+6. **Chave por NPJ:** `tenants.djen_ativo`, ligada pelo admin da plataforma,
+   começando desligada para todos; `DJEN_SYNC_ENABLED` continua como trava do
+   ambiente. Decidido em 2026-11-08.
