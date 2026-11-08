@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from sqlalchemy import and_, create_engine, delete, exists, insert, select, text, update
+from sqlalchemy import Integer, and_, bindparam, create_engine, delete, exists, insert, select, text, update, union, union_all
 
 from gestaolegal.database.guarda_tenant import (
     TenantLeakError,
@@ -60,6 +60,31 @@ def _recusa(conexao, stmt, *args, mensagem=""):
 
 
 class TestSelect:
+    @pytest.mark.parametrize("compor", [union, union_all])
+    @pytest.mark.parametrize("aninhada", [False, True])
+    def test_cada_ramo_da_union_exige_filtro(self, conn, compor, aninhada):
+        seguro = select(unidades.c.id).where(unidades.c.tenant_id == 1)
+        inseguro = compor(seguro, select(unidades.c.id))
+        if aninhada:
+            inseguro = select(inseguro.subquery())
+        with contexto_tenant(1):
+            _recusa(conn, inseguro, mensagem="sem critério de tenant")
+            conn.execute(compor(seguro, seguro))
+
+    @pytest.mark.parametrize("nomeado", [False, True])
+    def test_override_do_bind_usa_valor_executado(self, conn, nomeado):
+        valor = bindparam("npj", 1) if nomeado else 1
+        stmt = select(unidades).where(unidades.c.tenant_id == valor)
+        chave = "npj" if nomeado else "tenant_id_1"
+        with contexto_tenant(1):
+            _recusa(conn, stmt, {chave: 2}, mensagem="tenant ativo é 1")
+            conn.execute(stmt, {chave: 1})
+
+    def test_statement_desconhecido_e_recusado(self, conn):
+        with contexto_tenant(1):
+            _recusa(conn, text("SELECT 1").columns(id=Integer), mensagem="não suportado")
+            _recusa(conn, select(text("id")).select_from(text("unidades")), mensagem="não é suportado")
+
     def test_sem_criterio_e_recusado(self, conn):
         with contexto_tenant(1):
             _recusa(conn, select(atendidos.c.id), mensagem="sem critério de tenant")
@@ -143,6 +168,26 @@ class TestSelect:
 
 
 class TestUpdateDelete:
+    @pytest.mark.parametrize("lote", [False, True])
+    def test_update_parametrizado_nao_transfere_tenant(self, conn, lote):
+        stmt = update(unidades).where(unidades.c.tenant_id == 1)
+        params = [{"tenant_id": 1}, {"tenant_id": 2}] if lote else {"tenant_id": 2}
+        with contexto_tenant(1):
+            _recusa(conn, stmt, params, mensagem="muda tenant_id")
+
+    def test_update_bind_e_ordered_values(self, conn):
+        stmt = update(unidades).where(unidades.c.tenant_id == 1).ordered_values(
+            (unidades.c.tenant_id, bindparam("destino", 1))
+        )
+        with contexto_tenant(1):
+            _recusa(conn, stmt, {"destino": 2}, mensagem="muda tenant_id")
+            conn.execute(stmt, {"destino": 1})
+
+    def test_delete_override_do_filtro_em_lote(self, conn):
+        stmt = delete(unidades).where(unidades.c.tenant_id == bindparam("npj", 1))
+        with contexto_tenant(1):
+            _recusa(conn, stmt, [{"npj": 1}, {"npj": 2}], mensagem="tenant ativo é 1")
+
     def test_update_sem_criterio_e_recusado(self, conn):
         with contexto_tenant(1):
             _recusa(conn, update(atendidos).values(nome="x"), mensagem="Update")
@@ -160,6 +205,17 @@ class TestUpdateDelete:
 
 
 class TestInsert:
+    def test_insert_bind_resolvido_em_todas_as_linhas(self, conn):
+        stmt = insert(unidades).values(**self._unidade(tenant_id=bindparam("npj", 1)))
+        with contexto_tenant(1):
+            _recusa(conn, stmt, [{"npj": 1}, {"npj": 2}], mensagem="tenant ativo é 1")
+            conn.execute(stmt, {"npj": 1})
+
+    def test_insert_lote_com_override_externo_e_recusado(self, conn):
+        stmt = insert(unidades).values([self._unidade(tenant_id=1)])
+        with contexto_tenant(1):
+            _recusa(conn, stmt, {"tenant_id_m0": 2}, mensagem="não é suportado")
+
     def _unidade(self, **extra):
         return {"nome": "Sede", "sigla": "SD", "ativa": True, "criado": AGORA, **extra}
 

@@ -177,8 +177,17 @@ def downgrade() -> None:
         indices = {ix["name"] for ix in sa.inspect(bind).get_indexes(tabela)}
         if nome in indices:
             op.drop_index(nome, table_name=tabela)
+        # Nomes explícitos das FKs legadas: o MySQL pode descartar o índice
+        # simples redundante ao criar a composta. Recriá-lo sem nome muda o
+        # esquema no próximo upgrade. Preserve os nomes da cadeia histórica.
+        nomes_legados = {
+            ("arquivos", "id_criado_por"): "fk_arquivos_criado_por",
+            ("orientacao_juridica", "id_usuario"): "fk_orientacao_juridica_usuario",
+            ("password_reset_tokens", "usuario_id"): "fk_password_reset_usuario",
+            ("usuarios_unidades", "unidade_id"): "fk_usuarios_unidades_unidade",
+        }
         op.create_foreign_key(
-            None, tabela, pai, [coluna], ["id"], ondelete=ondelete
+            nomes_legados.get((tabela, coluna)), tabela, pai, [coluna], ["id"], ondelete=ondelete
         )
 
     for pai in reversed(PAIS):

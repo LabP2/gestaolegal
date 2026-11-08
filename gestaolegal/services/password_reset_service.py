@@ -9,6 +9,7 @@ from gestaolegal.exceptions import ValidationException
 from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.password_reset_repository import PasswordResetRepository
 from gestaolegal.repositories.user_repository import UserRepository
+from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.mail_service import enviar_link_recuperacao
 from gestaolegal.utils.request_context import RequestContext, sem_tenant
@@ -102,6 +103,8 @@ class PasswordResetService:
         """Token válido, com o NPJ dele já ativo. None se o link não vale."""
         with sem_tenant("recuperação de senha: localizar o token"):
             registro = self.repository.find_valid_by_hash(_hash(token))
+            if registro is not None and not TenantRepository().ativo(registro.tenant_id):
+                return None
         if registro is None or registro.tenant_id is None:
             return None
         RequestContext.set_tenant(registro.tenant_id)

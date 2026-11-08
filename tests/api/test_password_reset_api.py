@@ -142,6 +142,36 @@ class TestValidacao:
 
 
 class TestRedefinicao:
+    @pytest.mark.parametrize("primeiro_acesso", [False, True])
+    def test_npj_inativo_recusa_link_existente_sem_alterar_senha(self, client, app, usuario, primeiro_acesso):
+        from sqlalchemy import select, update
+        from gestaolegal.database.tables import tenants, usuarios
+        from gestaolegal.database.session import get_session
+        from gestaolegal.services.password_reset_service import PasswordResetService
+        from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
+
+        if primeiro_acesso:
+            with app.test_request_context(), contexto_tenant(1):
+                token = PasswordResetService().emitir_primeiro_acesso(usuario).rsplit('/', 1)[-1]
+                get_session().commit()
+        else:
+            token = _pedir_e_capturar_token(client)
+        with app.test_request_context(), sem_tenant("teste: desativar NPJ"):
+            session = get_session()
+            senha = session.execute(select(usuarios.c.senha).where(usuarios.c.id == usuario)).scalar_one()
+            session.execute(update(tenants).where(tenants.c.id == 1).values(ativo=False))
+            session.commit()
+        try:
+            assert client.get(f'/api/auth/reset-password/{token}/validate').status_code == 400
+            assert client.post('/api/auth/reset-password', json={'token': token, 'password': SENHA_NOVA}).status_code == 400
+            with app.test_request_context(), sem_tenant("teste: conferir senha"):
+                assert get_session().execute(select(usuarios.c.senha).where(usuarios.c.id == usuario)).scalar_one() == senha
+        finally:
+            with app.test_request_context(), sem_tenant("teste: restaurar NPJ"):
+                get_session().execute(update(tenants).where(tenants.c.id == 1).values(ativo=True))
+                get_session().commit()
+        assert client.get(f'/api/auth/reset-password/{token}/validate').status_code == 200
+
     def test_troca_a_senha_e_permite_login(self, client, usuario):
         token = _pedir_e_capturar_token(client)
         response = client.post(

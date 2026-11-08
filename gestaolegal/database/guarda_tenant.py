@@ -19,6 +19,9 @@ Regras:
   `BaseRepository.valores()` já preenche, e um INSERT sem tenant é sinal de
   código que não passou por ele.
 - UPDATE não pode mudar `tenant_id` para outro tenant.
+- UNION/UNION ALL são conferidos ramo a ramo, inclusive em subqueries.
+  Os binds são resolvidos com os parâmetros efetivos de cada execução/lote.
+  Construções sem suporte são recusadas; DDL é reservado à gestão do esquema.
 - Sem tenant ativo, recusa qualquer SELECT/INSERT/UPDATE/DELETE, mesmo de
   tabela global. A saída explícita é `sem_tenant(motivo)`, dentro do qual tudo
   é permitido (CRUD da plataforma, descoberta do tenant no login).
@@ -39,16 +42,17 @@ from sqlalchemy import Table, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.dml import Delete, Insert, Update
+from sqlalchemy.sql.ddl import DDLElement
 from sqlalchemy.sql.elements import BinaryExpression, BindParameter, ClauseElement, TextClause
 from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.selectable import Alias, Select
+from sqlalchemy.sql.selectable import Alias, CompoundSelect, Select
 
 from gestaolegal.database.tables import TABELAS_GLOBAIS
 from gestaolegal.utils.request_context import RequestContext
 
 logger = logging.getLogger(__name__)
 
-_DML = (Select, Insert, Update, Delete)
+_DML = (Select, CompoundSelect, Insert, Update, Delete)
 
 
 class TenantLeakError(RuntimeError):
@@ -83,11 +87,16 @@ def _percorrer(elemento: ClauseElement) -> Iterator[ClauseElement]:
         pilha.extend(atual.get_children())
 
 
-def _valor(bind: BindParameter) -> Any:
+def _valor(bind: BindParameter, params: dict, nomes: dict) -> Any:
+    if bind.callable is not None:
+        raise TenantLeakError("Bind callable de tenant não é suportado")
+    nome = nomes.get(bind, bind.key)
+    if nome in params:
+        return params[nome]
     return bind.effective_value
 
 
-def _origens_e_cobertas(stmt: ClauseElement, tenant_id: int) -> tuple[set, set]:
+def _origens_e_cobertas(stmt: ClauseElement, tenant_id: int, params: dict, nomes: dict) -> tuple[set, set]:
     origens: set = set()
     cobertas: set = set()
     for no in _percorrer(stmt):
@@ -100,9 +109,9 @@ def _origens_e_cobertas(stmt: ClauseElement, tenant_id: int) -> tuple[set, set]:
                     and coluna.name == "tenant_id"
                     and isinstance(outro, BindParameter)
                 ):
-                    if _valor(outro) != tenant_id:
+                    if _valor(outro, params, nomes) != tenant_id:
                         raise TenantLeakError(
-                            f"Critério de tenant {_valor(outro)!r} em "
+                            f"Critério de tenant {_valor(outro, params, nomes)!r} em "
                             f"{coluna.table.name}, mas o tenant ativo é {tenant_id}"
                         )
                     cobertas.add(coluna.table)
@@ -138,19 +147,21 @@ def _linhas_do_insert(stmt: Insert, multiparams: Any, params: Any) -> list[dict]
     return linhas
 
 
-def _valor_bruto(valor: Any) -> Any:
-    return _valor(valor) if isinstance(valor, BindParameter) else valor
+def _valor_bruto(valor: Any, params: dict, nomes: dict) -> Any:
+    return _valor(valor, params, nomes) if isinstance(valor, BindParameter) else valor
 
 
-def _conferir_insert(stmt: Insert, multiparams: Any, params: Any, tenant_id: int) -> None:
-    if not _eh_tabela_de_tenant(stmt.table):
-        return
+def _conferir_insert(stmt: Insert, params: dict, tenant_id: int, nomes: dict) -> None:
     if stmt.select is not None:
         raise TenantLeakError(f"INSERT ... SELECT em {stmt.table.name} não é suportado")
-    for linha in _linhas_do_insert(stmt, multiparams, params):
+    if not _eh_tabela_de_tenant(stmt.table):
+        return
+    if stmt._multi_values and params:
+        raise TenantLeakError("INSERT em lote com parâmetros externos não é suportado")
+    for linha in _linhas_do_insert(stmt, None, params):
         if "tenant_id" not in linha:
             raise TenantLeakError(f"INSERT em {stmt.table.name} sem tenant_id")
-        valor = _valor_bruto(linha["tenant_id"])
+        valor = _valor_bruto(linha["tenant_id"], params, nomes)
         if valor != tenant_id:
             raise TenantLeakError(
                 f"INSERT em {stmt.table.name} com tenant_id {valor!r}, "
@@ -158,12 +169,14 @@ def _conferir_insert(stmt: Insert, multiparams: Any, params: Any, tenant_id: int
             )
 
 
-def conferir(stmt: Any, multiparams: Any = None, params: Any = None) -> None:
+def conferir(stmt: Any, multiparams: Any = None, params: Any = None, *, dialect=None) -> None:
     """Levanta `TenantLeakError` se o statement escapar do tenant ativo."""
     if RequestContext.motivo_sem_tenant() is not None:
         return
-    if not isinstance(stmt, _DML):
+    if isinstance(stmt, DDLElement):
         return
+    if not isinstance(stmt, _DML):
+        raise TenantLeakError(f"Statement não suportado: {type(stmt).__name__}")
     tenant_id = RequestContext.get_tenant_ou_none()
     if tenant_id is None:
         raise TenantLeakError(
@@ -171,16 +184,41 @@ def conferir(stmt: Any, multiparams: Any = None, params: Any = None) -> None:
             "consulta global, sem_tenant(motivo)."
         )
 
+    # Os nomes compilados incluem binds anônimos (tenant_id_1, tenant_id etc.).
+    # Validar só effective_value ignora o override passado a execute().
+    nomes = stmt.compile(dialect=dialect).bind_names
+    lotes = multiparams or [params or {}]
+    for valores in lotes:
+        if not isinstance(valores, dict):
+            raise TenantLeakError("Parâmetros posicionais não são suportados")
+        _conferir_statement(stmt, valores, tenant_id, nomes)
+
+
+def _conferir_statement(stmt, params: dict, tenant_id: int, nomes: dict) -> None:
+    if isinstance(stmt, CompoundSelect):
+        for ramo in stmt.selects:
+            _conferir_statement(ramo, params, tenant_id, nomes)
+        return
+    if not isinstance(stmt, (Select, Insert, Update, Delete)):
+        raise TenantLeakError(f"Statement não suportado: {type(stmt).__name__}")
+    # Uma UNION dentro de subquery também precisa de proteção por ramo.
+    for no in _percorrer(stmt):
+        if isinstance(no, TextClause):
+            raise TenantLeakError("SQL textual dentro de statement não é suportado")
+        if isinstance(no, CompoundSelect):
+            _conferir_statement(no, params, tenant_id, nomes)
     if isinstance(stmt, Insert):
-        _conferir_insert(stmt, multiparams, params, tenant_id)
+        _conferir_insert(stmt, params, tenant_id, nomes)
         return
 
-    if isinstance(stmt, Update) and stmt._values:
-        for chave, valor in stmt._values.items():
-            if getattr(chave, "key", chave) == "tenant_id" and _valor_bruto(valor) != tenant_id:
+    if isinstance(stmt, Update):
+        valores = dict(stmt._ordered_values or (stmt._values or {}).items())
+        valores.update(params)
+        for chave, valor in valores.items():
+            if getattr(chave, "key", chave) == "tenant_id" and _valor_bruto(valor, params, nomes) != tenant_id:
                 raise TenantLeakError(f"UPDATE muda tenant_id em {stmt.table.name}")
 
-    origens, cobertas = _origens_e_cobertas(stmt, tenant_id)
+    origens, cobertas = _origens_e_cobertas(stmt, tenant_id, params, nomes)
     faltando = origens - cobertas
     if faltando:
         nomes = sorted(getattr(o, "name", str(o)) for o in faltando)
@@ -199,7 +237,7 @@ def instalar_guarda(engine: Engine, *, permitir_texto: bool = False) -> None:
             erro = TenantLeakError("SQL textual (text()) não passa pela guarda de tenant")
         else:
             try:
-                conferir(clauseelement, multiparams, params)
+                conferir(clauseelement, multiparams, params, dialect=conn.dialect)
                 return
             except TenantLeakError as e:
                 erro = e

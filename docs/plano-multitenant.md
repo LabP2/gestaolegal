@@ -1,7 +1,7 @@
 # Plano: multitenancy (um tenant por NPJ)
 
-Base: `master` em `b8f2f8d`, branch `feat/multitenant`. Este documento é só o
-planejamento. Nada foi implementado nem migrado.
+Base: `master` em `b8f2f8d`, branch `feat/multitenant`. Documento de planejamento e acompanhamento; PRs 1–9 implementados na branch.
+A validação local e as correções de revisão estão em andamento.
 
 ## 0. Resumo
 
@@ -148,6 +148,8 @@ scripts, com a função `instalar_guarda(engine)` reutilizável.
 
 **Como ficou no PR 3** (`gestaolegal/database/guarda_tenant.py`):
 
+- Revisão: UNION é validado por ramo; binds são conferidos com os parâmetros
+  efetivos de cada execução/lote; construções sem suporte são recusadas.
 - INSERT sem `tenant_id` é **recusado**, e não preenchido: `valores()` já
   preenche, e um INSERT sem tenant indica código que não passou por ele.
 - A travessia não usa `find_tables`, que devolve a tabela base de um alias como
@@ -158,9 +160,10 @@ scripts, com a função `instalar_guarda(engine)` reutilizável.
 - Os testes instalam a guarda com `permitir_texto=True`, porque as fixtures
   gravam com `text()`. O acesso direto das fixtures em Core fica dentro de
   `sem_tenant("teste: ...")`.
-- Medido: de 12 µs (SELECT por id) a 50 µs (casos com dois outer joins e
-  EXISTS) por statement.
-- Os scripts (`seed_database`, `importar_unidade`) usam engine próprio e ainda
+- Medição original do PR 3: de 12 µs a 50 µs por statement. Essa medição
+  antecede a resolução dos nomes compilados dos binds e não descreve o custo
+  da guarda revisada.
+- O script `seed_database` usa engine próprio e ainda
   não instalam a guarda (PR 9).
 
 ### 2.4 Camada 4: testes estruturais e de vazamento
@@ -239,7 +242,7 @@ tenant (NPJ) ──< unidades ──< registros raiz (unidade_id)
   (`tables.py:28`), o ContextVar em `RequestContext` (`request_context.py:6`),
   o decorator que resolve o contexto antes da rota (`api_decorators.py:57-100`),
   a migration em três passos (nula → preenche → NOT NULL, `b7c1d2e3f4a5`) e o
-  `--check` e o relatório do `importar_unidade.py`.
+  relatório histórico da importação (ferramenta descontinuada após a fusão).
 - `UNIDADE_PADRAO_ID = 1` (`tables.py:25`, usado em `usuario_service.py:414`)
   deixa de fazer sentido como constante global. Cada tenant nasce com a sua
   unidade inicial (§6.3), e o `create_admin` recebe a unidade explicitamente.
@@ -428,8 +431,8 @@ Ordem, em **três migrations encadeadas** (uma por PR, cada uma com `downgrade`)
   ao `make test` um teste que carrega o `ScriptDirectory` e exige
   `len(get_heads()) == 1` (estende a verificação; não afrouxa nada).
 - **Nova Lima já foi importada e roda em produção** (D7). M2 marca tudo, BH e
-  NL, como tenant 1. O `importar_unidade.py` só ganha `--tenant` quando houver
-  uma nova importação.
+  NL, como tenant 1. O importador e seus testes exclusivos foram removidos
+  após a fusão, em 08/11/2026; o histórico permanece no Git e em `docs/unidades.md`.
 
 ## 8. Arquivos privados
 
@@ -453,7 +456,7 @@ Proposta: `PRIVATE_FILES_ROOT/<tenant_id>/<categoria>/<ref>`
 |---|---|
 | `scripts/seed_database.py` | `--tenant SLUG` (padrão `daj-ufmg`); cria o tenant se faltar e roda dentro de `contexto_tenant`. Hoje escolhe unidades por `ativa` (`:97-103`): passa a filtrar pelo tenant. Semeia também um segundo tenant `npj-demo`, com e-mails próprios (`admin@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_ext@npjdemo.br`, mesma senha padrão), para demonstrar o isolamento (D11) |
 | `scripts/reset_demo_database.py` | Hoje faz `DROP DATABASE` (`:61-62`), o que apagaria **todos os tenants**. O `--check` passa a recusar se `tenants` tiver slug fora de `DEMO_TENANT_SLUGS`. Reset de um tenant só (DELETE por `tenant_id` em ordem topológica) fica fora deste plano. Executar continua exigindo autorização explícita |
-| `scripts/importar_unidade.py` | Nova Lima já foi importada; o script só precisa mudar numa próxima importação: `--tenant SLUG` obrigatório, `--sigla` dentro do tenant, INSERT com `tenant_id`. Até lá, a salvaguarda "tabela não coberta pelo `PLANO`" recusa rodar depois de M2, o que basta |
+| Importador de unidades | Descontinuado após a fusão de BH/Nova Lima. Script e testes exclusivos removidos; nenhuma adaptação multitenant prevista |
 | `scripts/migrar_arquivos_privados.py` | destino com `<tenant_id>/` |
 | `scripts/seed_local.py` (esteira Helton, via API) | sem mudança: o tenant vem do login |
 | `tests/api/conftest.py` | `ensure_tenants()` (tenants 1 e 2) antes de `ensure_unidades()` (`:117`); unidades 1 e 2 no tenant 1, unidade 3 no tenant 2; os 26 `text(...)` de INSERT passam `tenant_id`; fixtures de header (`:376, 392, 416, 490`) passam a gerar token com `tenant_id`; nova fixture `headers_outro_tenant` |
@@ -492,7 +495,7 @@ central:
    vazia**, e **nenhuma resposta pode conter `VAZOU-B`**. Para PUT, PATCH e
    DELETE com ids de B, espera 404, e os dados de B ficam iguais depois.
 3. Uma rota nova sem caso de teste falha o teste: a lista de rotas cobertas é
-   comparada ao `url_map`, como a salvaguarda do `PLANO` em `importar_unidade.py`.
+   comparada ao `url_map`, para detectar endpoints novos sem cobertura.
 4. Login: o e-mail de A devolve token com o tenant de A, e o de B, com o de B.
    Criar em B um usuário com o e-mail de A dá 400, com mensagem que não cita A.
    Tenant inativo dá a mesma resposta de login inválido. Token sem `tenant_id`
@@ -506,7 +509,8 @@ central:
    órfãs, e isso é uma mudança separada.
 
 Os ~510 testes atuais continuam verdes com o tenant 1 implícito nas fixtures.
-Nenhuma asserção existente é removida.
+As asserções de funcionalidades mantidas são preservadas. A única retirada
+autorizada na revisão é a suíte exclusiva do importador já descontinuado.
 
 **Como ficou (PR 6).** A varredura está em `tests/api/test_tenant_vazamento.py`,
 do ponto de vista do outro NPJ atacando a DAJ (a fixture de dois conjuntos
@@ -519,8 +523,9 @@ atendido, histórico do caso) podem responder lista vazia, desde que igual à de
 um id inexistente. Trechos sem tenant aceitos numa requisição: login e
 recuperação de senha (rotas públicas), a conferência de NPJ ativo na
 autenticação (toda rota com token) e a checagem de e-mail único (criar e editar
-usuário). A criação com ids de outro NPJ no corpo continua aceita; ver
-`docs/known_issues.md`.
+usuário). A criação com ids de outro NPJ no corpo é recusada com 400 desde o commit
+`c08db38`. A revisão exige status explícitos de sucesso/leitura, restaura o banco
+da varredura ao sair e cobre ataques nos dois sentidos entre NPJs.
 
 ## 11. Impacto no DJEN (`/mnt/dados/gestaolegal-djen/docs/plano-djen.md`)
 

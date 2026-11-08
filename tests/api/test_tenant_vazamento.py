@@ -638,8 +638,50 @@ def _corpo(response) -> Any:
     return response.get_json(silent=True)
 
 
+def _exigir_sucesso(response) -> None:
+    assert response.status_code == 200, (response.status_code, _corpo(response))
+
+
+def _exigir_leitura_isolada(response) -> None:
+    assert response.status_code in (200, 403, 404), (response.status_code, _corpo(response))
+
+
+@pytest.mark.parametrize("validar", [_exigir_sucesso, _exigir_leitura_isolada])
+def test_erro_500_nao_e_evidencia_de_isolamento(validar):
+    from flask import Response
+    response = Response('{"error":"falha"}', status=500, content_type='application/json')
+    with pytest.raises(AssertionError):
+        validar(response)
+
+
 @pytest.fixture(scope="module")
-def cenario(app: Flask, client: FlaskClient, create_admin_user: None) -> Cenario:
+def banco_preservado(app: Flask, create_admin_user: None):
+    # A varredura cria usuários e configurações que não podem contaminar os
+    # módulos seguintes. Preserve o estado de entrada, inclusive IDs dos
+    # usuários das fixtures de sessão. Não depende da ordem de coleta.
+    with sem_tenant("teste: preservar banco da varredura"):
+        session = db_session_module.get_session()
+        try:
+            copia = {t.name: [dict(r) for r in session.execute(select(t)).mappings()]
+                     for t in metadata.sorted_tables}
+        finally:
+            session.close()
+    yield
+    with sem_tenant("teste: restaurar banco da varredura"):
+        session = db_session_module.get_session()
+        try:
+            for tabela in reversed(metadata.sorted_tables):
+                session.execute(tabela.delete())
+            for tabela in metadata.sorted_tables:
+                if copia[tabela.name]:
+                    session.execute(tabela.insert(), copia[tabela.name])
+            session.commit()
+        finally:
+            session.close()
+
+
+@pytest.fixture(scope="module")
+def cenario(app: Flask, client: FlaskClient, create_admin_user: None, banco_preservado) -> Cenario:
     with app.app_context():
         criar_usuario(OUTRO_EMAIL, OUTRO_SENHA, "admin", "Admin Outro NPJ", tenant_id=TENANT_OUTRO)
     outro = headers_para(client, OUTRO_EMAIL, OUTRO_SENHA, unidade=UNIDADE_OUTRO)
@@ -654,6 +696,7 @@ def cenario(app: Flask, client: FlaskClient, create_admin_user: None) -> Cenario
     antes = {}
     for chave in _de("colecao"):
         response = _chamar(client, *chave, ROTAS[chave], {}, outro)
+        _exigir_sucesso(response)
         antes[chave] = (response.status_code, _corpo(response))
 
     ids = {**_criar_dados_da_daj(client, daj), **meus}
@@ -737,6 +780,7 @@ def test_colecao_nao_mostra_dados_de_outro_npj(client, cenario, caplog, chave):
     response = _chamar(client, *chave, ROTAS[chave], cenario.ids, cenario.outro)
     motivos = _motivos(caplog)
     _conferir_resposta(response, cenario)
+    _exigir_sucesso(response)
     assert (response.status_code, _corpo(response)) == cenario.antes[chave]
     assert motivos <= {MOTIVO_AUTENTICACAO} | ROTAS[chave].motivos
 
@@ -747,6 +791,7 @@ def test_leitura_por_id_de_outro_npj_e_recusada(client, cenario, caplog, chave):
     response = _chamar(client, *chave, ROTAS[chave], cenario.ids, cenario.outro)
     motivos = _motivos(caplog)
     _conferir_resposta(response, cenario)
+    _exigir_leitura_isolada(response)
     if response.status_code not in (403, 404):
         # Sublistas por id (casos do atendido, histórico do caso) respondem
         # lista vazia a um id que não acham. Vale, desde que o id da DAJ dê a

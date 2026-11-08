@@ -81,6 +81,28 @@ class TestLogin:
 
 
 class TestLeitura:
+    @pytest.mark.parametrize("inverter", [False, True], ids=["outro-ataca-daj", "daj-ataca-outro"])
+    def test_leitura_escrita_e_colecao_nos_dois_sentidos(
+        self, client, headers_outro, auth_headers, sample_atendido_data, inverter
+    ):
+        dono, atacante = (headers_outro, auth_headers) if inverter else (auth_headers, headers_outro)
+        criado = client.post('/api/atendido/', json=sample_atendido_data, headers=dono)
+        assert criado.status_code == 201
+        id = get_success_data(criado)['id']
+        url = f'/api/atendido/{id}'
+        try:
+            antes = get_success_data(client.get(url, headers=dono))
+            for metodo in ('GET', 'PUT', 'DELETE'):
+                resposta = client.open(url, method=metodo, headers=atacante,
+                                      json={**sample_atendido_data, 'nome': 'Ataque fictício'})
+                assert resposta.status_code == 404, (metodo, resposta.get_json())
+                assert get_success_data(client.get(url, headers=dono)) == antes
+            lista = client.get('/api/atendido/', headers=atacante)
+            assert lista.status_code == 200
+            assert id not in {item['id'] for item in get_success_data(lista)['items']}
+        finally:
+            assert client.delete(url, headers=dono).status_code == 200
+
     def test_atendido_de_outro_tenant_nao_aparece(
         self, client, headers_outro, atendido_daj
     ):

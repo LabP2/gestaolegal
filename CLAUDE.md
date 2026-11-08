@@ -112,8 +112,8 @@ antes de entrar no `master`.
    usuários (o serviço `mail`/Postfix e qualquer `MAIL_RELAYHOST`), e qualquer
    script que leia ou escreva no banco de **produção** ou de **QA**
    (`docker-compose.qa.yml`, os dumps em `dumps/`). A importação dos bancos de
-   Belo Horizonte e Nova Lima (`docs/unidades.md`, Fase B) roda contra dados
-   reais de pessoas.
+   Belo Horizonte e Nova Lima já foi concluída; o importador foi descontinuado.
+   `docs/unidades.md`, Fase B, permanece como registro histórico.
 2. **Segredos e o que roda fora daqui**: `.env*` (exceto `.env.example` e
    `.env.worktree`), `.github/workflows/` (executa no push), credenciais do
    MySQL e do GHCR. `docker-compose*.yml` não entra: molda só a stack local.
