@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Any
 
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, insert, or_, select
 from sqlalchemy import update as sql_update
 
@@ -10,6 +11,7 @@ from gestaolegal.common import PaginatedResult
 from gestaolegal.database.tables import (
     assistidos,
     assistidos_pessoa_juridica,
+    atendido_nomes,
     atendido_xOrientacaoJuridica,
     atendidos,
 )
@@ -103,7 +105,7 @@ class AtendidoRepository(BaseRepository):
     ) -> PaginatedResult[dict]:
         # EXISTS mantém uma pessoa por resultado mesmo quando o legado tem
         # mais de uma ficha de assistido para o mesmo atendido.
-        has_assistido = (
+        tem_ficha = (
             select(assistidos.c.id)
             .where(
                 assistidos.c.id_atendido == atendidos.c.id,
@@ -111,6 +113,8 @@ class AtendidoRepository(BaseRepository):
             )
             .exists()
         )
+        # Parte cadastrada sem triagem conta como assistido sem ter ficha.
+        has_assistido = or_(tem_ficha, atendidos.c.sem_triagem.is_(True))
         stmt = select(
             atendidos.c.id,
             atendidos.c.nome,
@@ -121,6 +125,7 @@ class AtendidoRepository(BaseRepository):
             atendidos.c.status,
             atendidos.c.data_nascimento,
             atendidos.c.endereco_id,
+            atendidos.c.sem_triagem,
             func.count().over().label("total_count"),
             has_assistido.label("is_assistido"),
         )
@@ -303,3 +308,45 @@ class AtendidoRepository(BaseRepository):
                 )
             )
         self.session.flush()
+
+    # --- variações do nome (busca no DJEN) -------------------------------------
+
+    def nomes(self, id_atendido: int) -> list[dict[str, Any]]:
+        stmt = self.escopo(
+            select(atendido_nomes.c.id, atendido_nomes.c.nome)
+            .where(atendido_nomes.c.id_atendido == id_atendido)
+            .order_by(atendido_nomes.c.nome),
+            atendido_nomes,
+        )
+        return [dict(r) for r in self.session.execute(stmt).mappings()]
+
+    def nome_existe(self, id_atendido: int, nome: str) -> bool:
+        stmt = self.escopo(
+            select(atendido_nomes.c.id).where(
+                atendido_nomes.c.id_atendido == id_atendido,
+                func.lower(atendido_nomes.c.nome) == nome.lower(),
+            ),
+            atendido_nomes,
+        )
+        return self.session.execute(stmt).first() is not None
+
+    def adicionar_nome(self, id_atendido: int, nome: str) -> int:
+        result = self.session.execute(
+            insert(atendido_nomes).values(
+                **self.valores({"id_atendido": id_atendido, "nome": nome})
+            )
+        )
+        self.session.flush()
+        return result.lastrowid
+
+    def remover_nome(self, id_atendido: int, nome_id: int) -> bool:
+        result = self.session.execute(
+            self.escopo(
+                sql_delete(atendido_nomes).where(
+                    atendido_nomes.c.id == nome_id,
+                    atendido_nomes.c.id_atendido == id_atendido,
+                ),
+                atendido_nomes,
+            )
+        )
+        return (result.rowcount or 0) > 0

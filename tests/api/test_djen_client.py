@@ -7,7 +7,13 @@ import pytest
 
 from gestaolegal.integrations import djen_client
 from gestaolegal.integrations.djen_client import DJENClient, DJENError, RespostaHTTP
-from gestaolegal.integrations.djen_html import html_seguro, resumo, texto_plano
+from gestaolegal.integrations.djen_html import (
+    corrigir_caixa,
+    html_seguro,
+    para_latin1,
+    resumo,
+    texto_plano,
+)
 from gestaolegal.utils.cnj import mascarar_cnj, normalizar_cnj
 
 from .djen_fixtures import HTML_PUBLICACAO, TransporteFalso, item_djen, resposta
@@ -198,3 +204,18 @@ class TestHTML:
     def test_resumo(self):
         assert resumo("a  b") == "a b"
         assert len(resumo("x" * 600, 500)) == 500
+
+    def test_corrigir_caixa_do_djen(self):
+        assert corrigir_caixa("AçãO TRABALHISTA - RITO SUMARíSSIMO") == "AÇÃO TRABALHISTA - RITO SUMARÍSSIMO"
+        assert corrigir_caixa("23ª VARA DO TRABALHO") == "23ª VARA DO TRABALHO"
+        assert corrigir_caixa("Procedimento Comum Cível") == "Procedimento Comum Cível"
+        assert corrigir_caixa(None) is None
+
+    def test_para_latin1_cabe_no_cp1252(self):
+        # U+0096 é o travessão do cp1252 lido como latin1 na origem.
+        assert para_latin1("Orcri \x96 Lav.") == "Orcri – Lav."
+        assert para_latin1("5ª Vara, São Paulo, “aspas” — ok") == "5ª Vara, São Paulo, “aspas” — ok"
+        saida = para_latin1("≥ ő 😀 \x81")
+        assert saida == "? o ? "
+        saida.encode("cp1252")
+        assert para_latin1(None) is None

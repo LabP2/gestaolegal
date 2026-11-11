@@ -14,6 +14,8 @@
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
 	import NewspaperIcon from '@lucide/svelte/icons/newspaper';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import { PROCESSO_PAPEIS_SEM_CASO } from '$lib/types';
 
 	type NavItem = ItemComPapeis & {
 		title: string;
@@ -91,6 +93,22 @@
 			]
 		},
 		{
+			title: 'Processos',
+			url: '/processos',
+			icon: ScaleIcon,
+			items: [
+				{
+					title: 'Lista de processos',
+					url: '/processos'
+				},
+				{
+					title: 'Novo processo sem caso',
+					url: '/processos/novo',
+					roles: PROCESSO_PAPEIS_SEM_CASO
+				}
+			]
+		},
+		{
 			title: 'Arquivos',
 			url: '/arquivos',
 			icon: FolderIcon,
@@ -119,6 +137,11 @@
 				{
 					title: 'Sem caso',
 					url: '/djen/sem-caso',
+					roles: ['admin', 'prof', 'orient']
+				},
+				{
+					title: 'Busca por parte',
+					url: '/djen/busca-parte',
 					roles: ['admin', 'prof', 'orient']
 				},
 				{

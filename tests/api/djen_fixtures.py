@@ -110,6 +110,8 @@ class TransporteFalso:
     def __init__(self) -> None:
         self.por_processo: dict[str, list[dict]] = {}
         self.por_oab: dict[tuple[str, str], list[dict]] = {}
+        # Busca manual por parte: nome exato -> itens.
+        self.por_parte: dict[str, list[dict]] = {}
         self.falhar: set[str] = set()  # números ou "numero/UF" que dão erro de rede
         self.chamadas: list[dict[str, str]] = []
         self.extra: Callable[[dict[str, str]], RespostaHTTP | None] | None = None
@@ -131,6 +133,13 @@ class TransporteFalso:
             if chave in self.falhar:
                 raise DJENError("rede indisponível (simulado)")
             return resposta(self.por_oab.get((params["numeroOab"], params["ufOab"]), []))
+        if "nomeParte" in params:
+            if params["nomeParte"] in self.falhar:
+                raise DJENError("rede indisponível (simulado)")
+            itens = self.por_parte.get(params["nomeParte"], [])
+            if "siglaTribunal" in params:
+                itens = [i for i in itens if i["siglaTribunal"] == params["siglaTribunal"]]
+            return resposta(itens)
         return resposta([])
 
 
@@ -169,6 +178,8 @@ def limpar_djen() -> None:
                     session.execute(eventos.delete().where(eventos.c.id.in_(ids)))
             if "djen_oabs" in metadata.tables:
                 session.execute(metadata.tables["djen_oabs"].delete())
+            if "djen_exemplos" in metadata.tables:
+                session.execute(metadata.tables["djen_exemplos"].delete())
             session.execute(djen_comunicacoes.delete())
             session.execute(djen_sincronizacoes.delete())
             session.execute(update(tenants).values(djen_ativo=False))

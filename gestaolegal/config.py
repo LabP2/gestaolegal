@@ -186,3 +186,9 @@ class Config:
     DJEN_MAX_PROCESSOS: ClassVar[int] = int(os.environ.get("DJEN_MAX_PROCESSOS", "15"))
     # Publicações descartadas e pendentes sem caso são apagadas depois disto.
     DJEN_RETENCAO_DIAS: ClassVar[int] = 90
+    # Banco de exemplos (treino da sugestão automática): texto e destinatários
+    # dos exemplos rotulados são anulados depois disto, contado do rótulo. As
+    # não revisadas seguem DJEN_RETENCAO_DIAS (docs/plano-djen.md, §8).
+    DJEN_EXEMPLOS_RETENCAO_DIAS: ClassVar[int] = int(
+        os.environ.get("DJEN_EXEMPLOS_RETENCAO_DIAS", "730")
+    )

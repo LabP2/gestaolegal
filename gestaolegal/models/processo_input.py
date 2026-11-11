@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 
@@ -51,3 +51,21 @@ class ProcessoUpdateInput(ProcessoNumeroInput):
     obs: str | None = None
     id_caso: int | None = None
     status: bool | None = None
+
+
+class ParteInput(BaseModel):
+    id_atendido: int
+    polo: Literal["ativo", "passivo", "outro"] | None = None
+
+
+class ProcessoSemCasoInput(ProcessoCreateInput):
+    """`POST /api/processos`: processo sem caso, com ao menos uma parte."""
+
+    partes: list[ParteInput] = Field(min_length=1)
+
+    @field_validator("id_caso")
+    @classmethod
+    def sem_caso(cls, value: int | None) -> int | None:
+        if value is not None:
+            raise ValueError("Processo sem caso não recebe id_caso")
+        return value

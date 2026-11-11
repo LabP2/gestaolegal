@@ -38,7 +38,7 @@
 	</div>
 	<ProcessoForm
 		data={data.form}
-		casoId={processo.id_caso}
+		casoId={processo.id_caso ?? undefined}
 		processoId={processo.id}
 		{onUpdate}
 		{onError}

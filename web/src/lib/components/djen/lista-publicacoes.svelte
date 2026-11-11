@@ -114,7 +114,7 @@
 		{#if descricao}<p class="text-muted-foreground">{descricao}</p>{/if}
 	</div>
 
-	<StatusSincronizacao {status} />
+	<StatusSincronizacao {status} podeRodar={urole === 'admin'} />
 
 	<div class="rounded-lg border bg-card p-6">
 		<div class="mb-4 flex flex-wrap items-end gap-3">

@@ -10,6 +10,7 @@ from .orientacao_juridica_controller import (
     orientacao_juridica_controller as orientacao_juridica_controller_api,
 )
 from .plantao_controller import plantao_controller
+from .processo_controller import processo_controller
 from .plataforma_controller import plataforma_controller
 from .presenca_controller import presenca_controller
 from .relatorio_controller import relatorio_controller
@@ -37,4 +38,6 @@ routes = [
     (plataforma_controller, "/api/plataforma"),
     # /api/djen/... e /api/processos/<id>/djen/buscar (docs/plano-djen.md, §5).
     (djen_controller, "/api"),
+    # Lista geral e processo sem caso (docs/plano-processos-avulsos.md, §3).
+    (processo_controller, "/api/processos"),
 ]

@@ -172,6 +172,7 @@ class TestChave:
             ("GET", "/api/djen/publicacoes/1"),
             ("GET", "/api/djen/status"),
             ("POST", "/api/processos/1/djen/buscar"),
+            ("POST", "/api/djen/sincronizar"),
         ],
     )
     def test_rotas_dao_403_com_djen_desligado(self, client, auth_headers, app, metodo, url):
@@ -312,6 +313,36 @@ class TestRotina:
         transporte.chamadas.clear()
         rodar_rotina(app)
         assert all(c.get("numeroProcesso") != p["numero_cnj"] for c in transporte.chamadas)
+
+    def test_botao_roda_a_rotina_do_proprio_npj(self, client, auth_headers, djen, transporte):
+        # Ação manual: não depende de DJEN_SYNC_ENABLED (desligado aqui).
+        caso = criar_caso(client, auth_headers)
+        p = criar_processo(client, auth_headers, caso)
+        transporte.por_processo[p["numero_cnj"]] = [item_djen(7051, p["numero_cnj"])]
+        r = client.post("/api/djen/sincronizar", headers=auth_headers)
+        d = get_success_data(r)
+        assert d["status"] == "ok" and d["novas"] >= 1 and d["vinculadas"] >= 1
+        (sinc,) = _linhas(djen_sincronizacoes, tenant_id=TENANT_DAJ)
+        assert sinc["status"] == "ok"
+        assert _linhas(djen_sincronizacoes, tenant_id=TENANT_OUTRO) == []
+
+        status = get_success_data(client.get("/api/djen/status", headers=auth_headers))
+        assert status["ultima"]["status"] == "ok"
+        assert status["rotina"] == {
+            "janela_dias": Config.DJEN_JANELA_DIAS,
+            "max_processos": Config.DJEN_MAX_PROCESSOS,
+        }
+
+    @pytest.mark.parametrize("papel", ["prof", "orient", "colab_proj", "estag_direito", "colab_ext"])
+    def test_so_admin_roda_a_rotina_pela_tela(self, client, app, djen, transporte, auth_headers, papel):
+        caso = criar_caso(client, auth_headers)
+        criar_processo(client, auth_headers, caso)
+        with app.app_context():
+            criar_usuario(f"{papel}.rotina@gl.com", "senha12345", papel, f"Usuário {papel}")
+        h = headers_para(client, f"{papel}.rotina@gl.com", "senha12345")
+        assert client.post("/api/djen/sincronizar", headers=h).status_code == 403
+        assert transporte.chamadas == []
+        assert _linhas(djen_sincronizacoes) == []
 
     def test_respeita_o_maximo_de_processos(self, app, client, auth_headers, djen, transporte, sync_habilitado):
         caso = criar_caso(client, auth_headers)

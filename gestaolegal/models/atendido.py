@@ -12,14 +12,15 @@ if TYPE_CHECKING:
 @dataclass
 class Atendido:
     nome: str
-    data_nascimento: date
-    cpf: str
-    celular: str
-    email: str
-    estado_civil: str
-    como_conheceu: str
-    procurou_outro_local: str
-    pj_constituida: str
+    # Nulos só no cadastro simplificado (`sem_triagem`).
+    data_nascimento: date | None
+    cpf: str | None
+    celular: str | None
+    email: str | None
+    estado_civil: str | None
+    como_conheceu: str | None
+    procurou_outro_local: str | None
+    pj_constituida: str | None
     status: int
 
     id: int | None = None
@@ -37,6 +38,7 @@ class Atendido:
     rg_repres_legal: str | None = None
     nascimento_repres_legal: date | None = None
     pretende_constituir_pj: str | None = None
+    sem_triagem: bool = False
     orientacoes_juridicas: list["OrientacaoJuridica"] | None = None
     casos: list["Caso"] | None = None
     endereco: "Endereco | None" = None

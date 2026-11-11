@@ -436,9 +436,12 @@
 								<div class="flex min-w-0 items-center gap-2">
 									<File class="h-4 w-4 shrink-0" />
 									<div class="min-w-0">
-										<p class="truncate font-medium">
+										<a
+											href="/casos/{caso.id}/processos/{processo.id}"
+											class="block truncate font-medium hover:underline"
+										>
 											{processo.especie}{processo.numero ? ` · Nº ${processo.numero}` : ''}
-										</p>
+										</a>
 										<p class="truncate text-xs text-muted-foreground">
 											{#if processo.vara}{processo.vara}{/if}
 											{#if processo.probabilidade}· Prob.: {processo.probabilidade}{/if}
@@ -446,6 +449,14 @@
 									</div>
 								</div>
 								<div class="flex shrink-0 gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										href="/casos/{caso.id}/processos/{processo.id}"
+										title="Ver detalhes"
+									>
+										<Eye class="h-4 w-4" />
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"

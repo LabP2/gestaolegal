@@ -115,6 +115,27 @@ class TestVinculoAutomatico:
         assert all(a["id_executor_acao"] is None for a in avisos)
         assert avisos[0]["acao"] == f"Nova publicação no DJEN no caso {caso_com_equipe}"
 
+    def test_descricao_cabe_na_coluna_latin1_e_classe_em_maiusculas(
+        self, client, auth_headers, djen, transporte, caso_com_equipe
+    ):
+        # `eventos.descricao` é latin1 no MySQL: U+0096 e símbolos fora do
+        # cp1252 derrubavam o INSERT (erro 1366) e a busca dava 500.
+        p = criar_processo(client, auth_headers, caso_com_equipe)
+        item = item_djen(11050, p["numero_cnj"], texto="Juiz da Vara \x96 Orcri \x96 prazo ≥ 5 dias")
+        item["nomeClasse"] = "AçãO TRABALHISTA - RITO SUMARíSSIMO"
+        transporte.por_processo[p["numero_cnj"]] = [item]
+        r = client.post(f"/api/processos/{p['id']}/djen/buscar", headers=auth_headers)
+        assert r.status_code == 200
+
+        (evento,) = _eventos_djen(caso_com_equipe)
+        assert evento["descricao"].startswith(
+            "1ª Vara Cível da Comarca Fictícia — AÇÃO TRABALHISTA - RITO SUMARÍSSIMO"
+        )
+        assert "Vara – Orcri – prazo ? 5 dias" in evento["descricao"]
+        evento["descricao"].encode("cp1252")
+        (com,) = _linhas(djen_comunicacoes, id_djen=11050)
+        assert com["nome_classe"] == "AÇÃO TRABALHISTA - RITO SUMARÍSSIMO"
+
     def test_responsavel_e_o_orientador_sem_estagiario(self, client, auth_headers, djen, transporte, equipe):
         caso = criar_caso(client, auth_headers, id_orientador=equipe["orient"])
         p = criar_processo(client, auth_headers, caso)

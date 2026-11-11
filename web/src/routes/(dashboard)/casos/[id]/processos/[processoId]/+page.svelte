@@ -5,36 +5,11 @@
 	import type { PageProps } from './$types';
 	import Edit from '@lucide/svelte/icons/edit';
 	import { Badge } from '$lib/components/ui/badge';
-	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-	import { api } from '$lib/api-client';
-	import { ApiException, DJEN_PAPEIS_GESTAO, type BuscaProcessoDjen } from '$lib/types';
-	import { formatDateTime } from '$lib/utils/date';
-	import { toast } from 'svelte-sonner';
+	import PublicacoesProcesso from '$lib/components/djen/publicacoes-processo.svelte';
 
 	let { data }: PageProps = $props();
+	// svelte-ignore state_referenced_locally
 	const { processo } = data;
-
-	// DJEN: botão só com o DJEN ligado e para quem pode vincular (plano, §6–7).
-	const podeBuscarDjen = $derived(
-		data.me.tenant?.djen_ativo === true && DJEN_PAPEIS_GESTAO.includes(data.me.urole)
-	);
-	let djenConsultadoEm = $state(processo.djen_consultado_em ?? null);
-	let buscandoDjen = $state(false);
-
-	async function buscarDjen() {
-		buscandoDjen = true;
-		try {
-			const r = await api.post<BuscaProcessoDjen>(`processos/${processo.id}/djen/buscar`);
-			djenConsultadoEm = r.djen_consultado_em;
-			toast.success(
-				r.novas ? `${r.novas} publicação(ões) nova(s) no DJEN.` : 'Nenhuma publicação nova no DJEN.'
-			);
-		} catch (err) {
-			toast.error(err instanceof ApiException ? err.message : 'Erro ao consultar o DJEN.');
-		} finally {
-			buscandoDjen = false;
-		}
-	}
 
 	function formatDate(dateString?: string | null): string {
 		if (!dateString) return 'Não informado';
@@ -155,36 +130,7 @@
 		<InfoCard title="Valores" items={financialData} />
 		<InfoCard title="Datas Importantes" items={datesData} />
 
-		{#if data.me.tenant?.djen_ativo}
-			<Card.Root class="md:col-span-2">
-				<Card.Header>
-					<Card.Title>Publicações no DJEN</Card.Title>
-					<Card.Description>
-						{#if !processo.numero_cnj}
-							O número do processo não está no padrão CNJ (20 dígitos); as publicações não são
-							buscadas.
-						{:else if djenConsultadoEm}
-							Última consulta: {formatDateTime(djenConsultadoEm)}.
-						{:else if processo.djen_pendente}
-							Aguardando a rotina buscar o histórico de publicações.
-						{:else}
-							Ainda não consultado.
-						{/if}
-					</Card.Description>
-				</Card.Header>
-				<Card.Content class="flex flex-wrap gap-2">
-					{#if podeBuscarDjen && processo.numero_cnj}
-						<Button variant="outline" onclick={buscarDjen} disabled={buscandoDjen}>
-							<RefreshCw class="mr-2 h-4 w-4 {buscandoDjen ? 'animate-spin' : ''}" />
-							{buscandoDjen ? 'Buscando…' : 'Buscar publicações agora'}
-						</Button>
-					{/if}
-					<Button variant="ghost" href="/djen?q={processo.numero_cnj ?? ''}">
-						Ver publicações
-					</Button>
-				</Card.Content>
-			</Card.Root>
-		{/if}
+		<PublicacoesProcesso {processo} me={data.me} class="md:col-span-2" />
 
 		{#if processo.obs}
 			<Card.Root class="md:col-span-2">

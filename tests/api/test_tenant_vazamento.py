@@ -32,6 +32,7 @@ from sqlalchemy import select
 
 from gestaolegal.database import session as db_session_module
 from gestaolegal.database.tables import TABELAS_GLOBAIS, metadata
+from gestaolegal.integrations import djen_client
 from gestaolegal.utils.request_context import sem_tenant
 
 from .conftest import (
@@ -45,6 +46,7 @@ from .conftest import (
     get_success_data,
     headers_para,
 )
+from .djen_fixtures import TransporteFalso, item_djen
 from .test_tenant_isolamento import OUTRO_EMAIL, OUTRO_SENHA
 
 MARCA = "VAZOU-DAJ"
@@ -53,6 +55,13 @@ MARCA = "VAZOU-DAJ"
 BUSCA = "VAZOU"
 PREFIXO_PLATAFORMA = "/api/plataforma/"
 ID_INEXISTENTE = 987654
+# Processo sem caso da DAJ e a publicação que o transporte falso devolve na
+# busca por parte, com esse número e o id_djen da publicação da DAJ.
+NUMERO_DAJ = "9999999-99.2026.8.13.0001"
+ID_DJEN_DAJ = 424242
+# Nome que o transporte falso responde só com a publicação da DAJ: o outro NPJ
+# a marca como não pertinente no próprio banco de exemplos.
+NOME_NAO_PERTINENTE = "Parte marcada pelo outro NPJ"
 # Rotas da plataforma abertas sem token.
 PUBLICAS_PLATAFORMA = {("POST", "/api/plataforma/auth/login")}
 LOGGER_CONTEXTO = "gestaolegal.utils.request_context"
@@ -107,6 +116,24 @@ def _evento(_: Ids) -> dict[str, Any]:
 
 def _processo(_: Ids) -> dict[str, Any]:
     return {"especie": "Ação", "numero": "5550001", "status": True}
+
+
+def _processo_sem_caso(ids: Ids) -> dict[str, Any]:
+    return {"especie": "Ação", "numero": "5550002", "partes": [{"id_atendido": ids["meu_atendido"]}]}
+
+
+def _importacao(ids: Ids) -> dict[str, Any]:
+    return {
+        "nome": "Parte do outro NPJ",
+        "de": "2026-11-01",
+        "ate": "2026-11-05",
+        "ids": [ID_INEXISTENTE],
+        "id_atendido": ids["meu_atendido"],
+    }
+
+
+def _nao_pertinentes(_: Ids) -> dict[str, Any]:
+    return {"nome": NOME_NAO_PERTINENTE, "de": "2026-11-01", "ate": "2026-11-05", "ids": [ID_DJEN_DAJ]}
 
 
 # As escritas do outro NPJ referenciam os próprios registros ("meu_*"). O
@@ -279,6 +306,14 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("PUT", "/api/atendido/<int:id>/assistido"): Rota("id", {"id": "assistido_atendido"}, json=_assistido),
     ("GET", "/api/atendido/<int:id>/casos"): Rota("id", {"id": "atendido"}),
     ("GET", "/api/atendido/<int:id>/orientacoes"): Rota("id", {"id": "atendido"}),
+    ("POST", "/api/atendido/simplificado"): Rota(
+        "escrita", json=lambda _: {"nome": "Parte do outro NPJ"}, status=(201,)
+    ),
+    ("GET", "/api/atendido/<int:id>/nomes"): Rota("id", {"id": "parte"}),
+    ("POST", "/api/atendido/<int:id>/nomes"): Rota("id", {"id": "parte"}, json=lambda _: {"nome": "Outro nome"}),
+    ("DELETE", "/api/atendido/<int:id>/nomes/<int:nome_id>"): Rota(
+        "id", {"id": "parte", "nome_id": "atendido_nome"}
+    ),
     ("POST", "/api/atendido/<int:id>/tornar-assistido"): Rota("id", {"id": "atendido_livre"}, json=_assistido),
     # --- casos ---
     ("GET", "/api/caso/"): Rota("colecao", query=f"search={BUSCA}"),
@@ -361,6 +396,26 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ),
     ("DELETE", "/api/djen/oabs/<int:id>"): Rota("id", {"id": "oab"}),
     ("POST", "/api/processos/<int:id>/djen/buscar"): Rota("id", {"id": "processo"}),
+    # Roda a rotina do próprio NPJ; não pode gravar nada na DAJ.
+    ("POST", "/api/djen/sincronizar"): Rota("escrita"),
+    # Busca por parte (docs/plano-processos-avulsos.md, §3). O transporte falso
+    # devolve a publicação e o número de processo da DAJ: o outro NPJ não pode
+    # vê-los como "já no banco" nem como processo cadastrado.
+    ("GET", "/api/djen/busca-parte"): Rota("colecao", query=f"nome={BUSCA}&de=2026-11-01&ate=2026-11-05"),
+    # Importa uma publicação que o DJEN não devolve: nada a gravar.
+    ("POST", "/api/djen/busca-parte/importar"): Rota("escrita", json=_importacao),
+    # Banco de exemplos: o mesmo id_djen do exemplo da DAJ, no outro NPJ.
+    ("POST", "/api/djen/busca-parte/nao-pertinentes"): Rota("escrita", json=_nao_pertinentes),
+    ("GET", "/api/djen/exemplos/resumo"): Rota("colecao"),
+    ("GET", "/api/djen/exemplos/exportar"): Rota("colecao", query="incluir_nao_revisadas=1"),
+    # --- processos: lista geral e sem caso ---
+    ("GET", "/api/processos"): Rota("colecao", query=f"parte={BUSCA}&status=todos"),
+    ("POST", "/api/processos"): Rota("escrita", json=_processo_sem_caso),
+    ("GET", "/api/processos/<int:id>"): Rota("id", {"id": "processo_avulso"}),
+    ("PUT", "/api/processos/<int:id>"): Rota(
+        "id", {"id": "processo_avulso"}, json=lambda ids: {"obs": "Outro", "partes": [{"id_atendido": ids["meu_atendido"]}]}
+    ),
+    ("DELETE", "/api/processos/<int:id>"): Rota("id", {"id": "processo"}),
     # --- fila de atendimento ---
     ("GET", "/api/fila_atendimento/"): Rota("colecao"),
     ("GET", "/api/fila_atendimento/preview"): Rota("colecao"),
@@ -494,6 +549,23 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
     ids["processo"] = _ok(
         client.post(f"/api/caso/{c}/processos", json={"especie": f"{MARCA} processo", "numero": "9990001", "status": True}, headers=h)
     )["id"]
+    # Processo sem caso, com parte sem triagem e uma variação do nome.
+    ids["parte"] = _ok(client.post("/api/atendido/simplificado", json={"nome": f"{MARCA} Parte"}, headers=h))["id"]
+    ids["atendido_nome"] = _ok(
+        client.post(f"/api/atendido/{ids['parte']}/nomes", json={"nome": f"{MARCA} variação"}, headers=h)
+    )[0]["id"]
+    ids["processo_avulso"] = _ok(
+        client.post(
+            "/api/processos",
+            json={
+                "especie": "Ação",
+                "numero": NUMERO_DAJ,
+                "identificacao": f"{MARCA} processo sem caso",
+                "partes": [{"id_atendido": ids["parte"]}],
+            },
+            headers=h,
+        )
+    )["id"]
     ids["lembrete"] = _ok(
         client.post(
             f"/api/caso/{c}/lembretes",
@@ -614,6 +686,23 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
                     capturada_em=agora,
                 )
             ).lastrowid
+            session.execute(
+                metadata.tables["djen_exemplos"].insert().values(
+                    tenant_id=TENANT_DAJ,
+                    id_djen=ID_DJEN_DAJ,
+                    numero_processo="99999999920268130001",
+                    data_disponibilizacao=date.today(),
+                    sigla_tribunal=MARCA,
+                    texto_plano=f"{MARCA} exemplo",
+                    destinatarios=[{"nome": f"{MARCA} parte", "polo": "A"}],
+                    termo_busca=MARCA,
+                    rotulo="pertinente",
+                    origem="busca_parte",
+                    id_rotulado_por=ids["usuario"],
+                    rotulado_em=agora,
+                    criado_em=agora,
+                )
+            )
             ids["oab"] = session.execute(
                 metadata.tables["djen_oabs"].insert().values(
                     tenant_id=TENANT_DAJ,
@@ -735,6 +824,18 @@ def banco_preservado(app: Flask, create_admin_user: None):
             session.commit()
         finally:
             session.close()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def djen_sem_rede():
+    """A varredura nunca chama a API real do DJEN: toda consulta volta vazia."""
+    anterior = djen_client._transporte
+    falso = TransporteFalso()
+    falso.por_parte[BUSCA] = [item_djen(ID_DJEN_DAJ, "99999999920268130001")]
+    falso.por_parte[NOME_NAO_PERTINENTE] = [item_djen(ID_DJEN_DAJ, "99999999920268130001")]
+    djen_client.definir_transporte(falso)
+    yield
+    djen_client.definir_transporte(anterior)
 
 
 @pytest.fixture(scope="module")
@@ -904,6 +1005,8 @@ REFERENCIAS_CRUZADAS = [
     ("POST", "/api/orientacao_juridica/"),
     ("POST", "/api/fila_atendimento/"),
     ("POST", "/api/caso/<int:caso_id>/lembretes"),
+    ("POST", "/api/processos"),
+    ("POST", "/api/djen/busca-parte/importar"),
 ]
 
 
@@ -950,10 +1053,38 @@ def test_dono_continua_lendo_os_proprios_dados(client, cenario):
         f"/api/arquivo/{ids['arquivo']}",
         f"/api/user/{ids['usuario']}",
         f"/api/djen/publicacoes/{ids['publicacao']}",
+        f"/api/processos/{ids['processo_avulso']}",
+        f"/api/atendido/{ids['parte']}/nomes",
     ):
         assert client.get(url, headers=h).status_code == 200, url
     busca = client.get(f"/api/search/?q={BUSCA}", headers=h)
     assert MARCA in busca.get_data(as_text=True)
+
+
+def test_dono_ve_na_busca_por_parte_o_que_ja_tem(client, cenario):
+    # Controle da busca por parte: para a DAJ, a mesma publicação aparece como
+    # já gravada e casada com o processo sem caso. Para o outro NPJ, a
+    # varredura de coleções exige a resposta de antes (nada disso).
+    query = ROTAS[("GET", "/api/djen/busca-parte")].query
+    dados = get_success_data(client.get(f"/api/djen/busca-parte?{query}", headers=cenario.daj))
+    (item,) = dados["items"]
+    assert item["ja_no_banco"] is True
+    assert item["processo_id"] == cenario.ids["processo_avulso"]
+    outro = get_success_data(client.get(f"/api/djen/busca-parte?{query}", headers=cenario.outro))
+    assert outro["items"][0]["ja_no_banco"] is False
+    assert outro["items"][0]["processo_id"] is None
+    # O rótulo do banco de exemplos também é do NPJ.
+    assert item["rotulo"] == "pertinente"
+    assert outro["items"][0]["rotulo"] != "pertinente"
+
+
+def test_dono_ve_o_proprio_banco_de_exemplos(client, cenario):
+    # Controle das coleções do banco de exemplos: a DAJ vê o próprio exemplo.
+    resumo = get_success_data(client.get("/api/djen/exemplos/resumo", headers=cenario.daj))
+    assert resumo["por_rotulo"]["pertinente"] >= 1
+    exportado = client.get("/api/djen/exemplos/exportar", headers=cenario.daj)
+    assert exportado.status_code == 200
+    assert f"{MARCA} exemplo" in exportado.get_data(as_text=True)
 
 
 # --------------------------------------------------------------------------- #

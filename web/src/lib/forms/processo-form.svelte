@@ -12,6 +12,7 @@
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
 	import type { Caso } from '$lib/types';
+	import type { Snippet } from 'svelte';
 
 	let {
 		data,
@@ -20,7 +21,9 @@
 		onCancel,
 		isCreateMode = true,
 		casoId,
-		processoId
+		processoId,
+		salvar,
+		extra
 	}: {
 		data: SuperValidated<Infer<typeof processoCreateFormSchema>>;
 		isCreateMode?: boolean;
@@ -29,6 +32,10 @@
 		onUpdate?: (data: any) => void;
 		onError?: (error: any) => void;
 		onCancel?: () => void;
+		/** Envio próprio (processo sem caso, `/api/processos`); sem ele, usa a rota do caso. */
+		salvar?: (dados: Infer<typeof processoCreateFormSchema>) => Promise<{ id: number }>;
+		/** Seção extra antes dos botões (partes do processo sem caso). */
+		extra?: Snippet;
 	} = $props();
 
 	const processoForm = superForm(data, {
@@ -44,9 +51,11 @@
 					return;
 				}
 
-				const response = isCreateMode
-					? await api.post<Caso>(`caso/${casoId}/processos`, form.data)
-					: await api.put<Caso>(`caso/${casoId}/processos/${processoId}`, form.data);
+				const response = salvar
+					? await salvar(form.data)
+					: isCreateMode
+						? await api.post<Caso>(`caso/${casoId}/processos`, form.data)
+						: await api.put<Caso>(`caso/${casoId}/processos/${processoId}`, form.data);
 
 				toast.success(
 					isCreateMode ? 'Processo criado com sucesso!' : 'Processo atualizado com sucesso!'
@@ -207,6 +216,8 @@
 			rows={4}
 		/>
 	</FormSection>
+
+	{@render extra?.()}
 
 	<div class="flex items-center justify-between border-t border-border pt-6">
 		<Button type="button" variant="outline" onclick={() => onCancel?.()}>Cancelar</Button>

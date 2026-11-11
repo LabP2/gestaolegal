@@ -9,14 +9,16 @@ from datetime import date
 from functools import wraps
 from typing import Any
 
-from flask import Blueprint, request
+from flask import Blueprint, Response, request
 
 from gestaolegal.common import PageParams
 from gestaolegal.exceptions import ValidationException
 from gestaolegal.services.djen_service import (
+    PAPEIS_EXEMPLOS,
     PAPEIS_GESTAO,
     PAPEIS_OABS,
     PAPEIS_PARTICIPANTE,
+    PAPEIS_ROTINA,
     PAPEIS_UNIDADE,
     DJENService,
 )
@@ -73,6 +75,7 @@ def listar_publicacoes():
     page = request.args.get("page", default=1, type=int)
     per_page = min(request.args.get("per_page", default=20, type=int), 100)
     caso_id = request.args.get("caso_id", default=None, type=int)
+    processo_id = request.args.get("processo_id", default=None, type=int)
     filtros: dict[str, Any] = {
         "inicio": _data("inicio"),
         "fim": _data("fim"),
@@ -81,6 +84,7 @@ def listar_publicacoes():
         "oab": _oab(_texto("oab", 20)),
         "situacao": _texto("situacao", 12),
         "caso_id": caso_id,
+        "processo_id": processo_id,
         "q": _texto("q", 200),
     }
     result = DJENService().listar(
@@ -192,6 +196,20 @@ def status():
     return success_response(data=dados)
 
 
+@djen_controller.route("/djen/sincronizar", methods=["POST"])
+@authorized(*PAPEIS_ROTINA)
+@djen_habilitado
+def sincronizar():
+    """Roda a rotina agora, só para o NPJ de quem chama.
+
+    Como o botão "Buscar publicações agora" do processo, é uma ação manual:
+    depende da chave do NPJ (`djen_ativo`), não de `DJEN_SYNC_ENABLED`, que
+    trava apenas a execução agendada.
+    """
+    registro = DJENService().sincronizar()
+    return success_response(data=registro, message="Rotina do DJEN concluída")
+
+
 @djen_controller.route("/processos/<int:id>/djen/buscar", methods=["POST"])
 @authorized(*PAPEIS_GESTAO)
 @djen_habilitado
@@ -201,3 +219,77 @@ def buscar_processo(id: int):
     )
     return success_response(data=resultado, message="Busca no DJEN concluída")
 
+
+
+@djen_controller.route("/djen/busca-parte", methods=["GET"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def busca_parte():
+    """Consulta direta ao DJEN por nome da parte, sem gravar nada.
+
+    `nome` pode se repetir (o nome do atendido e as variações); `tribunal`
+    também (uma consulta por tribunal; nenhum = todos).
+    """
+    dados = DJENService().busca_parte(
+        request.args.getlist("nome"),
+        request.args.get("de"),
+        request.args.get("ate"),
+        request.args.getlist("tribunal"),
+        RequestContext.get_current_user(),
+        RequestContext.get_unidade_ativa(),
+    )
+    return success_response(data=dados)
+
+
+@djen_controller.route("/djen/busca-parte/importar", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def importar_busca_parte():
+    dados = DJENService().importar_busca(
+        _corpo(), RequestContext.get_current_user(), RequestContext.get_unidade_ativa()
+    )
+    return success_response(data=dados, message="Publicações importadas")
+
+
+@djen_controller.route("/djen/busca-parte/nao-pertinentes", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def nao_pertinentes_busca_parte():
+    """Marca publicações da busca como não pertinentes (banco de exemplos).
+
+    Mesmo corpo da importação; não cria publicação nem processo.
+    """
+    dados = DJENService().marcar_nao_pertinentes(_corpo(), RequestContext.get_current_user())
+    return success_response(data=dados, message="Publicações marcadas como não pertinentes")
+
+
+@djen_controller.route("/djen/exemplos/resumo", methods=["GET"])
+@authorized(*PAPEIS_EXEMPLOS)
+@djen_habilitado
+def resumo_exemplos():
+    return success_response(data=DJENService().resumo_exemplos())
+
+
+@djen_controller.route("/djen/exemplos/exportar", methods=["GET"])
+@authorized(*PAPEIS_EXEMPLOS)
+@djen_habilitado
+def exportar_exemplos():
+    """Arquivo JSON Lines com os exemplos rotulados do NPJ.
+
+    `incluir_nao_revisadas=1` acrescenta as não revisadas.
+    """
+    incluir = (request.args.get("incluir_nao_revisadas") or "").strip().lower() in (
+        "1",
+        "true",
+        "sim",
+    )
+    conteudo = DJENService().exportar_exemplos(incluir_nao_revisadas=incluir)
+    nome = f"djen-exemplos-{date.today().isoformat()}.jsonl"
+    return Response(
+        conteudo,
+        mimetype="application/x-ndjson",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nome}"',
+            "Cache-Control": "no-store",
+        },
+    )

@@ -9,8 +9,10 @@ from gestaolegal.models.assistido_input import (
     AssistidoUpdateInput,
 )
 from gestaolegal.models.atendido import Atendido
+from gestaolegal.integrations.djen_html import para_latin1
 from gestaolegal.models.atendido_input import (
     AtendidoCreateInput,
+    AtendidoSimplificadoInput,
     AtendidoUpdateInput,
     ListAtendido,
 )
@@ -187,6 +189,9 @@ class AtendidoService:
 
         try:
             assistido_id = self.repository.create_assistido(assistido_data)
+            if atendido.sem_triagem:
+                # A triagem feita depois mantém o atendido e encerra o "sem triagem".
+                self.repository.update(id_atendido, {"sem_triagem": False})
             if pj is not None:
                 self.repository.salvar_pessoa_juridica(assistido_id, pj.model_dump())
             logger.info(
@@ -261,6 +266,71 @@ class AtendidoService:
         except Exception:
             self.repository.session.rollback()
             raise
+
+    # --- cadastro simplificado e variações do nome ------------------------------
+    # docs/plano-processos-avulsos.md, §2: parte de processo sem caso.
+
+    @staticmethod
+    def _documento(valor: str | None, digitos: int, campo: str, rotulo: str) -> str | None:
+        if valor is None:
+            return None
+        so_digitos = "".join(c for c in valor if c.isdigit())
+        if len(so_digitos) != digitos or not so_digitos.isascii():
+            raise ValidationException(f"{rotulo} inválido", field=campo)
+        if digitos == 11:
+            d = so_digitos
+            return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}"
+        d = so_digitos
+        return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+
+    def criar_simplificado(self, dados: AtendidoSimplificadoInput) -> Atendido:
+        """Só nome, documento e observação; o resto fica nulo até a triagem."""
+        registro = {
+            # `atendidos` tem colunas legadas em latin1 no MySQL.
+            "nome": para_latin1(dados.nome),
+            "cpf": self._documento(dados.cpf, 11, "cpf", "CPF"),
+            "cnpj": self._documento(dados.cnpj, 14, "cnpj", "CNPJ"),
+            "obs": para_latin1(dados.obs),
+            "status": 1,
+            "sem_triagem": True,
+            "unidade_id": RequestContext.get_unidade_ativa(),
+        }
+        atendido_id = self.repository.create(registro)
+        logger.info(f"Atendido {atendido_id} cadastrado sem triagem")
+        atendido = self.find_by_id(atendido_id)
+        assert atendido is not None
+        return atendido
+
+    def _da_unidade(self, atendido_id: int) -> Atendido:
+        atendido = self.repository.find_by_id(
+            atendido_id, unidade_id=RequestContext.get_unidade_ativa()
+        )
+        if not atendido:
+            raise NotFoundException(resource="Atendido", resource_id=atendido_id)
+        return atendido
+
+    def nomes(self, atendido_id: int) -> list[dict[str, Any]]:
+        self._da_unidade(atendido_id)
+        return self.repository.nomes(atendido_id)
+
+    def adicionar_nome(self, atendido_id: int, nome: Any) -> list[dict[str, Any]]:
+        atendido = self._da_unidade(atendido_id)
+        if not isinstance(nome, str) or not " ".join(nome.split()):
+            raise ValidationException("Informe o nome", field="nome")
+        nome = " ".join(nome.split())
+        if len(nome) > 150:
+            raise ValidationException("Nome com mais de 150 caracteres", field="nome")
+        if nome.lower() == (atendido.nome or "").lower() or self.repository.nome_existe(
+            atendido_id, nome
+        ):
+            raise ValidationException("Este nome já está cadastrado", field="nome")
+        self.repository.adicionar_nome(atendido_id, nome)
+        return self.repository.nomes(atendido_id)
+
+    def remover_nome(self, atendido_id: int, nome_id: int) -> None:
+        self._da_unidade(atendido_id)
+        if not self.repository.remover_nome(atendido_id, nome_id):
+            raise NotFoundException(resource="Nome", resource_id=nome_id)
 
     def soft_delete(self, atendido_id: int):
         logger.info(f"Soft deleting atendido with id: {atendido_id}")

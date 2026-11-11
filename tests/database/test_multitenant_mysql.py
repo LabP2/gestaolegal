@@ -20,6 +20,8 @@ from sqlalchemy.engine import URL
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 ROOT = Path(__file__).resolve().parents[2]
+DJEN = "d3e4f5a6b7c8"
+AVULSOS = "f1a2b3c4d5e6"
 pytestmark = pytest.mark.skipif(
     os.environ.get("MULTITENANT_MYSQL_TEST") != "1",
     reason="MySQL descartável: habilite MULTITENANT_MYSQL_TEST=1",
@@ -219,7 +221,12 @@ def test_api_com_fks_mysql(mysql_descartavel, monkeypatch, tmp_path):
 
 
 def test_migration_djen(mysql_descartavel):
-    """DJEN (d3e4f5a6b7c8): numero_cnj dos existentes, chave desligada, ida e volta."""
+    """DJEN (d3e4f5a6b7c8): numero_cnj dos existentes, chave desligada, ida e volta.
+
+    Vai só até a revisão do DJEN: o downgrade a partir do head passaria antes
+    pela migration dos processos sem caso, e o esquema "depois" não seria o
+    desta migration.
+    """
     from scripts.seed_database import seed_database
 
     engine, cfg = mysql_descartavel
@@ -230,7 +237,7 @@ def test_migration_djen(mysql_descartavel):
         conn.execute(text("UPDATE processos SET numero = '1000001-11.2026.8.13.0001' WHERE id = :id"), {"id": ids[0]})
         conn.execute(text("UPDATE processos SET numero = 'ANTIGO 123/99' WHERE id = :id"), {"id": ids[1]})
     antes = _schema(engine)
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, DJEN)
     with engine.connect() as conn:
         cnj = dict(conn.execute(text("SELECT id, numero_cnj FROM processos WHERE id IN :ids")
                                 .bindparams(sa_bindparam("ids", expanding=True)), {"ids": ids}).all())
@@ -241,7 +248,7 @@ def test_migration_djen(mysql_descartavel):
     # Ida e volta: o downgrade devolve o esquema anterior e o upgrade o refaz.
     command.downgrade(cfg, "c2d3e4f5a6b7")
     assert _schema(engine) == antes
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, DJEN)
     assert _schema(engine) == depois
     # A FK composta impede publicação de um NPJ apontar para caso de outro.
     with engine.connect() as conn:
@@ -282,4 +289,155 @@ def test_migration_djen(mysql_descartavel):
             {"c": caso, "u": unidade})
     with pytest.raises(RuntimeError, match="Remova-os antes do downgrade"):
         command.downgrade(cfg, "c2d3e4f5a6b7")
+    assert _schema(engine) == depois
+
+
+def _colunas_atendido(engine) -> dict[str, tuple]:
+    with engine.connect() as conn:
+        return {
+            r[0]: tuple(r[1:])
+            for r in conn.execute(text(
+                "SELECT COLUMN_NAME, COLUMN_TYPE, CHARACTER_SET_NAME, COLLATION_NAME, IS_NULLABLE "
+                "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'atendidos'"))
+        }
+
+
+def test_migration_processos_avulsos(mysql_descartavel):
+    """Processos sem caso (f1a2b3c4d5e6): unidade do caso, nulidade dos dados do
+    atendido sem mudar charset, FKs compostas e ida e volta.
+
+    Vai só até a própria revisão: o esquema "depois" não inclui as migrations
+    seguintes (banco de exemplos), que têm teste próprio.
+    """
+    from scripts.seed_database import seed_database
+
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, DJEN)
+    seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
+    antes = _schema(engine)
+    colunas_antes = _colunas_atendido(engine)
+    command.upgrade(cfg, AVULSOS)
+    with engine.connect() as conn:
+        # Todo processo herdou a unidade do próprio caso.
+        assert conn.execute(text(
+            "SELECT COUNT(*) FROM processos p JOIN casos c ON c.id = p.id_caso "
+            "AND c.tenant_id = p.tenant_id WHERE p.unidade_id = c.unidade_id")).scalar() == \
+            conn.execute(text("SELECT COUNT(*) FROM processos")).scalar() > 0
+        assert conn.execute(text("SELECT COUNT(*) FROM atendidos WHERE sem_triagem <> 0")).scalar() == 0
+    colunas = _colunas_atendido(engine)
+    for coluna in ("data_nascimento", "cpf", "celular", "email", "estado_civil",
+                   "como_conheceu", "procurou_outro_local", "pj_constituida"):
+        # Só a nulidade muda; tipo, charset e collation (latin1 legado) ficam.
+        assert colunas_antes[coluna][3] == "NO" and colunas[coluna][3] == "YES", coluna
+        assert colunas[coluna][:3] == colunas_antes[coluna][:3], coluna
+    assert {k: v for k, v in colunas.items() if k != "sem_triagem"}.keys() == colunas_antes.keys()
+    depois = _schema(engine)
+    insp = inspect(engine)
+    assert next(c for c in insp.get_columns("processos") if c["name"] == "id_caso")["nullable"] is True
+    assert any(f["constrained_columns"] == ["tenant_id", "unidade_id"] and f["referred_table"] == "unidades"
+               for f in insp.get_foreign_keys("processos"))
+
+    # FKs compostas: processo sem caso e parte nunca cruzam NPJs.
+    with engine.connect() as conn:
+        unidade_daj = conn.execute(text("SELECT id FROM unidades WHERE tenant_id = 1 LIMIT 1")).scalar_one()
+        unidade_outro = conn.execute(text("SELECT id FROM unidades WHERE tenant_id = 2 LIMIT 1")).scalar_one()
+        usuario = conn.execute(text("SELECT id FROM usuarios WHERE tenant_id = 1 LIMIT 1")).scalar_one()
+        atendido_outro = conn.execute(text("SELECT id FROM atendidos WHERE tenant_id = 2 LIMIT 1")).scalar_one()
+    novo_processo = (
+        "INSERT INTO processos (tenant_id, especie, status, id_criado_por, unidade_id) "
+        "VALUES (1, 'Ação', 1, :u, :unidade)"
+    )
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(novo_processo), {"u": usuario, "unidade": unidade_outro})
+    assert erro.value.orig.args[0] == 1452
+    with engine.begin() as conn:
+        processo = conn.execute(text(novo_processo), {"u": usuario, "unidade": unidade_daj}).lastrowid
+        parte = conn.execute(text(
+            "INSERT INTO atendidos (tenant_id, nome, status, sem_triagem, unidade_id) "
+            "VALUES (1, 'Parte Fictícia', 1, 1, :unidade)"), {"unidade": unidade_daj}).lastrowid
+        conn.execute(text(
+            "INSERT INTO processo_partes (tenant_id, id_processo, id_atendido, polo) "
+            "VALUES (1, :p, :a, 'passivo')"), {"p": processo, "a": parte})
+        conn.execute(text(
+            "INSERT INTO atendido_nomes (tenant_id, id_atendido, nome) VALUES (1, :a, 'UFMG')"),
+            {"a": parte})
+    for sql, valores in (
+        ("INSERT INTO processo_partes (tenant_id, id_processo, id_atendido) VALUES (1, :p, :a)",
+         {"p": processo, "a": atendido_outro}),
+        ("INSERT INTO atendido_nomes (tenant_id, id_atendido, nome) VALUES (1, :a, 'X')",
+         {"a": atendido_outro}),
+    ):
+        with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+            conn.execute(text(sql), valores)
+        assert erro.value.orig.args[0] == 1452
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO atendido_nomes (tenant_id, id_atendido, nome) VALUES (1, :a, 'UFMG')"),
+            {"a": parte})
+    assert erro.value.orig.args[0] == 1062
+
+    # O downgrade recusa antes de qualquer DDL enquanto houver processo sem
+    # caso ou parte sem triagem.
+    with pytest.raises(RuntimeError, match="Remova-os antes do downgrade"):
+        command.downgrade(cfg, DJEN)
+    assert _schema(engine) == depois
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM atendido_nomes"))
+        conn.execute(text("DELETE FROM processo_partes"))
+        conn.execute(text("DELETE FROM processos WHERE id = :p"), {"p": processo})
+        conn.execute(text("DELETE FROM atendidos WHERE id = :a"), {"a": parte})
+    command.downgrade(cfg, DJEN)
+    assert _schema(engine) == antes
+    assert _colunas_atendido(engine) == colunas_antes
+    command.upgrade(cfg, AVULSOS)
+    assert _schema(engine) == depois
+
+
+def test_migration_djen_exemplos(mysql_descartavel):
+    """Banco de exemplos (b3c4d5e6f7a8): tabela utf8mb4, unicidade e FK composta
+    por NPJ, ida e volta."""
+    from scripts.seed_database import seed_database
+
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, AVULSOS)
+    seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
+    antes = _schema(engine)
+    command.upgrade(cfg, "head")
+    depois = _schema(engine)
+    assert set(depois) - set(antes) == {"djen_exemplos"}
+    with engine.connect() as conn:
+        collation = conn.execute(text(
+            "SELECT TABLE_COLLATION FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'djen_exemplos'")).scalar_one()
+        usuario_daj = conn.execute(text("SELECT id FROM usuarios WHERE tenant_id = 1 LIMIT 1")).scalar_one()
+        usuario_outro = conn.execute(text("SELECT id FROM usuarios WHERE tenant_id = 2 LIMIT 1")).scalar_one()
+    assert collation.startswith("utf8mb4")
+
+    novo = (
+        "INSERT INTO djen_exemplos (tenant_id, id_djen, numero_processo, data_disponibilizacao, "
+        "texto_plano, destinatarios, rotulo, origem, id_rotulado_por, rotulado_em, criado_em) "
+        "VALUES (:t, :id_djen, '00000000020268130001', '2026-11-05', :texto, :dest, "
+        "'nao_pertinente', 'busca_parte', :u, NOW(), NOW())"
+    )
+    # Texto fora do latin1 (travessão, ≥, emoji) grava sem erro 1366.
+    texto = "Intimação — prazo ≥ 15 dias 📎"
+    with engine.begin() as conn:
+        conn.execute(text(novo), {"t": 1, "id_djen": 1, "texto": texto, "dest": '[{"nome": "Fulana"}]',
+                                  "u": usuario_daj})
+        # O mesmo id_djen em outro NPJ é outro exemplo.
+        conn.execute(text(novo), {"t": 2, "id_djen": 1, "texto": texto, "dest": None, "u": usuario_outro})
+        assert conn.execute(text(
+            "SELECT texto_plano FROM djen_exemplos WHERE tenant_id = 1")).scalar_one() == texto
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(novo), {"t": 1, "id_djen": 1, "texto": "x", "dest": None, "u": usuario_daj})
+    assert erro.value.orig.args[0] == 1062
+    # Quem rotulou é usuário do mesmo NPJ.
+    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
+        conn.execute(text(novo), {"t": 1, "id_djen": 2, "texto": "x", "dest": None, "u": usuario_outro})
+    assert erro.value.orig.args[0] == 1452
+
+    command.downgrade(cfg, AVULSOS)
+    assert _schema(engine) == antes
+    command.upgrade(cfg, "head")
     assert _schema(engine) == depois

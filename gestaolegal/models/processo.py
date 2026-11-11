@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 @dataclass
 class Processo:
     especie: str
-    id_caso: int
+    id_caso: int | None
     status: bool
     id_criado_por: int
 
@@ -29,5 +29,37 @@ class Processo:
     numero_cnj: str | None = None
     djen_pendente: bool = False
     djen_consultado_em: datetime | None = None
+    unidade_id: int | None = None
     caso: "Caso | None" = None
     criado_por: "UserInfo | None" = None
+
+
+@dataclass
+class ParteProcesso:
+    """Parte de um processo: de `processo_partes` ou, no processo de caso, do
+    caso (`casos_atendidos`, sem polo)."""
+
+    id_atendido: int
+    nome: str
+    origem: str  # processo | caso
+    polo: str | None = None
+    sem_triagem: bool = False
+    id: int | None = None  # linha de `processo_partes`
+
+
+@dataclass
+class ProcessoListItem:
+    """Linha de `GET /api/processos`."""
+
+    id: int
+    especie: str
+    status: bool
+    unidade_id: int
+    id_caso: int | None = None
+    numero: str | None = None
+    numero_cnj: str | None = None
+    identificacao: str | None = None
+    vara: str | None = None
+    data_distribuicao: date | None = None
+    partes: list[str] | None = None
+    total_publicacoes: int = 0

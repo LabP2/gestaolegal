@@ -10,6 +10,7 @@ em entidades) ou como texto simples. É conteúdo de terceiros:
   o resumo do evento e para a busca.
 """
 
+import unicodedata
 from html import escape
 from html.parser import HTMLParser
 
@@ -97,3 +98,49 @@ def resumo(texto: str, limite: int = 500) -> str:
     if len(texto) <= limite:
         return texto
     return texto[: limite - 1].rstrip() + "…"
+
+
+def corrigir_caixa(texto: str | None) -> str | None:
+    """Conserta a caixa que o DJEN entrega em nomes de classe e órgão.
+
+    A API devolve, por exemplo, "AçãO TRABALHISTA - RITO SUMARíSSIMO": o texto
+    em maiúsculas com as letras acentuadas em minúsculas. Quando nenhuma letra
+    ASCII está em minúscula, o texto inteiro vai para maiúsculas.
+    """
+    if not texto:
+        return texto
+    if any("a" <= c <= "z" for c in texto) or texto == texto.upper():
+        return texto
+    return texto.upper()
+
+
+def para_latin1(texto: str | None) -> str | None:
+    """Adapta o texto às colunas legadas em latin1 (`eventos.descricao`, `tipo`).
+
+    O latin1 do MySQL é o cp1252. Caracteres de controle C1 (U+0080 a U+009F)
+    chegam no DJEN quando a origem leu cp1252 como latin1 (o travessão vira
+    U+0096): voltam ao caractere certo. O que o cp1252 não tem perde o acento,
+    se for o caso, ou vira "?"; sem isso o INSERT falha com o erro 1366.
+    """
+    if not texto:
+        return texto
+    saida: list[str] = []
+    for c in texto:
+        if "\x80" <= c <= "\x9f":
+            try:
+                c = bytes([ord(c)]).decode("cp1252")
+            except UnicodeDecodeError:
+                continue
+        try:
+            c.encode("cp1252")
+        except UnicodeEncodeError:
+            base = "".join(
+                b for b in unicodedata.normalize("NFKD", c) if not unicodedata.combining(b)
+            )
+            try:
+                base.encode("cp1252")
+                c = base
+            except UnicodeEncodeError:
+                c = "?"
+        saida.append(c)
+    return "".join(saida)

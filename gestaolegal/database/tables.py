@@ -198,20 +198,23 @@ atendidos = Table(
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("nome", String(80), nullable=False),
-    Column("data_nascimento", Date, nullable=False),
-    Column("cpf", String(14), nullable=False),
+    # Os dados pessoais abaixo aceitam nulo só no banco, por causa do cadastro
+    # simplificado da parte (docs/plano-processos-avulsos.md, §1). O cadastro
+    # normal continua exigindo tudo pela validação de entrada.
+    Column("data_nascimento", Date, nullable=True),
+    Column("cpf", String(14), nullable=True),
     Column("cnpj", String(18), nullable=True),
     Column("endereco_id", Integer, nullable=True),
     Column("telefone", String(18), nullable=True),
-    Column("celular", String(18), nullable=False),
-    Column("email", String(80), nullable=False),
-    Column("estado_civil", String(80), nullable=False),
-    Column("como_conheceu", String(80), nullable=False),
+    Column("celular", String(18), nullable=True),
+    Column("email", String(80), nullable=True),
+    Column("estado_civil", String(80), nullable=True),
+    Column("como_conheceu", String(80), nullable=True),
     Column("indicacao_orgao", String(80), nullable=True),
-    Column("procurou_outro_local", String(80), nullable=False),
+    Column("procurou_outro_local", String(80), nullable=True),
     Column("procurou_qual_local", String(80), nullable=True),
     Column("obs", Text, nullable=True),
-    Column("pj_constituida", String(80), nullable=False),
+    Column("pj_constituida", String(80), nullable=True),
     Column("repres_legal", Boolean, nullable=True),
     Column("nome_repres_legal", String(80), nullable=True),
     Column("cpf_repres_legal", String(14), nullable=True),
@@ -220,6 +223,9 @@ atendidos = Table(
     Column("nascimento_repres_legal", Date, nullable=True),
     Column("pretende_constituir_pj", String(80), nullable=True),
     Column("status", Integer, nullable=False),
+    # Parte cadastrada sem triagem socioeconômica (processo sem caso): conta
+    # como assistido sem ter linha em `assistidos`.
+    Column("sem_triagem", Boolean, nullable=False, server_default="0"),
     coluna_unidade(),
     coluna_tenant(),
     unica_tenant_id("atendidos"),
@@ -377,7 +383,9 @@ processos = Table(
     Column("data_distribuicao", Date, nullable=True),
     Column("data_transito_em_julgado", Date, nullable=True),
     Column("obs", Text, nullable=True),
-    Column("id_caso", Integer, nullable=False),
+    # Nulo no processo sem caso (docs/plano-processos-avulsos.md), cujas
+    # partes ficam em `processo_partes`.
+    Column("id_caso", Integer, nullable=True),
     Column("status", Boolean, nullable=False),
     Column("id_criado_por", Integer, nullable=False),
     # DJEN: só os 20 dígitos de `numero`, quando tiver exatamente 20 (padrão
@@ -386,11 +394,14 @@ processos = Table(
     # Processo cadastrado ou com número alterado: a rotina busca o histórico.
     Column("djen_pendente", Boolean, nullable=False, server_default="0"),
     Column("djen_consultado_em", DateTime, nullable=True),
+    # Processo de caso grava a unidade do caso; sem caso, a unidade ativa.
+    coluna_unidade(),
     coluna_tenant(),
     unica_tenant_id("processos"),
     Index("ix_processos_tenant_numero_cnj", "tenant_id", "numero_cnj"),
     fk_tenant("processos", "id_caso", "casos"),
     fk_tenant("processos", "id_criado_por", "usuarios"),
+    fk_tenant("processos", "unidade_id", "unidades"),
     # Mesmo número pode existir em NPJs diferentes. O nome é lido por
     # _tratar_numero_duplicado (processo_repository.py) para responder 400.
     UniqueConstraint("tenant_id", "numero", name="uq_processos_tenant_numero"),
@@ -795,4 +806,77 @@ djen_oabs = Table(
     fk_tenant("djen_oabs", "id_usuario", "usuarios"),
     fk_tenant("djen_oabs", "id_criado_por", "usuarios"),
     fk_tenant("djen_oabs", "unidade_id", "unidades"),
+)
+
+
+# Banco de exemplos rotulados (docs/plano-processos-avulsos.md, "Banco de
+# exemplos"; plano-djen.md, §8): publicações julgadas pertinentes ou não, para
+# treinar a sugestão automática. Separado de `djen_comunicacoes` para não
+# entrar nas listas, na caixa "Sem caso" nem nas contagens. Sem unidade e sem
+# vínculo com atendido. `texto_plano` e `destinatarios` são anulados pela
+# retenção; rótulo e metadados ficam.
+ROTULOS_EXEMPLO = ("pertinente", "nao_pertinente", "nao_revisada")
+ORIGENS_EXEMPLO = ("busca_parte", "vinculo_manual", "vinculo_automatico", "descarte")
+djen_exemplos = Table(
+    "djen_exemplos",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_djen", BigInteger, nullable=False),  # `id` da API
+    Column("numero_processo", String(20), nullable=False),
+    Column("data_disponibilizacao", Date, nullable=False),
+    Column("sigla_tribunal", String(30), nullable=True),
+    Column("nome_orgao", String(300), nullable=True),
+    Column("nome_classe", String(300), nullable=True),
+    Column("tipo_comunicacao", String(100), nullable=True),
+    Column("tipo_documento", String(100), nullable=True),
+    Column("destinatarios", JSON, nullable=True),
+    Column("texto_plano", TEXTO_LONGO, nullable=True),
+    # Nome buscado na busca por parte; nulo quando veio da rotina/caixa.
+    Column("termo_busca", String(150), nullable=True),
+    Column("rotulo", String(15), nullable=False),  # ROTULOS_EXEMPLO
+    Column("origem", String(20), nullable=False),  # ORIGENS_EXEMPLO
+    # Quem rotulou; nulo no vínculo automático e na não revisada.
+    Column("id_rotulado_por", Integer, nullable=True),
+    Column("rotulado_em", DateTime, nullable=True),
+    Column("criado_em", DateTime, nullable=False),
+    Column("texto_apagado_em", DateTime, nullable=True),
+    coluna_tenant(),
+    unica_tenant_id("djen_exemplos"),
+    UniqueConstraint("tenant_id", "id_djen", name="uq_djen_exemplos_tenant_id_djen"),
+    Index("ix_djen_exemplos_tenant_rotulo", "tenant_id", "rotulo"),
+    fk_tenant("djen_exemplos", "id_rotulado_por", "usuarios"),
+    # Tabela nova: utf8mb4, sem o latin1 das legadas.
+    mysql_charset="utf8mb4",
+    mysql_collate="utf8mb4_0900_ai_ci",
+)
+
+
+# Partes do processo sem caso (docs/plano-processos-avulsos.md, §1). No
+# processo de caso, as partes continuam vindo de `casos_atendidos`.
+processo_partes = Table(
+    "processo_partes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_processo", Integer, nullable=False),
+    Column("id_atendido", Integer, nullable=False),
+    Column("polo", String(10), nullable=True),  # ativo | passivo | outro
+    coluna_tenant(),
+    UniqueConstraint(
+        "tenant_id", "id_processo", "id_atendido", name="uq_processo_partes_tenant_parte"
+    ),
+    fk_tenant("processo_partes", "id_processo", "processos"),
+    fk_tenant("processo_partes", "id_atendido", "atendidos"),
+)
+
+# Variações do nome do atendido, para a busca por parte no DJEN e para o
+# filtro de parte da lista de processos.
+atendido_nomes = Table(
+    "atendido_nomes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_atendido", Integer, nullable=False),
+    Column("nome", String(150), nullable=False),
+    coluna_tenant(),
+    UniqueConstraint("tenant_id", "id_atendido", "nome", name="uq_atendido_nomes_tenant_nome"),
+    fk_tenant("atendido_nomes", "id_atendido", "atendidos"),
 )

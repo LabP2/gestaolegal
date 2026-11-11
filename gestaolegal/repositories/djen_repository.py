@@ -1,10 +1,11 @@
-"""Acesso a `djen_comunicacoes`, `djen_sincronizacoes` e `djen_oabs`, sempre no
-tenant ativo."""
+"""Acesso a `djen_comunicacoes`, `djen_sincronizacoes`, `djen_oabs` e
+`djen_exemplos`, sempre no tenant ativo."""
 
+from contextlib import contextmanager
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import func, insert, or_, select
+from sqlalchemy import func, insert, null, or_, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import update as sql_update
 
@@ -12,6 +13,7 @@ from gestaolegal.common import PageParams, PaginatedResult
 from gestaolegal.database.tables import (
     casos,
     djen_comunicacoes,
+    djen_exemplos,
     djen_oabs,
     djen_sincronizacoes,
     unidades,
@@ -106,6 +108,7 @@ class DjenComunicacaoRepository(BaseRepository):
         situacao: str | None = None,
         caso_id: int | None = None,
         q: str | None = None,
+        processo_id: int | None = None,
     ) -> PaginatedResult[ComunicacaoListItem]:
         """Publicações da unidade.
 
@@ -144,6 +147,8 @@ class DjenComunicacaoRepository(BaseRepository):
             stmt = stmt.where(t.c.situacao == situacao)
         if caso_id is not None:
             stmt = stmt.where(t.c.id_caso == caso_id)
+        if processo_id is not None:
+            stmt = stmt.where(t.c.id_processo == processo_id)
         if q:
             termo = f"%{q.lower()}%"
             digitos = "".join(ch for ch in q if ch.isdigit())
@@ -176,6 +181,19 @@ class DjenComunicacaoRepository(BaseRepository):
             djen_comunicacoes,
         )
         return [v for v in self.session.execute(stmt).scalars() if v]
+
+    def por_ids_djen(self, ids_djen: list[int]) -> dict[int, ComunicacaoDJEN]:
+        """Publicações já gravadas no NPJ, pelo `id` da API (busca por parte)."""
+        if not ids_djen:
+            return {}
+        stmt = self.escopo(
+            select(djen_comunicacoes).where(djen_comunicacoes.c.id_djen.in_(ids_djen)),
+            djen_comunicacoes,
+        )
+        return {
+            row["id_djen"]: from_dict(ComunicacaoDJEN, dict(row))
+            for row in self.session.execute(stmt).mappings()
+        }
 
     def apagar_vencidas(self, limite: datetime) -> int:
         """Retenção (plano, §8): descartadas e pendentes sem caso antes de `limite`."""
@@ -211,6 +229,28 @@ class DjenSincronizacaoRepository(BaseRepository):
         )
         row = self.session.execute(stmt).mappings().one_or_none()
         return from_dict(SincronizacaoDJEN, dict(row)) if row else None
+
+    @contextmanager
+    def trava_da_rotina(self):
+        """Lock nomeado do MySQL por NPJ, numa conexão própria; rende False
+        se outra execução já o detém.
+
+        A conexão da sessão volta ao pool a cada commit da rotina e perderia o
+        lock no caminho. No SQLite (testes) não há o que travar.
+        """
+        engine = self.session.get_bind()
+        if engine.dialect.name != "mysql":
+            yield True
+            return
+        nome = f"gestaolegal_djen_{self.tenant_id()}"
+        with engine.connect() as conn:
+            if conn.execute(select(func.get_lock(nome, 0))).scalar() != 1:
+                yield False
+                return
+            try:
+                yield True
+            finally:
+                conn.execute(select(func.release_lock(nome)))
 
 
 class DjenOabRepository(BaseRepository):
@@ -296,5 +336,72 @@ class DjenOabRepository(BaseRepository):
             .order_by(usuarios.c.nome),
             usuarios,
             usuarios_unidades,
+        )
+        return [dict(r) for r in self.session.execute(stmt).mappings()]
+
+
+class DjenExemploRepository(BaseRepository):
+    """Banco de exemplos rotulados (docs/plano-processos-avulsos.md)."""
+
+    def por_ids_djen(self, ids_djen: list[int]) -> dict[int, dict[str, Any]]:
+        if not ids_djen:
+            return {}
+        stmt = self.escopo(
+            select(djen_exemplos).where(djen_exemplos.c.id_djen.in_(set(ids_djen))),
+            djen_exemplos,
+        )
+        return {row["id_djen"]: dict(row) for row in self.session.execute(stmt).mappings()}
+
+    def criar(self, data: dict[str, Any]) -> int:
+        result = self.session.execute(insert(djen_exemplos).values(**self.valores(data)))
+        self.session.flush()
+        return result.lastrowid
+
+    def atualizar(self, id: int, data: dict[str, Any]) -> None:
+        self.session.execute(
+            self.escopo(
+                sql_update(djen_exemplos).where(djen_exemplos.c.id == id), djen_exemplos
+            ).values(**data)
+        )
+
+    def apagar_nao_revisadas(self, limite: datetime) -> int:
+        """Retenção: não revisadas criadas antes de `limite` somem inteiras."""
+        t = djen_exemplos
+        stmt = self.escopo(
+            sql_delete(t).where(t.c.rotulo == "nao_revisada", t.c.criado_em < limite), t
+        )
+        return self.session.execute(stmt).rowcount or 0
+
+    def anular_textos(self, limite: datetime, agora: datetime) -> int:
+        """Retenção: rotuladas antes de `limite` perdem texto e destinatários."""
+        t = djen_exemplos
+        stmt = self.escopo(
+            sql_update(t).where(
+                t.c.rotulo != "nao_revisada",
+                t.c.rotulado_em < limite,
+                t.c.texto_apagado_em.is_(None),
+            ),
+            t,
+        ).values(texto_plano=None, destinatarios=null(), texto_apagado_em=agora)  # SQL NULL, não JSON null
+        return self.session.execute(stmt).rowcount or 0
+
+    def contagens(self) -> list[dict[str, Any]]:
+        """(rótulo, origem, total, com_texto) do tenant ativo."""
+        t = djen_exemplos
+        stmt = self.escopo(
+            select(
+                t.c.rotulo,
+                t.c.origem,
+                func.count().label("total"),
+                func.count(t.c.texto_plano).label("com_texto"),
+            ).group_by(t.c.rotulo, t.c.origem),
+            t,
+        )
+        return [dict(r) for r in self.session.execute(stmt).mappings()]
+
+    def para_exportar(self, rotulos: tuple[str, ...]) -> list[dict[str, Any]]:
+        t = djen_exemplos
+        stmt = self.escopo(
+            select(t).where(t.c.rotulo.in_(rotulos)).order_by(t.c.id), t
         )
         return [dict(r) for r in self.session.execute(stmt).mappings()]

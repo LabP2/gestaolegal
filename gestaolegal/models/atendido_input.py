@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import date
 
+from pydantic import Field, field_validator
+
 from gestaolegal.models.base_model import BaseModel
 from gestaolegal.models.endereco import Endereco
 
@@ -9,15 +11,16 @@ from gestaolegal.models.endereco import Endereco
 class ListAtendido:
     id: int
     nome: str
-    cpf: str
-    telefone: str
-    celular: str
-    email: str
-    data_nascimento: date
+    cpf: str | None
+    telefone: str | None
+    celular: str | None
+    email: str | None
+    data_nascimento: date | None
     status: bool
     is_assistido: bool
+    sem_triagem: bool
 
-    endereco: Endereco
+    endereco: Endereco | None
 
 
 class AtendidoCreateInput(BaseModel):
@@ -82,3 +85,20 @@ class AtendidoUpdateInput(BaseModel):
     cep: str | None = None
     cidade: str | None = None
     estado: str | None = None
+
+
+class AtendidoSimplificadoInput(BaseModel):
+    """Parte cadastrada sem triagem (processo sem caso): só nome, documento e
+    observação. Marca `sem_triagem`."""
+
+    nome: str = Field(min_length=1, max_length=80)
+    cpf: str | None = Field(default=None, max_length=14)
+    cnpj: str | None = Field(default=None, max_length=18)
+    obs: str | None = None
+
+    @field_validator("nome", "cpf", "cnpj", "obs", mode="before")
+    @classmethod
+    def aparar(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value

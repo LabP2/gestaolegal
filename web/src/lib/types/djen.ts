@@ -78,6 +78,8 @@ export interface StatusDjen {
 	ultima: SincronizacaoDjen | null;
 	/** Mais de 2 dias úteis sem sincronizar (ou nunca sincronizou). */
 	atrasada: boolean;
+	/** Parâmetros da rotina neste servidor (DJEN_JANELA_DIAS, DJEN_MAX_PROCESSOS). */
+	rotina: { janela_dias: number; max_processos: number };
 	filtros: { tribunais: string[]; tipos: string[] };
 }
 
@@ -125,3 +127,91 @@ export interface SugestaoOab {
 	uf_oab: string;
 	cadastrada: boolean;
 }
+
+/** Item de `GET /api/djen/busca-parte`: consulta direta, nada gravado. */
+export interface ItemBuscaParte {
+	id_djen: number;
+	data_disponibilizacao: string;
+	numero_processo: string;
+	numero_processo_mascara: string | null;
+	sigla_tribunal: string | null;
+	nome_orgao: string | null;
+	tipo_comunicacao: string | null;
+	tipo_documento: string | null;
+	nome_classe: string | null;
+	destinatarios: DestinatarioPublicacao[];
+	resumo: string | null;
+	link: string | null;
+	ativo: boolean;
+	/** A publicação já está gravada neste NPJ. */
+	ja_no_banco: boolean;
+	/** Id local, quando já gravada na unidade ativa. */
+	publicacao_id: number | null;
+	/** Processo da unidade com o mesmo número, se houver. */
+	processo_id: number | null;
+	processo_id_caso: number | null;
+	/** Rótulo no banco de exemplos; nulo = ainda sem exemplo. */
+	rotulo: RotuloExemplo | null;
+}
+
+export interface ResultadoBuscaParte {
+	items: ItemBuscaParte[];
+	total: number;
+	/** O DJEN tinha mais resultados que o limite da busca. */
+	truncado: boolean;
+	nomes: string[];
+	de: string;
+	ate: string;
+	tribunais: string[];
+}
+
+/** `POST /api/djen/busca-parte/importar`. */
+export interface ImportacaoBuscaParte {
+	novas: number;
+	atualizadas: number;
+	vinculadas: number;
+	processos_criados: number[];
+	nao_encontradas: number[];
+}
+
+/** Banco de exemplos rotulados (treino da sugestão automática). */
+export type RotuloExemplo = 'pertinente' | 'nao_pertinente' | 'nao_revisada';
+
+export const ROTULO_EXEMPLO_LABEL: Record<RotuloExemplo, string> = {
+	pertinente: 'Pertinente',
+	nao_pertinente: 'Não pertinente',
+	nao_revisada: 'Não revisada'
+};
+
+export type OrigemExemplo = 'busca_parte' | 'vinculo_manual' | 'vinculo_automatico' | 'descarte';
+
+export const ORIGEM_EXEMPLO_LABEL: Record<OrigemExemplo, string> = {
+	busca_parte: 'Busca por parte',
+	vinculo_manual: 'Vínculo manual',
+	vinculo_automatico: 'Vínculo automático',
+	descarte: 'Descarte'
+};
+
+/** `POST /api/djen/busca-parte/nao-pertinentes`. */
+export interface NaoPertinentesBuscaParte {
+	marcadas: number;
+	/** Demais itens da consulta que entraram como "não revisada". */
+	nao_revisadas: number;
+	nao_encontradas: number[];
+}
+
+/** `GET /api/djen/exemplos/resumo` (só admin). */
+export interface ResumoExemplos {
+	total: number;
+	por_rotulo: Record<RotuloExemplo, number>;
+	por_origem: Partial<Record<OrigemExemplo, number>>;
+	/** Exemplos que ainda guardam o texto (antes da retenção). */
+	com_texto: number;
+	/** Dias, contados do rótulo, até o texto dos rotulados ser apagado. */
+	retencao_dias: number;
+	/** Dias até as não revisadas serem apagadas. */
+	retencao_nao_revisadas_dias: number;
+}
+
+/** Período máximo da busca por parte, em dias. */
+export const BUSCA_PARTE_MAX_DIAS = 30;

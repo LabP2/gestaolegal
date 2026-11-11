@@ -205,6 +205,22 @@ class DJENClient:
             }
         )
 
+    def buscar_por_parte(
+        self, nome: str, inicio: date, fim: date, tribunal: str | None = None
+    ) -> list[Comunicacao]:
+        """Busca manual por nome da parte (docs/plano-processos-avulsos.md, §3).
+
+        Tem homônimos e ruído: nunca entra na captura automática.
+        """
+        filtros = {
+            "nomeParte": nome,
+            "dataDisponibilizacaoInicio": inicio.isoformat(),
+            "dataDisponibilizacaoFim": fim.isoformat(),
+        }
+        if tribunal:
+            filtros["siglaTribunal"] = tribunal.upper()
+        return self._paginar(filtros)
+
     # --- infraestrutura ------------------------------------------------------
 
     def _paginar(self, filtros: dict[str, str]) -> list[Comunicacao]:

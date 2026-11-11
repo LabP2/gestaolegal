@@ -137,7 +137,10 @@ class Seed:
         return self.conn.execute(stmt).mappings().one_or_none()
 
     def inserir(self, tabela: Table, dados: dict):
-        dados = {**dados, "tenant_id": self.tenant_id}
+        # Numa revisão anterior ao head, colunas mais novas (como
+        # `processos.unidade_id`) ainda não existem: ficam de fora.
+        reais = {c.name for c in self._colunas(tabela)}
+        dados = {k: v for k, v in {**dados, "tenant_id": self.tenant_id}.items() if k in reais}
         result = self.conn.execute(tabela.insert().values(**dados))
         self.criados[tabela.name] += 1
         return result.inserted_primary_key[0] if "id" in tabela.c else None
@@ -268,7 +271,7 @@ class Seed:
                     id_criado_por=admin, situacao_deferimento="ativo", status=True)
                 self.garantir("casos_atendidos", {"id_caso": caso, "id_atendido": atendido})
                 self.garantir("processos", {"id_caso": caso, "identificacao": f"[{MARCA}] {assunto}"},
-                    especie="Ação", status=True, id_criado_por=admin,
+                    unidade_id=unidade_id, especie="Ação", status=True, id_criado_por=admin,
                     vara="Vara de demonstração", data_distribuicao=hoje,
                     obs="Processo fictício, sem número judicial real.")
                 for numero, (tipo, dias, descricao) in enumerate((

@@ -17,12 +17,24 @@ export type { Arquivo, ListArquivo } from './arquivo';
 export type { Notificacao, FiltroArquivadas } from './notificacao';
 export { destinoDaNotificacao, FILTROS_ARQUIVADAS } from './notificacao';
 export { ARQUIVO_PAPEIS_EDITAM, ARQUIVO_PAPEIS_EXCLUEM } from './arquivo';
-export type { Atendido, ListAtendido } from './atendido';
+export type { Atendido, ListAtendido, AtendidoNome, AtendidoSimplificadoInput } from './atendido';
 export type { Paginated, PaginationMeta } from './paginated';
 export type { Endereco } from './endereco';
 export type { Unidade } from './unidade';
 export type { Caso, ListCaso } from './caso';
-export type { Processo, ListProcesso, ProcessoCreateInput, ProcessoUpdateInput } from './processo';
+export type {
+	Processo,
+	ListProcesso,
+	ProcessoCreateInput,
+	ProcessoUpdateInput,
+	PoloParte,
+	ParteProcesso,
+	ProcessoDetalhe,
+	ProcessoListItem,
+	PaginaProcessos,
+	ProcessoSemCasoInput
+} from './processo';
+export { POLO_PARTE_LABEL, PROCESSO_PAPEIS_SEM_CASO } from './processo';
 export type { SearchResultGroup, SearchResults, SearchResponse, SearchResultItem } from './search';
 export type { FilaItem, FilaHoje, SenhaPreview } from './fila-atendimento';
 export { FilaPrioridade, FilaStatus } from './fila-atendimento';
@@ -62,6 +74,19 @@ export type {
 	BuscaProcessoDjen,
 	OabMonitorada,
 	OabMonitoradaInput,
-	SugestaoOab
+	SugestaoOab,
+	ItemBuscaParte,
+	ResultadoBuscaParte,
+	ImportacaoBuscaParte,
+	RotuloExemplo,
+	OrigemExemplo,
+	NaoPertinentesBuscaParte,
+	ResumoExemplos
 } from './djen';
-export { SITUACAO_PUBLICACAO_LABEL, DJEN_PAPEIS_GESTAO } from './djen';
+export {
+	SITUACAO_PUBLICACAO_LABEL,
+	DJEN_PAPEIS_GESTAO,
+	BUSCA_PARTE_MAX_DIAS,
+	ROTULO_EXEMPLO_LABEL,
+	ORIGEM_EXEMPLO_LABEL
+} from './djen';

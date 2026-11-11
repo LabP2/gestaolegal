@@ -362,12 +362,44 @@ Mudanças em rotas que já existem:
 ## 8. Dados pessoais e retenção
 
 - As publicações são públicas, mas trazem nomes de terceiros.
-- Só gravamos o que chega pelas OABs monitoradas ou pelos processos
-  cadastrados. Nada de busca ampla por tribunal ou por parte.
+- Em `djen_comunicacoes` só gravamos o que chega pelas OABs monitoradas, pelos
+  processos cadastrados ou pela importação manual da busca por parte. Nada de
+  captura ampla por tribunal ou por parte.
 - Publicações `descartadas`, e as `pendentes` sem vínculo há mais de 90 dias,
   são apagadas pela própria rotina. O prazo conta a partir de `capturada_em`
   (pendentes) ou da data do descarte (descartadas).
 - As vinculadas seguem a vida do caso.
+
+### 8.1 Banco de exemplos (decidido em 09/11/2026)
+
+Finalidade nova, distinta do acompanhamento dos processos: **treinar um
+classificador** (regressão logística, no futuro) que sugira se uma publicação é
+pertinente ao NPJ. Para isso o sistema guarda exemplos rotulados também das
+publicações **não pertinentes**, inclusive das vistas na busca por parte, numa
+tabela separada (`djen_exemplos`), que não aparece nas listas, na caixa "Sem
+caso" nem nas contagens.
+
+- **O que é guardado**: `id_djen`, número do processo, data, tribunal, órgão,
+  classe, tipo de comunicação e de documento, destinatários (nomes e polo),
+  texto plano da publicação (sem HTML), o nome buscado (busca por parte), o
+  rótulo (`pertinente`, `nao_pertinente`, `nao_revisada`), a origem (busca por
+  parte, vínculo manual, vínculo automático, descarte), quem rotulou e quando.
+  Sem vínculo com atendido.
+- **De onde vem**: importar uma publicação da busca por parte (pertinente) ou
+  marcá-la como não pertinente; os demais itens da mesma consulta entram como
+  "não revisada". Na rotina e na caixa "Sem caso": vínculo manual ou automático
+  (pertinente) e descarte (não pertinente). A consulta da busca por parte, em
+  si, continua sem gravar nada; pendentes não viram exemplo até alguém agir.
+- **Por quanto tempo**: as "não revisadas" são apagadas inteiras em 90 dias
+  (`DJEN_RETENCAO_DIAS`, contados da criação). Nas rotuladas, o texto e os
+  destinatários são anulados depois de 2 anos (`DJEN_EXEMPLOS_RETENCAO_DIAS`,
+  padrão 730, contados do rótulo); rótulo e metadados ficam. A limpeza roda no
+  fim de cada execução da rotina, por NPJ. Rotular de novo renova o texto e o
+  prazo.
+- **Quem acessa**: só o `admin` do NPJ vê as contagens e exporta o arquivo
+  (JSON Lines). O arquivo exportado não traz quem rotulou nem ids internos e
+  deve ser tratado como dado pessoal de terceiros (nomes de partes): guardar
+  só onde o treino roda e apagar depois.
 
 ## 9. Testes
 
