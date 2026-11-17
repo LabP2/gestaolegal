@@ -402,8 +402,18 @@ ROTAS: dict[tuple[str, str], Rota] = {
     # devolve a publicação e o número de processo da DAJ: o outro NPJ não pode
     # vê-los como "já no banco" nem como processo cadastrado.
     ("GET", "/api/djen/busca-parte"): Rota("colecao", query=f"nome={BUSCA}&de=2026-11-01&ate=2026-11-05"),
+    ("GET", "/api/djen/monitoramentos"): Rota("colecao"),
+    ("GET", "/api/djen/monitoramentos/logs"): Rota("colecao", query="modo=automatico"),
+    ("POST", "/api/djen/monitoramentos"): Rota("escrita", json=lambda _: {"tipo": "parte", "valor": "Teste monitoramento", "tribunais": ["TJMG"]}),
+    ("PATCH", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}, json=lambda _: {"ativo": False}),
+    ("DELETE", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}),
+    ("POST", "/api/djen/monitoramentos/buscar"): Rota("escrita", json=lambda _: {"tipo": "oab", "valor": "123456/MG", "de": "2026-11-01", "ate": "2026-11-07"}),
+    ("GET", "/api/djen/acervo"): Rota("colecao"),
+    ("GET", "/api/djen/acervo/<int:id>"): Rota("id", {"id": "acervo"}),
+    ("POST", "/api/djen/acervo/classificar"): Rota("escrita", json=lambda _: {"ids": [ID_DJEN_DAJ], "rotulo": "irrelevante"}),
+    ("POST", "/api/djen/acervo/descartar"): Rota("escrita", json=lambda _: {"ids": [ID_DJEN_DAJ]}),
     # Importa uma publicação que o DJEN não devolve: nada a gravar.
-    ("POST", "/api/djen/busca-parte/importar"): Rota("escrita", json=_importacao),
+    ("POST", "/api/djen/busca-parte/importar"): Rota("escrita", status=(400,), json=_importacao),
     # Banco de exemplos: o mesmo id_djen do exemplo da DAJ, no outro NPJ.
     ("POST", "/api/djen/busca-parte/nao-pertinentes"): Rota("escrita", json=_nao_pertinentes),
     ("GET", "/api/djen/exemplos/resumo"): Rota("colecao"),
@@ -415,6 +425,7 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("PUT", "/api/processos/<int:id>"): Rota(
         "id", {"id": "processo_avulso"}, json=lambda ids: {"obs": "Outro", "partes": [{"id_atendido": ids["meu_atendido"]}]}
     ),
+    ("POST", "/api/processos/<int:id>/vincular-caso"): Rota("id", {"id": "processo_avulso"}, json=lambda ids: {"caso_id": ids["caso"]}),
     ("DELETE", "/api/processos/<int:id>"): Rota("id", {"id": "processo"}),
     # --- fila de atendimento ---
     ("GET", "/api/fila_atendimento/"): Rota("colecao"),
@@ -668,41 +679,19 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
             )
             session.commit()
             agora = datetime.now()
-            ids["publicacao"] = session.execute(
-                metadata.tables["djen_comunicacoes"].insert().values(
-                    tenant_id=TENANT_DAJ,
-                    id_djen=424242,
-                    numero_processo="99999999920268130001",
-                    data_disponibilizacao=date.today(),
-                    sigla_tribunal=MARCA,
-                    nome_orgao=f"{MARCA} vara",
-                    tipo_comunicacao=MARCA,
-                    texto_html=f"<p>{MARCA} publicação</p>",
-                    texto_plano=f"{MARCA} publicação",
-                    situacao="vinculada",
-                    id_caso=ids["caso"],
-                    id_processo=ids["processo"],
-                    unidade_id=UNIDADE_BH,
-                    capturada_em=agora,
-                )
-            ).lastrowid
-            session.execute(
-                metadata.tables["djen_exemplos"].insert().values(
-                    tenant_id=TENANT_DAJ,
-                    id_djen=ID_DJEN_DAJ,
-                    numero_processo="99999999920268130001",
-                    data_disponibilizacao=date.today(),
-                    sigla_tribunal=MARCA,
-                    texto_plano=f"{MARCA} exemplo",
-                    destinatarios=[{"nome": f"{MARCA} parte", "polo": "A"}],
-                    termo_busca=MARCA,
-                    rotulo="pertinente",
-                    origem="busca_parte",
-                    id_rotulado_por=ids["usuario"],
-                    rotulado_em=agora,
-                    criado_em=agora,
-                )
-            )
+            acervo_id = session.execute(metadata.tables['djen_publicacoes'].insert().values(
+                tenant_id=TENANT_DAJ, id_djen=ID_DJEN_DAJ,
+                numero_processo="99999999920268130001", data_disponibilizacao=date.today(),
+                sigla_tribunal=MARCA, nome_orgao=f"{MARCA} vara", tipo_comunicacao=MARCA,
+                texto_html=f"<p>{MARCA} publicação</p>", texto_plano=f"{MARCA} publicação",
+                capturada_em=agora)).lastrowid
+            ids["acervo"] = acervo_id
+            ids["publicacao"] = session.execute(metadata.tables['djen_comunicacoes'].insert().values(
+                tenant_id=TENANT_DAJ, id_publicacao=acervo_id, situacao='vinculada',
+                id_caso=ids['caso'], id_processo=ids['processo'], unidade_id=UNIDADE_BH)).lastrowid
+            session.execute(metadata.tables['djen_classificacoes'].insert().values(
+                tenant_id=TENANT_DAJ, id_publicacao=acervo_id, rotulo='relevante',
+                origem='classificacao', id_rotulado_por=ids['usuario'], rotulado_em=agora))
             ids["oab"] = session.execute(
                 metadata.tables["djen_oabs"].insert().values(
                     tenant_id=TENANT_DAJ,
@@ -862,7 +851,8 @@ def cenario(app: Flask, client: FlaskClient, create_admin_user: None, banco_pres
     meus["meu_atendido"] = _ok(client.post("/api/atendido/", json=corpo, headers=outro))["id"]
 
     antes = {}
-    for chave in _de("colecao"):
+    for chave in sorted(_de("colecao"), key=lambda c: c[1].endswith("/monitoramentos/logs")):
+        # Busca por parte é GET e grava logs próprios; fotografe logs após essa busca.
         response = _chamar(client, *chave, ROTAS[chave], {}, outro)
         _exigir_sucesso(response)
         antes[chave] = (response.status_code, _corpo(response))
@@ -1071,20 +1061,22 @@ def test_dono_ve_na_busca_por_parte_o_que_ja_tem(client, cenario):
     assert item["ja_no_banco"] is True
     assert item["processo_id"] == cenario.ids["processo_avulso"]
     outro = get_success_data(client.get(f"/api/djen/busca-parte?{query}", headers=cenario.outro))
-    assert outro["items"][0]["ja_no_banco"] is False
+    # O teste de descarte anterior criou uma comunicação própria do outro NPJ.
+    assert outro["items"][0]["publicacao_id"] != cenario.ids["publicacao"]
     assert outro["items"][0]["processo_id"] is None
     # O rótulo do banco de exemplos também é do NPJ.
-    assert item["rotulo"] == "pertinente"
-    assert outro["items"][0]["rotulo"] != "pertinente"
+    assert item["rotulo"] == "relevante"
+    assert outro["items"][0]["rotulo"] != "relevante"
 
 
 def test_dono_ve_o_proprio_banco_de_exemplos(client, cenario):
     # Controle das coleções do banco de exemplos: a DAJ vê o próprio exemplo.
     resumo = get_success_data(client.get("/api/djen/exemplos/resumo", headers=cenario.daj))
-    assert resumo["por_rotulo"]["pertinente"] >= 1
+    assert resumo["por_rotulo"]["relevante"] >= 1
     exportado = client.get("/api/djen/exemplos/exportar", headers=cenario.daj)
     assert exportado.status_code == 200
-    assert f"{MARCA} exemplo" in exportado.get_data(as_text=True)
+    linhas = [json.loads(linha) for linha in exportado.get_data(as_text=True).splitlines()]
+    assert any(linha["id_djen"] == ID_DJEN_DAJ and linha["rotulo"] == "relevante" for linha in linhas)
 
 
 # --------------------------------------------------------------------------- #

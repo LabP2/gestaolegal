@@ -219,3 +219,11 @@ class TestHTML:
         assert saida == "? o ? "
         saida.encode("cp1252")
         assert para_latin1(None) is None
+
+
+def test_paginacao_completa_nao_entra_em_loop_se_api_repetir_pagina():
+    cliente = DJENClient(transporte=lambda u,t: resposta([item_djen(1, NUMERO)], count=999),
+        dormir=Dormir(), itens_por_pagina=1, max_paginas=None)
+    with pytest.raises(DJENError, match='repetiu'):
+        cliente.buscar_por_processo(NUMERO)
+    assert cliente.requisicoes == 2

@@ -175,21 +175,29 @@ export interface ImportacaoBuscaParte {
 }
 
 /** Banco de exemplos rotulados (treino da sugestão automática). */
-export type RotuloExemplo = 'pertinente' | 'nao_pertinente' | 'nao_revisada';
+export type RotuloExemplo = 'relevante' | 'irrelevante' | 'nao_classificado';
 
 export const ROTULO_EXEMPLO_LABEL: Record<RotuloExemplo, string> = {
-	pertinente: 'Pertinente',
-	nao_pertinente: 'Não pertinente',
-	nao_revisada: 'Não revisada'
+	relevante: 'Relevante',
+	irrelevante: 'Irrelevante',
+	nao_classificado: 'Não classificado'
 };
 
-export type OrigemExemplo = 'busca_parte' | 'vinculo_manual' | 'vinculo_automatico' | 'descarte';
+export type OrigemExemplo =
+	| 'busca_parte'
+	| 'vinculo_manual'
+	| 'vinculo_automatico'
+	| 'descarte'
+	| 'classificacao'
+	| 'captura';
 
 export const ORIGEM_EXEMPLO_LABEL: Record<OrigemExemplo, string> = {
 	busca_parte: 'Busca por parte',
 	vinculo_manual: 'Vínculo manual',
 	vinculo_automatico: 'Vínculo automático',
-	descarte: 'Descarte'
+	descarte: 'Descarte',
+	classificacao: 'Classificação manual',
+	captura: 'Ainda não classificada'
 };
 
 /** `POST /api/djen/busca-parte/nao-pertinentes`. */
@@ -208,10 +216,84 @@ export interface ResumoExemplos {
 	/** Exemplos que ainda guardam o texto (antes da retenção). */
 	com_texto: number;
 	/** Dias, contados do rótulo, até o texto dos rotulados ser apagado. */
-	retencao_dias: number;
+	retencao_dias: number | null;
 	/** Dias até as não revisadas serem apagadas. */
-	retencao_nao_revisadas_dias: number;
+	retencao_nao_revisadas_dias: number | null;
 }
 
 /** Período máximo da busca por parte, em dias. */
 export const BUSCA_PARTE_MAX_DIAS = 30;
+
+export interface AcervoItem {
+	id: number;
+	id_djen: number;
+	numero_processo: string;
+	data_disponibilizacao: string;
+	sigla_tribunal: string | null;
+	nome_orgao: string | null;
+	resumo: string | null;
+	rotulo: RotuloExemplo;
+	origem: string;
+	situacao: string;
+	comunicacao_id: number | null;
+	id_processo: number | null;
+	id_caso: number | null;
+}
+export interface AcervoPagina {
+	items: AcervoItem[];
+	total: number;
+	page: number;
+	per_page: number;
+}
+export interface AcervoDetalhe extends Omit<Partial<Publicacao>, 'situacao'> {
+	situacao?: string;
+	comunicacao_id?: number | null;
+	link?: string | null;
+	link_certidao?: string | null;
+	id: number;
+	id_djen: number;
+	texto_plano: string | null;
+	rotulo: RotuloExemplo;
+	historico: {
+		rotulo_anterior: RotuloExemplo;
+		rotulo: RotuloExemplo;
+		origem: string;
+		id_rotulado_por: number | null;
+		rotulado_em: string;
+	}[];
+}
+
+export type Monitoramento = {
+	processo_id?: number | null;
+	id: number;
+	tipo: 'oab' | 'parte' | 'processo';
+	valor: string;
+	tribunais: string[];
+	ativo: boolean;
+	automatico: boolean;
+	unidade_id: number;
+	ultimo_sucesso: string | null;
+};
+export type LogMonitoramento = {
+	duracao_segundos: number | null;
+	id: number;
+	origem: string;
+	modo: string;
+	inicio: string;
+	fim: string | null;
+	status: string;
+	unidade_id: number;
+	execucao_id: number | null;
+	parametros: Record<string, string | number | null>;
+	encontradas: number;
+	novas: number;
+	mensagem: string | null;
+};
+export type LogsMonitoramento = {
+	agendamento?: { habilitado: boolean; janela_dias: number; janela_diurna_dias: number };
+	items: LogMonitoramento[];
+	total: number;
+	page: number;
+	per_page: number;
+	retencao_dias: number;
+};

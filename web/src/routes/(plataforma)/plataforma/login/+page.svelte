@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -9,6 +11,7 @@
 
 	let email = $state('');
 	let password = $state('');
+	let mostrarSenha = $state(false);
 	let erro = $state<string | null>(null);
 	let enviando = $state(false);
 
@@ -18,7 +21,7 @@
 		enviando = true;
 		try {
 			const dados = await plataforma.post<{ token: string; admin: PlataformaAdmin }>('auth/login', {
-				email,
+				email: email.trim(),
 				password
 			});
 			guardarTokenPlataforma(dados.token);
@@ -53,13 +56,29 @@
 				</div>
 				<div class="space-y-2">
 					<Label for="password">Senha</Label>
-					<Input
-						id="password"
-						type="password"
-						autocomplete="current-password"
-						bind:value={password}
-						required
-					/>
+					<div class="relative">
+						<Input
+							id="password"
+							type={mostrarSenha ? 'text' : 'password'}
+							autocomplete="current-password"
+							bind:value={password}
+							required
+							class="pr-12"
+						/>
+						<button
+							type="button"
+							class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+							aria-controls="password"
+							aria-pressed={mostrarSenha}
+							onclick={() => (mostrarSenha = !mostrarSenha)}
+						>
+							{#if mostrarSenha}<EyeOff class="h-4 w-4" aria-hidden="true" />{:else}<Eye
+									class="h-4 w-4"
+									aria-hidden="true"
+								/>{/if}
+						</button>
+					</div>
 				</div>
 				{#if erro}
 					<p role="alert" class="text-sm text-destructive">{erro}</p>

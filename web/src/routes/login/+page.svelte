@@ -2,6 +2,10 @@
 	import { goto } from '$app/navigation';
 	import AppFooter from '$lib/components/app-footer.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import * as Form from '$lib/components/ui/form';
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
 	import SimpleInput from '$lib/components/forms/simple-input.svelte';
 	import { loginSchema, type LoginData } from '$lib/forms/schemas/login-schema';
 	import { toast } from 'svelte-sonner';
@@ -18,6 +22,7 @@
 	let { data }: { data: PageData } = $props();
 
 	/** Aviso exibido junto ao formulário quando o login não é aceito. */
+	let mostrarSenha = $state(false);
 	let erroLogin = $state<string | null>(null);
 
 	const form = superForm<LoginData>(data.form, {
@@ -26,6 +31,7 @@
 		resetForm: false,
 		onSubmit: async ({ formData }) => {
 			const payload = Object.fromEntries(formData) as LoginData;
+			payload.email = payload.email.trim();
 			erroLogin = null;
 
 			try {
@@ -110,14 +116,36 @@
 						bind:value={$formData.email}
 						autocomplete="email"
 					/>
-					<SimpleInput
-						{form}
-						name="password"
-						type="password"
-						label="Senha"
-						bind:value={$formData.password}
-						autocomplete="current-password"
-					/>
+					<Form.Field {form} name="password">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Senha</Form.Label>
+								<div class="relative">
+									<Input
+										{...props}
+										type={mostrarSenha ? 'text' : 'password'}
+										bind:value={$formData.password}
+										autocomplete="current-password"
+										class="pr-12"
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+										aria-controls={props.id}
+										aria-pressed={mostrarSenha}
+										onclick={() => (mostrarSenha = !mostrarSenha)}
+									>
+										{#if mostrarSenha}<EyeOff class="h-4 w-4" aria-hidden="true" />{:else}<Eye
+												class="h-4 w-4"
+												aria-hidden="true"
+											/>{/if}
+									</button>
+								</div>
+							{/snippet}
+						</Form.Control>
+						<Form.FieldErrors />
+					</Form.Field>
 					<Button type="submit" class="h-12 w-full">
 						{#if $delayed}
 							<div class="flex items-center gap-2">

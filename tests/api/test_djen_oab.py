@@ -56,6 +56,15 @@ def _alterar(tabela, filtro, **valores) -> None:
     session = db_session_module.get_session()
     try:
         with sem_tenant("teste: ajuste direto"):
+            if tabela is djen_comunicacoes and 'id_djen' in filtro:
+                from gestaolegal.database.tables import djen_publicacoes
+                pid = session.execute(djen_publicacoes.select().where(djen_publicacoes.c.id_djen == filtro['id_djen'])).mappings().one()['id']
+                if 'capturada_em' in valores:
+                    session.execute(update(djen_publicacoes).where(djen_publicacoes.c.id == pid).values(capturada_em=valores.pop('capturada_em')))
+                filtro = {'id_publicacao': pid}
+                if not valores:
+                    session.commit()
+                    return
             stmt = update(tabela)
             for coluna, valor in filtro.items():
                 stmt = stmt.where(tabela.c[coluna] == valor)
@@ -213,7 +222,7 @@ class TestCapturaPorOab:
         assert [(c["numeroOab"], c["ufOab"]) for c in chamadas] == [("123456", "MG")]
         hoje = datetime.now().date()
         assert chamadas[0]["dataDisponibilizacaoFim"] == hoje.isoformat()
-        assert chamadas[0]["dataDisponibilizacaoInicio"] == (hoje - timedelta(days=3)).isoformat()
+        assert chamadas[0]["dataDisponibilizacaoInicio"] == (hoje - timedelta(days=2)).isoformat()
 
     def test_sem_processo_fica_pendente_na_unidade_da_oab(
         self, app, client, auth_headers, auth_headers_nl, djen, transporte, sync_habilitado
@@ -372,7 +381,7 @@ class TestDescarte:
 
 
 class TestRetencao:
-    def test_apaga_descartadas_e_pendentes_vencidas(
+    def test_preserva_descartadas_e_pendentes_antigas(
         self, app, client, auth_headers, djen, transporte, sync_habilitado
     ):
         cadastrar(client, auth_headers, "123456", "MG")
@@ -397,7 +406,7 @@ class TestRetencao:
         rodar_rotina(app)
 
         restantes = {r["id_djen"] for r in _linhas(djen_comunicacoes, tenant_id=TENANT_DAJ)}
-        assert restantes == {13002, 13004, 13005}
+        assert restantes == {13001, 13002, 13003, 13004, 13005}
 
     def test_retencao_nao_toca_outro_npj(
         self, app, client, auth_headers, headers_outro, djen, transporte, sync_habilitado

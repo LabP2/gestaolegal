@@ -1,0 +1,16 @@
+{
+  "ambiente": "docker-compose.dev.yml, MySQL local",
+  "branch": "feat/multitenant",
+  "revision": "b3c4d5e6f7a8",
+  "backup": "dumps/djen-acervo-20261116/antes.sql",
+  "tabelas_preservadas": 33,
+  "linhas_preservadas": 28786,
+  "comparacao": "SHA-256 dos registros ordenados; desconsiderada apenas a referencia id_djen_comunicacao dos eventos experimentais",
+  "producao_alterada": false,
+  "rotas_http_200": [
+    "/api/djen/acervo",
+    "/api/djen/publicacoes",
+    "/api/djen/exemplos/resumo",
+    "/api/djen/exemplos/exportar"
+  ]
+}

@@ -559,7 +559,7 @@ def _contagens() -> tuple[int, int, int, int]:
 
 
 class TestBuscaParte:
-    def test_consulta_sem_gravar_nada(self, client, auth_headers, djen, transporte):
+    def test_consulta_salva_acervo_e_vincula_processos_existentes(self, client, auth_headers, djen, transporte):
         a = parte(client, auth_headers)
         cadastrado = processo_sem_caso(client, auth_headers, [a["id"]])
         nome = _unico("Universidade Fictícia")
@@ -577,12 +577,12 @@ class TestBuscaParte:
         )
         assert r.status_code == 200, r.get_json()
         d = get_success_data(r)
-        assert _contagens() == antes
+        assert _contagens() == (antes[0] + 1, *antes[1:])
         # Os dois nomes trazem a 82002 uma vez só; mais recente primeiro.
         assert [i["id_djen"] for i in d["items"]] == [82002, 82001]
         por_id = {i["id_djen"]: i for i in d["items"]}
         assert por_id[82001]["processo_id"] == cadastrado["id"]
-        assert por_id[82001]["ja_no_banco"] is False
+        assert por_id[82001]["ja_no_banco"] is True
         assert por_id[82002]["processo_id"] is None
         assert por_id[82002]["numero_processo_mascara"] == mascara(novo)
         assert "resumo" in por_id[82002] and "texto" not in por_id[82002]
@@ -732,15 +732,16 @@ class TestImportacao:
             item_djen(83003, novo, data="2026-11-02"),
             item_djen(83004, numero_cnj_novo()),  # não escolhida
         ]
+        assert client.get("/api/djen/busca-parte", query_string={"nome": nome, **PERIODO}, headers=auth_headers).status_code == 200
         r = client.post(
             "/api/djen/busca-parte/importar",
-            json={"nome": nome, **PERIODO, "ids": [83001, 83002, 83003, 99999], "id_atendido": nova_parte["id"]},
+            json={"nome": nome, **PERIODO, "ids": [83001, 83002, 83003], "id_atendido": nova_parte["id"]},
             headers=auth_headers,
         )
         assert r.status_code == 200, r.get_json()
         d = get_success_data(r)
-        assert d["novas"] == 3 and d["vinculadas"] == 3
-        assert d["nao_encontradas"] == [99999]
+        assert d["novas"] == 2 and d["vinculadas"] == 2  # o existente já foi vinculado na captura
+        assert d["nao_encontradas"] == []
         (criado,) = d["processos_criados"]
         assert _linhas(djen_comunicacoes, id_djen=83004) == []
         (c1,) = _linhas(djen_comunicacoes, id_djen=83001)
@@ -759,6 +760,7 @@ class TestImportacao:
     def test_sem_parte_para_numero_novo_nao_grava_nada(self, client, auth_headers, djen, transporte):
         nome = _unico("Sem parte")
         transporte.por_parte[nome] = [item_djen(83010, numero_cnj_novo())]
+        assert client.get("/api/djen/busca-parte", query_string={"nome": nome, **PERIODO}, headers=auth_headers).status_code == 200
         antes = _contagens()
         r = client.post(
             "/api/djen/busca-parte/importar", json={"nome": nome, **PERIODO, "ids": [83010]}, headers=auth_headers
@@ -782,8 +784,9 @@ class TestImportacao:
         p = processo_sem_caso(client, auth_headers, [a["id"]])
         nome = _unico("Duas vezes")
         transporte.por_parte[nome] = [item_djen(83020, p["numero_cnj"])]
+        assert client.get("/api/djen/busca-parte", query_string={"nome": nome, **PERIODO}, headers=auth_headers).status_code == 200
         corpo = {"nome": nome, **PERIODO, "ids": [83020]}
-        assert get_success_data(client.post("/api/djen/busca-parte/importar", json=corpo, headers=auth_headers))["novas"] == 1
+        assert get_success_data(client.post("/api/djen/busca-parte/importar", json=corpo, headers=auth_headers))["novas"] == 0  # já vinculada na busca
         d = get_success_data(client.post("/api/djen/busca-parte/importar", json=corpo, headers=auth_headers))
         assert d["novas"] == 0 and d["processos_criados"] == []
         assert len(_linhas(djen_comunicacoes, id_djen=83020)) == 1
@@ -798,12 +801,96 @@ class TestImportacao:
         p = get_success_data(r)
         nome = _unico("Com caso")
         transporte.por_parte[nome] = [item_djen(83030, p["numero_cnj"])]
+        assert client.get("/api/djen/busca-parte", query_string={"nome": nome, **PERIODO}, headers=auth_headers).status_code == 200
         d = get_success_data(
             client.post(
                 "/api/djen/busca-parte/importar", json={"nome": nome, **PERIODO, "ids": [83030]}, headers=auth_headers
             )
         )
-        assert d["vinculadas"] == 1
+        assert d["vinculadas"] == 0  # evento e vínculo já foram criados pela busca
         (c,) = _linhas(djen_comunicacoes, id_djen=83030)
         assert c["id_caso"] == caso
         assert [e["id_caso"] for e in _eventos_djen()] == [caso]
+
+
+class TestVincularProcessoCaso:
+    def test_historico_eventos_e_repeticao(self, client, auth_headers, djen, transporte):
+        a = parte(client, auth_headers)
+        p = processo_sem_caso(client, auth_headers, [a["id"]])
+        transporte.por_processo[p["numero_cnj"]] = [
+            item_djen(89501, p["numero_cnj"]), item_djen(89502, p["numero_cnj"])
+        ]
+        r = client.post(f"/api/processos/{p['id']}/djen/buscar", headers=auth_headers)
+        assert r.status_code == 200
+        from .test_djen_exemplos import classificar, rotulos
+        assert classificar(client, auth_headers, [89501], "irrelevante").status_code == 200
+        caso = criar_caso(client, auth_headers)
+        url = f"/api/processos/{p['id']}/vincular-caso"
+        r = client.post(url, json={"caso_id": caso}, headers=auth_headers)
+        assert r.status_code == 200, r.get_json()
+        dados = get_success_data(r)
+        assert dados["eventos_criados"] == 2
+        assert rotulos()[89501] == "irrelevante"
+        assert dados["processo"]["id_caso"] == caso
+        assert a["id"] in [p["id_atendido"] for p in dados["processo"]["partes"]]
+        pubs = _linhas(djen_comunicacoes, id_processo=p["id"])
+        evs = _linhas(eventos, id_caso=caso)
+        assert len(evs) == 2
+        assert all(pub["id_caso"] == caso for pub in pubs)
+        assert {e["data_evento"] for e in evs} == {pub["data_disponibilizacao"] for pub in pubs}
+        r = client.post(url, json={"caso_id": caso}, headers=auth_headers)
+        assert r.status_code == 200
+        assert get_success_data(r)["eventos_criados"] == 0
+        assert len(_linhas(eventos, id_caso=caso)) == 2
+        outro = criar_caso(client, auth_headers)
+        assert client.post(url, json={"caso_id": outro}, headers=auth_headers).status_code == 400
+
+    def test_rejeita_outra_unidade_e_papel(self, client, auth_headers, auth_headers_nl, papeis):
+        a = parte(client, auth_headers)
+        p = processo_sem_caso(client, auth_headers, [a["id"]])
+        caso = criar_caso(client, auth_headers_nl)
+        url = f"/api/processos/{p['id']}/vincular-caso"
+        assert client.post(url, json={"caso_id": caso}, headers=auth_headers).status_code == 400
+        assert client.post(url, json={"caso_id": caso}, headers=auth_headers_nl).status_code == 404
+        assert client.post(url, json={"caso_id": caso}, headers=papeis["estag_direito"]["h"]).status_code == 403
+        assert get_success_data(client.get(f"/api/processos/{p['id']}", headers=auth_headers))["id_caso"] is None
+
+    def test_falha_evento_desfaz_vinculo(self, client, auth_headers, djen, transporte, monkeypatch):
+        from gestaolegal.services.djen_service import DJENService
+        from gestaolegal.exceptions import ValidationException
+
+        a = parte(client, auth_headers)
+        p = processo_sem_caso(client, auth_headers, [a["id"]])
+        transporte.por_processo[p["numero_cnj"]] = [item_djen(89503, p["numero_cnj"])]
+        assert client.post(f"/api/processos/{p['id']}/djen/buscar", headers=auth_headers).status_code == 200
+        caso = criar_caso(client, auth_headers)
+        def falhar(*args, **kwargs):
+            raise ValidationException("Falha simulada")
+        monkeypatch.setattr(DJENService, "_criar_evento", falhar)
+        r = client.post(f"/api/processos/{p['id']}/vincular-caso", json={"caso_id": caso}, headers=auth_headers)
+        assert r.status_code == 400
+        assert get_success_data(client.get(f"/api/processos/{p['id']}", headers=auth_headers))["id_caso"] is None
+        assert _linhas(djen_comunicacoes, id_processo=p["id"])[0]["id_caso"] is None
+
+    def test_captura_com_processo_lido_antes_do_vinculo(self, app, client, auth_headers, djen):
+        from dataclasses import replace
+        from gestaolegal.integrations.djen_client import converter_item
+        from gestaolegal.services.djen_service import DJENService, ResultadoCaptura
+        from gestaolegal.utils.request_context import contexto_tenant
+        from .conftest import TENANT_DAJ
+
+        a = parte(client, auth_headers)
+        p = processo_sem_caso(client, auth_headers, [a["id"]])
+        caso = criar_caso(client, auth_headers)
+        r = client.post(f"/api/processos/{p['id']}/vincular-caso", json={"caso_id": caso}, headers=auth_headers)
+        assert r.status_code == 200
+        assert get_success_data(r)["eventos_criados"] == 0
+        with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+            service = DJENService()
+            antigo = replace(service.processos.find_by_id(p["id"]), id_caso=None)
+            service.registrar(converter_item(item_djen(89504, p["numero_cnj"])),
+                              ResultadoCaptura(), processo=antigo)
+            service._depois_da_fonte()
+            service.session.commit()
+        assert len(_linhas(eventos, id_caso=caso)) == 1
+        assert _linhas(djen_comunicacoes, id_processo=p["id"])[0]["id_caso"] == caso

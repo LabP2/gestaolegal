@@ -251,3 +251,51 @@ Alterações anteriores preservadas; nenhum commit e nenhuma publicação. Crede
 
 
 **Fechamento:** bateria Python conjunta de atendidos, PJ, isolamento de tenants, casos, processos e restore: **348 passaram**, em64,47s. Evidência: `evidencias-ensaio-2026-11-16/correcoes-python.log`. As falhas intermediárias de isolamento/IDs dos testes foram corrigidas antes desta execução final. Evidências npm, comparação do dump e navegação real estão na mesma pasta, com prefixo `correcoes-`. API, banco, frontend e Mailpit continuam em execução. Não há falha pendente nos testes executados; os25 avisos de frontend anteriores permanecem.
+
+
+## Implementação do acervo DJEN e classificação — 2026-11-16
+
+Aplicada localmente na branch `feat/multitenant`, sem acesso nem alterações em
+produção. A revisão experimental `b3c4d5e6f7a8` foi refeita para substituir
+`djen_exemplos` pelo acervo normalizado. Comunicações agora referenciam
+publicações, sem cópia do texto. Classificação atual, histórico e origem das
+consultas ficam em tabelas próprias.
+
+Fluxos disponíveis:
+
+- `/djen`: acervo, filtros, leitura, importação e descarte.
+- `/djen/classificacao`: classificação sem criar vínculos, inicialmente
+  filtrada por não classificado.
+- Consultas por nome, OAB e processo persistem as páginas recebidas; repetir
+  preserva decisões anteriores. Itens sem avaliação continuam disponíveis.
+- Importar marca relevante; descartar marca irrelevante; avaliação de treino
+  altera apenas o rótulo. Falha de um lote não classifica os itens desse lote.
+- Exportação JSONL por lotes/stream, somente classificados por padrão.
+
+Validação final:
+
+| Verificação | Resultado |
+|---|---|
+| API e banco (pytest) | 1.060 passaram; 6 testes MySQL pulados nessa execução |
+| Migrations em MySQL 8.0.42 descartável | 5 passaram, incluindo novo esquema e downgrade |
+| Capturas concorrentes em MySQL descartável | 1 passou: uma publicação e uma classificação |
+| `npm test` (Playwright) | 20 passaram, incluindo 3 fluxos novos do DJEN |
+| `npm run check` | 0 erros; 25 avisos preexistentes |
+| `npm run build` | Aprovado |
+| Rotas na aplicação com MySQL local | Acervo, operacional, resumo e exportação: HTTP 200 |
+| `git diff --check` e compilação Python | Aprovados |
+
+Os seis testes MySQL pulados na execução padrão foram executados separadamente
+com `MULTITENANT_MYSQL_TEST=1`, em containers descartáveis. Os testes de API e
+interface usam dados sintéticos; não consultam o serviço real do DJEN.
+
+Antes da mudança local foi salvo um dump em
+`dumps/djen-acervo-20261116/antes.sql` (permissão 600, fora do Git). A comparação
+dos registros confirmou preservação de 33 tabelas e 28.786 linhas fora do
+acervo experimental. Eventos foram preservados, retirando somente sua
+referência à comunicação experimental, como previsto na migration. A aplicação
+local foi reiniciada e o novo acervo começa vazio.
+
+Evidências resumidas: `docs/evidencias-ensaio-2026-11-16/djen-acervo-*`.
+Regras atuais: seção inicial de `docs/plano-djen.md`. Elasticsearch/FULLTEXT e
+execução de treinamento de modelos permanecem fora desta implementação.

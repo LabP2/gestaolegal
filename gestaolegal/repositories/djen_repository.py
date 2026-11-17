@@ -1,19 +1,20 @@
 """Acesso a `djen_comunicacoes`, `djen_sincronizacoes`, `djen_oabs` e
-`djen_exemplos`, sempre no tenant ativo."""
+`djen_publicacoes`, sempre no tenant ativo."""
 
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
-from sqlalchemy import func, insert, null, or_, select
+from sqlalchemy import func, insert, or_, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import update as sql_update
 
 from gestaolegal.common import PageParams, PaginatedResult
+from gestaolegal.repositories.djen_filtros import filtrar_identificacao
 from gestaolegal.database.tables import (
     casos,
     djen_comunicacoes,
-    djen_exemplos,
+    djen_publicacoes,
     djen_oabs,
     djen_sincronizacoes,
     unidades,
@@ -29,68 +30,104 @@ from gestaolegal.models.djen import (
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.utils.dataclass_utils import from_dict
 
-LIMITE_RESUMO = 240
+# Read model joining the canonical content with operational state.
+_comunicacoes = djen_comunicacoes
 
-_COLUNAS_LISTA = (
-    djen_comunicacoes.c.id,
-    djen_comunicacoes.c.data_disponibilizacao,
-    djen_comunicacoes.c.numero_processo,
-    djen_comunicacoes.c.numero_processo_mascara,
-    djen_comunicacoes.c.situacao,
-    djen_comunicacoes.c.ativo,
-    djen_comunicacoes.c.sigla_tribunal,
-    djen_comunicacoes.c.nome_orgao,
-    djen_comunicacoes.c.tipo_comunicacao,
-    djen_comunicacoes.c.tipo_documento,
-    djen_comunicacoes.c.nome_classe,
-    djen_comunicacoes.c.id_processo,
-    djen_comunicacoes.c.id_caso,
-    djen_comunicacoes.c.oab_origem,
-    func.substr(djen_comunicacoes.c.texto_plano, 1, LIMITE_RESUMO).label("resumo"),
-)
+
+def _dados(tenant_id=None):
+    stmt = select(
+        *_comunicacoes.c,
+        *[col for col in djen_publicacoes.c if col.name not in ("id", "tenant_id")],
+    ).select_from(
+        _comunicacoes.join(
+            djen_publicacoes,
+            (_comunicacoes.c.id_publicacao == djen_publicacoes.c.id)
+            & (_comunicacoes.c.tenant_id == djen_publicacoes.c.tenant_id),
+        )
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(
+            _comunicacoes.c.tenant_id == tenant_id,
+            djen_publicacoes.c.tenant_id == tenant_id,
+        )
+    return stmt.subquery("djen_dados")
+
+
+LIMITE_RESUMO = 240
 
 
 class DjenComunicacaoRepository(BaseRepository):
+    @property
+    def dados(self):
+        if not hasattr(self, "_dados_cache"):
+            self._dados_cache = _dados(self.tenant_id())
+        return self._dados_cache
+
     def find_by_id(self, id: int) -> ComunicacaoDJEN | None:
         stmt = self.escopo(
-            select(djen_comunicacoes).where(djen_comunicacoes.c.id == id),
-            djen_comunicacoes,
+            select(self.dados).where(self.dados.c.id == id),
+            self.dados,
         )
         row = self.session.execute(stmt).mappings().one_or_none()
         return from_dict(ComunicacaoDJEN, dict(row)) if row else None
 
+    def vinculadas_ao_processo(self, processo_id: int) -> list[int]:
+        stmt = self.escopo(
+            select(_comunicacoes.c.id).where(
+                _comunicacoes.c.id_processo == processo_id,
+                _comunicacoes.c.situacao == "vinculada",
+            ).with_for_update(), _comunicacoes,
+        )
+        return list(self.session.execute(stmt).scalars())
+
     def find_by_id_djen(self, id_djen: int) -> ComunicacaoDJEN | None:
         stmt = self.escopo(
-            select(djen_comunicacoes).where(djen_comunicacoes.c.id_djen == id_djen),
-            djen_comunicacoes,
+            select(self.dados).where(self.dados.c.id_djen == id_djen),
+            self.dados,
         )
         row = self.session.execute(stmt).mappings().one_or_none()
         return from_dict(ComunicacaoDJEN, dict(row)) if row else None
 
     def criar(self, data: dict[str, Any]) -> int:
         result = self.session.execute(
-            insert(djen_comunicacoes).values(**self.valores(data))
+            insert(_comunicacoes).values(**self.valores(data))
         )
         self.session.flush()
         return result.lastrowid
 
     def atualizar(self, id: int, data: dict[str, Any]) -> None:
-        self.session.execute(
-            self.escopo(
-                sql_update(djen_comunicacoes).where(djen_comunicacoes.c.id == id),
-                djen_comunicacoes,
-            ).values(**data)
-        )
+        publicacao = {k: v for k, v in data.items() if k in djen_publicacoes.c}
+        operacional = {k: v for k, v in data.items() if k in _comunicacoes.c}
+        if publicacao:
+            pid = self.session.execute(
+                self.escopo(
+                    select(_comunicacoes.c.id_publicacao).where(
+                        _comunicacoes.c.id == id
+                    ),
+                    _comunicacoes,
+                )
+            ).scalar_one()
+            self.session.execute(
+                self.escopo(
+                    sql_update(djen_publicacoes).where(djen_publicacoes.c.id == pid),
+                    djen_publicacoes,
+                ).values(**publicacao)
+            )
+        if operacional:
+            self.session.execute(
+                self.escopo(
+                    sql_update(_comunicacoes).where(_comunicacoes.c.id == id),
+                    _comunicacoes,
+                ).values(**operacional)
+            )
 
     def ativos_por_ids(self, ids: set[int]) -> dict[int, bool]:
         """`ativo` de cada publicação (selo de cancelada nos eventos)."""
         if not ids:
             return {}
         stmt = self.escopo(
-            select(djen_comunicacoes.c.id, djen_comunicacoes.c.ativo).where(
-                djen_comunicacoes.c.id.in_(ids)
-            ),
-            djen_comunicacoes,
+            select(self.dados.c.id, self.dados.c.ativo).where(self.dados.c.id.in_(ids)),
+            self.dados,
         )
         return {row.id: bool(row.ativo) for row in self.session.execute(stmt)}
 
@@ -109,14 +146,38 @@ class DjenComunicacaoRepository(BaseRepository):
         caso_id: int | None = None,
         q: str | None = None,
         processo_id: int | None = None,
+        nome_parte: str | None = None,
+        numero_processo: str | None = None,
     ) -> PaginatedResult[ComunicacaoListItem]:
         """Publicações da unidade.
 
         `situacoes` limita o que o papel pode ver; `participante_id` restringe
         aos casos de que o usuário participa (estagiário, colaborador externo).
         """
-        t = djen_comunicacoes
-        stmt = select(*_COLUNAS_LISTA, func.count().over().label("total_count"))
+        t = self.dados
+        stmt = select(
+            *[
+                t.c[n]
+                for n in (
+                    "id",
+                    "data_disponibilizacao",
+                    "numero_processo",
+                    "numero_processo_mascara",
+                    "situacao",
+                    "ativo",
+                    "sigla_tribunal",
+                    "nome_orgao",
+                    "tipo_comunicacao",
+                    "tipo_documento",
+                    "nome_classe",
+                    "id_processo",
+                    "id_caso",
+                    "oab_origem",
+                )
+            ],
+            func.substr(t.c.texto_plano, 1, LIMITE_RESUMO).label("resumo"),
+            func.count().over().label("total_count"),
+        )
         stmt = self.escopo(stmt, t).where(
             t.c.unidade_id == unidade_id, t.c.situacao.in_(situacoes)
         )
@@ -141,8 +202,8 @@ class DjenComunicacaoRepository(BaseRepository):
             stmt = stmt.where(t.c.sigla_tribunal == tribunal)
         if tipo:
             stmt = stmt.where(t.c.tipo_comunicacao == tipo)
-        if oab:
-            stmt = stmt.where(t.c.oab_origem == oab)
+        stmt = filtrar_identificacao(stmt, t, self.session.get_bind().dialect.name,
+            nome_parte, numero_processo, oab)
         if situacao:
             stmt = stmt.where(t.c.situacao == situacao)
         if caso_id is not None:
@@ -165,20 +226,28 @@ class DjenComunicacaoRepository(BaseRepository):
         rows = self.session.execute(stmt).mappings().all()
         total = rows[0]["total_count"] if rows else 0
         items = [
-            from_dict(ComunicacaoListItem, {k: v for k, v in dict(r).items() if k != "total_count"})
+            from_dict(
+                ComunicacaoListItem,
+                {k: v for k, v in dict(r).items() if k != "total_count"},
+            )
             for r in rows
         ]
         return PaginatedResult(
-            items=items, total=total, page=page_params["page"], per_page=page_params["per_page"]
+            items=items,
+            total=total,
+            page=page_params["page"],
+            per_page=page_params["per_page"],
         )
 
     def valores_distintos(self, coluna: str, unidade_id: int) -> list[str]:
         """Tribunais ou tipos já capturados na unidade, para os filtros."""
-        col = djen_comunicacoes.c[coluna]
+        col = self.dados.c[coluna]
         stmt = self.escopo(
-            select(col).where(djen_comunicacoes.c.unidade_id == unidade_id, col.is_not(None))
-            .distinct().order_by(col),
-            djen_comunicacoes,
+            select(col)
+            .where(self.dados.c.unidade_id == unidade_id, col.is_not(None))
+            .distinct()
+            .order_by(col),
+            self.dados,
         )
         return [v for v in self.session.execute(stmt).scalars() if v]
 
@@ -187,29 +256,13 @@ class DjenComunicacaoRepository(BaseRepository):
         if not ids_djen:
             return {}
         stmt = self.escopo(
-            select(djen_comunicacoes).where(djen_comunicacoes.c.id_djen.in_(ids_djen)),
-            djen_comunicacoes,
+            select(self.dados).where(self.dados.c.id_djen.in_(ids_djen)),
+            self.dados,
         )
         return {
             row["id_djen"]: from_dict(ComunicacaoDJEN, dict(row))
             for row in self.session.execute(stmt).mappings()
         }
-
-    def apagar_vencidas(self, limite: datetime) -> int:
-        """Retenção (plano, §8): descartadas e pendentes sem caso antes de `limite`."""
-        t = djen_comunicacoes
-        stmt = self.escopo(
-            sql_delete(t).where(
-                or_(
-                    (t.c.situacao == "descartada") & (t.c.data_situacao < limite),
-                    (t.c.situacao == "pendente")
-                    & t.c.id_caso.is_(None)
-                    & (t.c.capturada_em < limite),
-                )
-            ),
-            t,
-        )
-        return self.session.execute(stmt).rowcount or 0
 
 
 class DjenSincronizacaoRepository(BaseRepository):
@@ -223,7 +276,9 @@ class DjenSincronizacaoRepository(BaseRepository):
     def ultima(self) -> SincronizacaoDJEN | None:
         stmt = self.escopo(
             select(djen_sincronizacoes)
-            .order_by(djen_sincronizacoes.c.inicio.desc(), djen_sincronizacoes.c.id.desc())
+            .order_by(
+                djen_sincronizacoes.c.inicio.desc(), djen_sincronizacoes.c.id.desc()
+            )
             .limit(1),
             djen_sincronizacoes,
         )
@@ -265,10 +320,12 @@ class DjenOabRepository(BaseRepository):
             ).select_from(
                 djen_oabs.outerjoin(
                     usuarios,
-                    (usuarios.c.id == djen_oabs.c.id_usuario) & self.no_tenant(usuarios),
+                    (usuarios.c.id == djen_oabs.c.id_usuario)
+                    & self.no_tenant(usuarios),
                 ).outerjoin(
                     unidades,
-                    (unidades.c.id == djen_oabs.c.unidade_id) & self.no_tenant(unidades),
+                    (unidades.c.id == djen_oabs.c.unidade_id)
+                    & self.no_tenant(unidades),
                 )
             ),
             djen_oabs,
@@ -278,7 +335,9 @@ class DjenOabRepository(BaseRepository):
     def _converter(row) -> OabMonitorada:
         return from_dict(OabMonitorada, dict(row))
 
-    def listar(self, unidade_id: int | None = None, so_ativas: bool = False) -> list[OabMonitorada]:
+    def listar(
+        self, unidade_id: int | None = None, so_ativas: bool = False
+    ) -> list[OabMonitorada]:
         stmt = self._select()
         if unidade_id is not None:
             stmt = stmt.where(djen_oabs.c.unidade_id == unidade_id)
@@ -288,12 +347,16 @@ class DjenOabRepository(BaseRepository):
         return [self._converter(r) for r in self.session.execute(stmt).mappings()]
 
     def find_by_id(self, id: int) -> OabMonitorada | None:
-        row = self.session.execute(
-            self._select().where(djen_oabs.c.id == id)
-        ).mappings().one_or_none()
+        row = (
+            self.session.execute(self._select().where(djen_oabs.c.id == id))
+            .mappings()
+            .one_or_none()
+        )
         return self._converter(row) if row else None
 
-    def existe(self, numero_oab: str, uf_oab: str, ignorar_id: int | None = None) -> bool:
+    def existe(
+        self, numero_oab: str, uf_oab: str, ignorar_id: int | None = None
+    ) -> bool:
         stmt = self.escopo(
             select(djen_oabs.c.id).where(
                 djen_oabs.c.numero_oab == numero_oab, djen_oabs.c.uf_oab == uf_oab
@@ -321,7 +384,9 @@ class DjenOabRepository(BaseRepository):
             self.escopo(sql_delete(djen_oabs).where(djen_oabs.c.id == id), djen_oabs)
         )
 
-    def usuarios_com_oab(self, unidade_id: int, papeis: tuple[str, ...]) -> list[dict[str, Any]]:
+    def usuarios_com_oab(
+        self, unidade_id: int, papeis: tuple[str, ...]
+    ) -> list[dict[str, Any]]:
         """Usuários ativos da unidade com `oab` preenchido: só sugestão."""
         stmt = self.escopo(
             select(usuarios.c.id, usuarios.c.nome, usuarios.c.oab, usuarios.c.urole)
@@ -336,72 +401,5 @@ class DjenOabRepository(BaseRepository):
             .order_by(usuarios.c.nome),
             usuarios,
             usuarios_unidades,
-        )
-        return [dict(r) for r in self.session.execute(stmt).mappings()]
-
-
-class DjenExemploRepository(BaseRepository):
-    """Banco de exemplos rotulados (docs/plano-processos-avulsos.md)."""
-
-    def por_ids_djen(self, ids_djen: list[int]) -> dict[int, dict[str, Any]]:
-        if not ids_djen:
-            return {}
-        stmt = self.escopo(
-            select(djen_exemplos).where(djen_exemplos.c.id_djen.in_(set(ids_djen))),
-            djen_exemplos,
-        )
-        return {row["id_djen"]: dict(row) for row in self.session.execute(stmt).mappings()}
-
-    def criar(self, data: dict[str, Any]) -> int:
-        result = self.session.execute(insert(djen_exemplos).values(**self.valores(data)))
-        self.session.flush()
-        return result.lastrowid
-
-    def atualizar(self, id: int, data: dict[str, Any]) -> None:
-        self.session.execute(
-            self.escopo(
-                sql_update(djen_exemplos).where(djen_exemplos.c.id == id), djen_exemplos
-            ).values(**data)
-        )
-
-    def apagar_nao_revisadas(self, limite: datetime) -> int:
-        """Retenção: não revisadas criadas antes de `limite` somem inteiras."""
-        t = djen_exemplos
-        stmt = self.escopo(
-            sql_delete(t).where(t.c.rotulo == "nao_revisada", t.c.criado_em < limite), t
-        )
-        return self.session.execute(stmt).rowcount or 0
-
-    def anular_textos(self, limite: datetime, agora: datetime) -> int:
-        """Retenção: rotuladas antes de `limite` perdem texto e destinatários."""
-        t = djen_exemplos
-        stmt = self.escopo(
-            sql_update(t).where(
-                t.c.rotulo != "nao_revisada",
-                t.c.rotulado_em < limite,
-                t.c.texto_apagado_em.is_(None),
-            ),
-            t,
-        ).values(texto_plano=None, destinatarios=null(), texto_apagado_em=agora)  # SQL NULL, não JSON null
-        return self.session.execute(stmt).rowcount or 0
-
-    def contagens(self) -> list[dict[str, Any]]:
-        """(rótulo, origem, total, com_texto) do tenant ativo."""
-        t = djen_exemplos
-        stmt = self.escopo(
-            select(
-                t.c.rotulo,
-                t.c.origem,
-                func.count().label("total"),
-                func.count(t.c.texto_plano).label("com_texto"),
-            ).group_by(t.c.rotulo, t.c.origem),
-            t,
-        )
-        return [dict(r) for r in self.session.execute(stmt).mappings()]
-
-    def para_exportar(self, rotulos: tuple[str, ...]) -> list[dict[str, Any]]:
-        t = djen_exemplos
-        stmt = self.escopo(
-            select(t).where(t.c.rotulo.in_(rotulos)).order_by(t.c.id), t
         )
         return [dict(r) for r in self.session.execute(stmt).mappings()]

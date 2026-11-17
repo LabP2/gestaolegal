@@ -257,45 +257,41 @@ O script não instala o cron automaticamente.
 ## Rotina do DJEN
 
 A integração com o DJEN (Comunica PJe, `docs/plano-djen.md`) captura as
-publicações das OABs monitoradas e dos processos cadastrados. A captura roda
-pelo comando `flask djen sincronizar`, que precisa ser agendado no host: o
-sistema não tem agendador próprio.
+publicações de OABs, nomes de partes e números CNJ cadastrados em **DJEN > Monitoramento**.
+O serviço `djen-worker` do Docker Compose executa todos os dias, no fuso
+`America/Sao_Paulo`: 04h com `DJEN_JANELA_DIAS=7`, e 10h/16h com
+`DJEN_JANELA_DIURNA_DIAS=3`. As janelas incluem hoje. Não instale também o
+cron antigo de 8h/14h; remova-o ao adotar o worker.
 
-São duas chaves, e as duas precisam estar ligadas:
+São duas chaves: `DJEN_SYNC_ENABLED=true` no ambiente e `djen_ativo` no NPJ.
+O padrão permanece desligado; publicar o código não autoriza ativar produção.
+O worker recupera o último horário vencido ao reiniciar e as consultas recuperam
+o período desde o último sucesso, com sobreposição. O banco impede rotinas
+simultâneas no mesmo NPJ. `--max-processos` é mantido por compatibilidade,
+mas a nova rotina percorre todos os itens ativos e todas as páginas.
 
-- `DJEN_SYNC_ENABLED=true` no `.env` do ambiente. Desligada (padrão), o comando
-  sai sem chamar a API. Ligar em QA ou produção exige decisão explícita: a
-  rotina gera notificações para usuários reais.
-- `djen_ativo` do NPJ, ligada pelo admin da plataforma na edição do NPJ. NPJ
-  com a chave desligada é pulado.
+OAB e processo consultam todos os tribunais na rotina; nomes usam os tribunais
+cadastrados. Buscas manuais possuem filtros independentes. Processos ativos com
+CNJ são incluídos automaticamente; pausas e remoções explícitas são preservadas.
+Itens iguais de várias unidades compartilham a chamada, mantendo acesso para cada
+unidade. A associação permanente do acervo não depende dos logs temporários.
+Toda captura manual ou automática vincula a publicação ao processo ativo único
+com o mesmo CNJ, inclusive em reconsultas. Se houver caso, gera evento sem
+repeti-lo nas consultas seguintes. Classificações humanas e descartes anteriores
+são preservados; publicações sem processo correspondente aguardam importação.
 
-As OABs consultadas são cadastradas pelo admin do NPJ em DJEN > OABs
-monitoradas. Cada execução busca a janela dos últimos `DJEN_JANELA_DIAS`
-dias de cada OAB ativa e até `DJEN_MAX_PROCESSOS` processos pendentes, e apaga
-as publicações descartadas e as pendentes sem caso com mais de 90 dias
-(retenção fixa, decidida no plano; não é variável de ambiente).
+Logs por consulta ficam em `djen_consultas`, com resumo da execução em
+`djen_sincronizacoes`. A aba **Logs de varredura** mostra andamento, resultados e
+falhas. `DJEN_LOG_RETENCAO_DIAS=90` controla a limpeza diária. Publicações,
+classificações e vínculos não expiram com os logs.
 
-Execução manual, no host, com a stack iniciada:
+Execução manual (sem depender do agendador):
 
 ```bash
-docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar
-# Um NPJ só:
-docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar --tenant daj-ufmg
+docker compose exec api flask --app 'gestaolegal:create_app()' djen sincronizar --tenant daj-ufmg
+# Desenvolvimento:
+docker compose -f docker-compose.dev.yml up -d --build djen-worker
 ```
-
-Para agendar em dias úteis às 8h e às 14h, no fuso do servidor, adicione ao
-`crontab` de um usuário com acesso ao Docker e escrita no checkout/log. O
-`flock` impede que duas execuções se sobreponham:
-
-```cron
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 8,14 * * 1-5 cd /opt/gestaolegal && flock -n /tmp/gestaolegal-djen.lock docker compose run --rm api flask --app 'gestaolegal:create_app()' djen sincronizar >> /opt/gestaolegal/djen.log 2>&1
-```
-
-Ajuste o caminho ao checkout do ambiente (e o nome do serviço, se não for
-`api`). Feriados não são tratados: a execução só não encontra nada. Cada
-execução grava o resultado em `djen_sincronizacoes`, exibido no topo da lista
-de publicações. Nenhum script instala esse cron.
 
 ---
 

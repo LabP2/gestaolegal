@@ -47,6 +47,21 @@ services:
         condition: service_started
         required: false
 
+  djen-worker:
+    entrypoint: []
+    image: ghcr.io/gestaolegalufmg/gestaolegal-api:${IMAGE_TAG:?Defina IMAGE_TAG com a versão ou SHA publicado}
+    command: ["python", "scripts/agendar_djen.py"]
+    env_file: [.env]
+    environment: *api_environment
+    volumes:
+      - uploads:/data/gestaolegal/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: mysql:8.0.42
     command: --authentication-policy=caching_sha2_password

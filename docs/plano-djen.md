@@ -1,13 +1,79 @@
+## Monitoramento unificado — implementação de 17/11/2026
+
+Esta seção substitui horários, limites de processos e retenção descritos no histórico abaixo.
+
+- Menu Monitoramento: OAB, Nome da Parte, Número do Processo e Logs de varredura.
+- Busca avulsa e monitoramento são independentes; nomes exigem tribunais ao cadastrar.
+- Todas as capturas, manuais ou automáticas, vinculam publicações a um único processo ativo do NPJ pelo CNJ. Isso inclui publicações reencontradas após cadastrar o processo. Casamento por nome/OAB não basta: o vínculo sempre usa o CNJ.
+- Vínculos e descartes anteriores são preservados; a classificação humana não é sobrescrita. Sem processo correspondente, a publicação permanece para importação manual.
+- Processo com caso gera evento e notificações; processo sem caso recebe o vínculo sem evento. Reconsultas não duplicam eventos.
+- OAB/processo consultam todos os tribunais na rotina; manual permite período e tribunais.
+- Todos os dias às 04h (hoje + 6 dias), 10h e 16h (hoje + 2 dias), America/Sao_Paulo.
+- Processos ativos entram automaticamente. Pausa/remoção por item preserva o acervo.
+- Admin vê o NPJ; demais gestores veem suas unidades. Consulta compartilhada por item/tribunal.
+- Logs por 90 dias configuráveis. Associação publicação/unidade/origem é permanente.
+- Migração 19e72ac50bd8 preserva consultas e transfere acessos antes de permitir a limpeza.
+- Worker Docker dedicado; DJEN_SYNC_ENABLED continua sendo a chave explícita do ambiente.
+- Sem caso fica como aba de Publicações. Busca por parte mantém a interface existente na aba correspondente.
+
 # Plano — integração com o DJEN (Comunica PJe)
 
-Branch `feat/djen`, rebaseada sobre `feat/multitenant` (PRs 1 a 9 do
-multitenant, head de migration `c2d3e4f5a6b7`). Este documento só traz o
-planejamento: nada foi implementado nem migrado.
+## Atualização implementada — acervo e classificação (2026-11-16)
 
-**Depende do multitenant.** O DJEN é construído sobre a multitenancy já
-implementada; as regras estão na seção 3.1. Se `feat/multitenant` mudar antes
-do merge (achados da verificação em andamento), `feat/djen` é rebaseada de
-novo.
+Implementação local na branch `feat/multitenant`. Esta seção substitui as
+regras antigas de retenção, exemplos e atualização automática de pendências
+nas seções históricas abaixo. Nenhuma implantação em produção foi realizada.
+
+- `djen_publicacoes`: conteúdo canônico, único por `(tenant_id, id_djen)`.
+- `djen_comunicacoes`: situação operacional e vínculos; referencia o acervo,
+  sem duplicar texto e metadados.
+- `djen_classificacoes`: relevante, irrelevante ou não classificado; uma por
+  publicação e NPJ, com origem, autor e data.
+- `djen_classificacao_historico`: decisões anteriores, preservadas.
+- `djen_consultas` e `djen_consulta_resultados`: origem, parâmetros, unidade,
+  executor e resultado das capturas, com associação às publicações.
+
+Cada página recebida de consultas por nome, OAB ou processo é persistida antes
+da próxima chamada externa. Falhas posteriores não apagam páginas anteriores.
+O limite de páginas é registrado como captura parcial. Consultas repetidas
+atualizam os dados da fonte e vinculam pendências quando há um único processo
+ativo com o mesmo CNJ. A regra vale para todas as origens, manuais ou automáticas,
+inclusive para publicações reencontradas após cadastrar o processo. Não apaga
+rótulos humanos, não reabre descartes e não duplica vínculos ou eventos.
+Cancelamentos da fonte continuam sendo atualizados.
+
+A tela `/djen` mostra o acervo para os perfis de gestão (admin, prof, orient),
+com filtros e seleção. Importar usa o conteúdo salvo, cria os vínculos e marca
+como relevante. Descartar marca como irrelevante na mesma transação. Um lote
+com item inválido é recusado integralmente. Publicações já vinculadas não são
+descartadas. Os demais perfis mantêm a leitura operacional restrita já existente.
+
+A tela `/djen/classificacao` abre em não classificado, permite leitura do texto,
+consulta ao histórico e classificação individual ou em lote. Ela não altera
+vínculos. Classificar como irrelevante uma publicação já importada também não
+remove o vínculo; é uma decisão de treino separada. A importação explícita
+posterior pode torná-la relevante novamente, com histórico.
+
+Nenhuma ausência de seleção equivale a avaliação negativa. Não há exclusão
+automática por idade ou falta de classificação. A exportação JSONL usa somente
+rótulos explícitos por padrão e é lida em lotes de 500, transmitida em streaming
+com o tenant autenticado restaurado por chunk. A inclusão de não classificados
+é opcional e eles não são exemplos negativos.
+
+O acervo é por NPJ; o acesso exige uma consulta de origem ou comunicação na
+unidade ativa. Todas as associações possuem FKs compostas por tenant. Índices
+cobrem identificação externa, data, processo, rótulo e associações de consulta.
+Elasticsearch e a futura busca FULLTEXT não fazem parte desta entrega.
+
+A revisão experimental `b3c4d5e6f7a8` foi refeita, sem conversão de dados da
+tabela antiga `djen_exemplos`. Ela recria comunicações e cria o acervo. Eventos
+existentes são preservados, retirando apenas a referência à comunicação
+experimental. O downgrade também é descartável. Em um banco local que já tinha
+a versão anterior dessa revisão, é necessário remover `djen_exemplos`, voltar
+apenas o marcador para `f1a2b3c4d5e6` e reaplicar a revisão, após backup. Não
+executar esse procedimento como atualização genérica de ambientes publicados.
+
+## Planejamento histórico
 
 ## Resultado esperado
 
@@ -539,3 +605,19 @@ plano não decidia, sempre pelo caminho mais conservador. Revisar antes do merge
     migration do DJEN.
 21. `tests/api/test_jwt_tenant.py`: o dicionário esperado do tenant ganhou
     `"djen_ativo": False`.
+
+### Buscas manuais em lote e histórico completo
+
+- Nas abas OAB, Nome da Parte e Número do Processo, **Buscar todos** consulta
+  sequencialmente os itens ativos da aba, nas unidades listadas, usando uma cópia
+  do período e tribunais selecionados. Pausados ficam fora do lote. O progresso
+  identifica o item atual; uma falha não impede a consulta dos seguintes, e o
+  resultado informa consultas incompletas.
+- Para um número CNJ, **Buscar todas as publicações** consulta o histórico
+  disponível sem filtro de datas ou tribunal e percorre todas as páginas. A ação
+  está no formulário e nas linhas de processos monitorados, e também nos
+  detalhes do processo. As páginas já recebidas permanecem no acervo em caso
+  de falha; reconsultas preservam classificações e vínculos.
+- O CNJ monitorado abre os detalhes quando há um único processo correspondente
+  no mesmo NPJ e unidade. Sem cadastro correspondente, continua como texto.
+  Abrir o link seleciona a unidade do processo.

@@ -120,3 +120,13 @@ def excluir(id: int):
         id, RequestContext.get_current_user(), RequestContext.get_unidade_ativa()
     )
     return success_response(message="Processo inativado com sucesso")
+
+
+@processo_controller.route("/<int:id>/vincular-caso", methods=["POST"])
+@authorized(*PAPEIS_SEM_CASO)
+def vincular_caso(id: int):
+    dados = ProcessoService().vincular_caso(
+        id, _corpo().get("caso_id"), RequestContext.get_current_user(),
+        RequestContext.get_unidade_ativa(),
+    )
+    return success_response(data=dados, message="Processo vinculado ao caso")

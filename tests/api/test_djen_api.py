@@ -97,6 +97,9 @@ def _linhas(tabela, **filtro):
     session = db_session_module.get_session()
     try:
         with sem_tenant("teste: leitura direta"):
+            if tabela is djen_comunicacoes:
+                from gestaolegal.repositories.djen_repository import _dados
+                tabela = _dados()
             stmt = select(tabela)
             for coluna, valor in filtro.items():
                 stmt = stmt.where(tabela.c[coluna] == valor)
@@ -309,10 +312,10 @@ class TestRotina:
         assert _linhas(djen_sincronizacoes, tenant_id=TENANT_OUTRO) == []
         (linha,) = _linhas(processos, id=p["id"])
         assert linha["djen_pendente"] is False and linha["djen_consultado_em"] is not None
-        # Segunda execução: nada pendente, nada novo.
+        # Segunda execução: processo ativo é monitorado novamente, sem duplicar.
         transporte.chamadas.clear()
         rodar_rotina(app)
-        assert all(c.get("numeroProcesso") != p["numero_cnj"] for c in transporte.chamadas)
+        assert any(c.get("numeroProcesso") == p["numero_cnj"] for c in transporte.chamadas)
 
     def test_botao_roda_a_rotina_do_proprio_npj(self, client, auth_headers, djen, transporte):
         # Ação manual: não depende de DJEN_SYNC_ENABLED (desligado aqui).
@@ -344,12 +347,11 @@ class TestRotina:
         assert transporte.chamadas == []
         assert _linhas(djen_sincronizacoes) == []
 
-    def test_respeita_o_maximo_de_processos(self, app, client, auth_headers, djen, transporte, sync_habilitado):
+    def test_varredura_percorre_todos_os_processos_ativos(self, app, client, auth_headers, djen, transporte, sync_habilitado):
         caso = criar_caso(client, auth_headers)
-        for _ in range(3):
-            criar_processo(client, auth_headers, caso)
+        numeros = {criar_processo(client, auth_headers, caso)["numero_cnj"] for _ in range(3)}
         rodar_rotina(app, max_processos=2)
-        assert len([c for c in transporte.chamadas if "numeroProcesso" in c]) == 2
+        assert numeros <= {c.get("numeroProcesso") for c in transporte.chamadas}
 
     def test_falha_de_um_processo_deixa_parcial_sem_perder_o_resto(
         self, app, client, auth_headers, djen, transporte, sync_habilitado
@@ -363,7 +365,7 @@ class TestRotina:
         assert len(_linhas(djen_comunicacoes, id_djen=7101)) == 1
         (sinc,) = _linhas(djen_sincronizacoes, tenant_id=TENANT_DAJ)
         assert sinc["status"] == "parcial"
-        assert f"processo {ruim['id']}" in sinc["mensagem"]
+        assert f"processo {ruim['numero_cnj']}" in sinc["mensagem"]
         (linha,) = _linhas(processos, id=ruim["id"])
         assert linha["djen_pendente"] is True  # fica para a próxima
 

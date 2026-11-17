@@ -59,6 +59,14 @@ class ProcessoRepository(BaseRepository):
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Processo, dict(result._mapping)) if result else None
 
+    def bloquear(self, id: int) -> Processo | None:
+        """Lê o estado atual e serializa associação e captura na transação."""
+        row = self.session.execute(self.escopo(
+            select(processos).where(processos.c.id == id).with_for_update(),
+            processos,
+        )).one_or_none()
+        return from_dict(Processo, dict(row._mapping)) if row else None
+
     def find_by_caso_id(self, caso_id: int) -> list[Processo]:
         stmt = self.escopo(
             select(processos).where(processos.c.id_caso == caso_id), processos

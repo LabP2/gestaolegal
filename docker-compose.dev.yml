@@ -85,6 +85,25 @@ services:
         - action: rebuild
           path: ./uv.lock
 
+  djen-worker:
+    build:
+      context: .
+      target: dev
+    command: ["python", "scripts/agendar_djen.py"]
+    env_file: [.env]
+    environment:
+      <<: *dev_environment
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./gestaolegal:/code/gestaolegal:ro
+      - ./scripts:/code/scripts:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: mysql:8.0.42
     command: --authentication-policy=caching_sha2_password

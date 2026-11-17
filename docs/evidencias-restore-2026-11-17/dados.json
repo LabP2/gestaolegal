@@ -1,0 +1,62 @@
+{
+  "atendidos": {
+    "originais": 4086,
+    "restaurados": 4086,
+    "identicos": true
+  },
+  "casos": {
+    "originais": 950,
+    "restaurados": 950,
+    "identicos": true
+  },
+  "eventos": {
+    "originais": 1183,
+    "restaurados": 1183,
+    "identicos": true
+  },
+  "assistidos": {
+    "originais": 950,
+    "restaurados": 950,
+    "identicos": true
+  },
+  "arquivosCaso": {
+    "originais": 247,
+    "restaurados": 247,
+    "identicos": true
+  },
+  "arquivosEvento": {
+    "originais": 461,
+    "restaurados": 461,
+    "identicos": true
+  },
+  "assistencias_judiciarias": {
+    "originais": 1,
+    "restaurados": 1,
+    "identicos": true
+  },
+  "enderecos": {
+    "originais": 4359,
+    "restaurados": 4359,
+    "identicos": true
+  },
+  "processos": {
+    "originais": 86,
+    "restaurados": 86,
+    "identicos": true
+  },
+  "historicos": {
+    "originais": 1461,
+    "restaurados": 1461,
+    "identicos": true
+  },
+  "casos_atendidos": {
+    "originais": 980,
+    "restaurados": 980,
+    "identicos": true
+  },
+  "assistidos_pessoa_juridica": {
+    "originais": 10,
+    "restaurados": 10,
+    "identicos": true
+  }
+}

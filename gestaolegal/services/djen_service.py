@@ -44,10 +44,11 @@ from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.caso_repository import CasoRepository
 from gestaolegal.repositories.djen_repository import (
     DjenComunicacaoRepository,
-    DjenExemploRepository,
     DjenOabRepository,
     DjenSincronizacaoRepository,
 )
+from gestaolegal.repositories.djen_acervo_repository import DjenAcervoRepository
+from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.atendido_repository import AtendidoRepository
 from gestaolegal.repositories.processo_repository import ProcessoRepository
@@ -89,7 +90,7 @@ _CONSULTAR = object()
 # Banco de exemplos rotulados (docs/plano-processos-avulsos.md, "Banco de
 # exemplos"). Só o admin vê as contagens e exporta.
 PAPEIS_EXEMPLOS = ("admin",)
-ROTULOS_EXPLICITOS = ("pertinente", "nao_pertinente")
+ROTULOS_EXPLICITOS = ("relevante", "irrelevante")
 # Campos do exemplo no arquivo exportado (JSON Lines), nesta ordem.
 CAMPOS_EXPORTACAO = (
     "id_djen",
@@ -106,7 +107,7 @@ CAMPOS_EXPORTACAO = (
     "destinatarios",
     "texto_plano",
     "rotulado_em",
-    "texto_apagado_em",
+    "id_rotulado_por",
 )
 
 
@@ -151,7 +152,9 @@ class DJENService:
         self.tenants = TenantRepository()
         self.eventos = EventoRepository()
         self.oabs = DjenOabRepository()
-        self.exemplos = DjenExemploRepository()
+        self.acervo = DjenAcervoRepository()
+        self._alteracoes_captura = set()
+        self._recebidas_antes = set()
         # Avisos da captura em curso, agregados por caso até o commit da fonte:
         # {caso_id: (caso, eventos, executor)}.
         self._avisos: dict[int, tuple[Caso, list[Evento], int | None]] = {}
@@ -233,7 +236,9 @@ class DJENService:
             raise NotFoundException(resource="Publicação", resource_id=id)
         if participante is not None:
             caso = (
-                self.casos.find_by_id(comunicacao.id_caso) if comunicacao.id_caso else None
+                self.casos.find_by_id(comunicacao.id_caso)
+                if comunicacao.id_caso
+                else None
             )
             if caso is None or participante not in (
                 caso.id_orientador,
@@ -264,7 +269,10 @@ class DJENService:
 
     def status(self) -> dict[str, Any]:
         ultima = self.sincronizacoes.ultima()
-        rotina = {"janela_dias": Config.DJEN_JANELA_DIAS, "max_processos": Config.DJEN_MAX_PROCESSOS}
+        rotina = {
+            "janela_dias": Config.DJEN_JANELA_DIAS,
+            "max_processos": Config.DJEN_MAX_PROCESSOS,
+        }
         if ultima is None:
             return {"ultima": None, "atrasada": True, "rotina": rotina}
         referencia = (ultima.fim or ultima.inicio).date()
@@ -304,19 +312,26 @@ class DJENService:
         oab_origem: str | None = None,
         executor_id: int | None = None,
         exemplo: bool = True,
+        somente_com_processo: bool = False,
     ) -> None:
         """Upsert por `id_djen` no tenant ativo (idempotente).
 
         `processo` vem da busca pelo número; sem ele, casa pelo `numero_cnj`.
-        Publicação já gravada só atualiza o cancelamento.
+        Toda captura pode vincular ao processo; descartes e vínculos anteriores são preservados.
         """
         agora = datetime.now()
+        pid = self.acervo.guardar(self._dados_publicacao(item))
         existente = self.repo.find_by_id_djen(item.id_djen)
+        alvo = processo if processo is not None else self._casar(item.numero_processo)
         if existente is not None:
-            mudou = existente.ativo != item.ativo or (
-                existente.motivo_cancelamento or None
-            ) != (item.motivo_cancelamento or None)
+            mudou = (
+                item.id_djen in self._alteracoes_captura
+                or existente.ativo != item.ativo
+                or (existente.motivo_cancelamento or None)
+                != (item.motivo_cancelamento or None)
+            )
             if mudou:
+                self._alteracoes_captura.discard(item.id_djen)
                 self.repo.atualizar(
                     existente.id,
                     {
@@ -328,17 +343,14 @@ class DJENService:
                 resultado.atualizadas += 1
                 if existente.ativo and not item.ativo and existente.id_caso:
                     self._ao_cancelar(existente, executor_id)
-            if existente.situacao == "pendente" and existente.id_processo is None:
-                alvo = processo or self._casar(existente.numero_processo)
-                if alvo:
-                    caso = self._caso_do_processo(alvo)
-                    self._vincular(
-                        existente.id, alvo, caso, executor_id, manual=False, exemplo=exemplo
-                    )
-                    resultado.vinculadas += 1
+            if existente.situacao == "pendente" and alvo is not None:
+                self._vincular(existente.id, alvo, self._caso_do_processo(alvo), executor_id,
+                    manual=False, exemplo=exemplo)
+                resultado.vinculadas += 1
             return
 
-        alvo = processo if processo is not None else self._casar(item.numero_processo)
+        if alvo is None and somente_com_processo:
+            return
         caso = self._caso_do_processo(alvo) if alvo else None
         # Processo sem caso: a unidade é a do próprio processo.
         if caso is not None:
@@ -355,32 +367,17 @@ class DJENService:
 
         novo_id = self.repo.criar(
             {
-                "id_djen": item.id_djen,
-                "hash": item.hash,
-                "numero_processo": item.numero_processo,
-                "numero_processo_mascara": item.numero_processo_mascara,
-                "data_disponibilizacao": item.data_disponibilizacao,
-                "sigla_tribunal": item.sigla_tribunal,
-                "nome_orgao": djen_html.corrigir_caixa(item.nome_orgao),
-                "tipo_comunicacao": item.tipo_comunicacao,
-                "tipo_documento": item.tipo_documento,
-                "nome_classe": djen_html.corrigir_caixa(item.nome_classe),
-                "texto_html": item.texto,
-                "texto_plano": djen_html.texto_plano(item.texto),
-                "link": item.link,
-                "destinatarios": item.destinatarios,
-                "advogados": item.advogados,
-                "ativo": item.ativo,
-                "motivo_cancelamento": item.motivo_cancelamento,
+                "id_publicacao": pid,
                 "situacao": "pendente",
                 "oab_origem": oab_origem,
-                "capturada_em": agora,
                 "unidade_id": unidade_id,
             }
         )
         resultado.novas += 1
         if alvo is not None:
-            self._vincular(novo_id, alvo, caso, executor_id, manual=False, exemplo=exemplo)
+            self._vincular(
+                novo_id, alvo, caso, executor_id, manual=False, exemplo=exemplo
+            )
             resultado.vinculadas += 1
 
     def _vincular(
@@ -402,6 +399,13 @@ class DJENService:
         Todo vínculo vira exemplo `pertinente` (manual ou automático), salvo
         com `exemplo=False`: a importação da busca por parte grava o seu.
         """
+        # A captura pode ter lido o processo antes de ele ganhar um caso.
+        # Usa o mesmo bloqueio da associação para não perder eventos nessa corrida.
+        atual = self.processos.bloquear(processo.id)
+        if atual is None:
+            raise ValidationException("Processo não encontrado", field="processo_id")
+        processo = atual
+        caso = self._caso_do_processo(processo)
         self.repo.atualizar(
             comunicacao_id,
             {
@@ -418,7 +422,7 @@ class DJENService:
             assert gravada is not None
             self._rotular(
                 self._dados_exemplo(gravada),
-                "pertinente",
+                "relevante",
                 "vinculo_manual" if manual else "vinculo_automatico",
                 executor_id if manual else None,
             )
@@ -432,6 +436,20 @@ class DJENService:
                 _, lista, _ = self._avisos.setdefault(caso.id, (caso, [], executor_id))
                 lista.append(evento)
         return evento
+
+    def associar_processo_ao_caso(
+        self, processo: Processo, caso: Caso, executor_id: int
+    ) -> int:
+        """Materializa o histórico sem alterar classificação ou autoria do vínculo."""
+        novos = []
+        for comunicacao_id in self.repo.vinculadas_ao_processo(processo.id):
+            self.repo.atualizar(comunicacao_id, {"id_caso": caso.id})
+            evento, novo = self._criar_evento(comunicacao_id, caso, executor_id)
+            if novo:
+                novos.append(evento)
+        if novos:
+            NotificacaoService().djen_publicacoes(caso, novos, executor_id)
+        return len(novos)
 
     def _criar_evento(
         self, comunicacao_id: int, caso: Caso, executor_id: int | None
@@ -449,7 +467,10 @@ class DJENService:
         )
         corpo = djen_html.resumo(comunicacao.texto_plano or "", 500)
         # `descricao` e `tipo` de `eventos` são colunas legadas em latin1.
-        descricao = djen_html.para_latin1("\n\n".join(p for p in (cabecalho, corpo) if p)) or None
+        descricao = (
+            djen_html.para_latin1("\n\n".join(p for p in (cabecalho, corpo) if p))
+            or None
+        )
         evento_id = self.eventos.create(
             {
                 "id_caso": caso.id,
@@ -472,12 +493,16 @@ class DJENService:
         assert evento is not None
         return evento, True
 
-    def _ao_cancelar(self, comunicacao: ComunicacaoDJEN, executor_id: int | None) -> None:
+    def _ao_cancelar(
+        self, comunicacao: ComunicacaoDJEN, executor_id: int | None
+    ) -> None:
         """Publicação cancelada depois do vínculo: o evento fica, com o selo de
         cancelada (lido de `djen_comunicacoes.ativo`), e o caso é avisado."""
         logger.info(f"DJEN: publicação {comunicacao.id} cancelada no DJEN")
         evento = self.eventos.find_by_djen_comunicacao(comunicacao.id)
-        caso = self.casos.find_by_id(comunicacao.id_caso) if comunicacao.id_caso else None
+        caso = (
+            self.casos.find_by_id(comunicacao.id_caso) if comunicacao.id_caso else None
+        )
         if evento is not None and caso is not None:
             NotificacaoService().djen_cancelada(caso, evento, executor_id)
 
@@ -503,11 +528,13 @@ class DJENService:
         except Exception:
             self.session.rollback()
             raise
-        logger.info(f"DJEN: publicação {id} vinculada ao processo {processo_id} por {user.id}")
+        logger.info(
+            f"DJEN: publicação {id} vinculada ao processo {processo_id} por {user.id}"
+        )
         return self.detalhe(id, user, unidade_id)
 
     def descartar(self, id: int, user: UserInfo, unidade_id: int) -> dict[str, Any]:
-        """Marca como não pertencente ao NPJ. A retenção apaga depois (plano, §8)."""
+        """Descarta e classifica como irrelevante, preservando o acervo."""
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
         comunicacao = self._visivel(id, user, unidade_id)
@@ -527,7 +554,7 @@ class DJENService:
                 },
             )
             self._rotular(
-                self._dados_exemplo(comunicacao), "nao_pertinente", "descarte", user.id
+                self._dados_exemplo(comunicacao), "irrelevante", "descarte", user.id
             )
             self.session.commit()
         except Exception:
@@ -645,7 +672,9 @@ class DJENService:
         if "id_usuario" in dados:
             mudancas["id_usuario"] = self._id_usuario(dados)
         if "unidade_id" in dados:
-            mudancas["unidade_id"] = self._unidade_escolhida(dados, user, atual.unidade_id)
+            mudancas["unidade_id"] = self._unidade_escolhida(
+                dados, user, atual.unidade_id
+            )
         if "ativo" in dados:
             if not isinstance(dados["ativo"], bool):
                 raise ValidationException("Valor inválido", field="ativo")
@@ -704,7 +733,14 @@ class DJENService:
     ) -> None:
         fim = date.today()
         inicio = fim - timedelta(days=janela_dias)
-        for item in self.client.buscar_por_oab(oab.numero_oab, oab.uf_oab, inicio, fim):
+        for item in self._capturar(
+            self.client,
+            "oab",
+            {"oab": oab.rotulo, "de": inicio.isoformat(), "ate": fim.isoformat()},
+            oab.unidade_id,
+            None,
+            lambda: self.client.buscar_por_oab(oab.numero_oab, oab.uf_oab, inicio, fim),
+        ):
             self.registrar(
                 item,
                 resultado,
@@ -716,10 +752,22 @@ class DJENService:
         self, processo: Processo, resultado: ResultadoCaptura, executor_id: int | None
     ) -> None:
         assert processo.numero_cnj
-        for item in self.client.buscar_por_processo(processo.numero_cnj):
-            if item.numero_processo != processo.numero_cnj:
-                continue
-            self.registrar(item, resultado, processo=processo, executor_id=executor_id)
+        limite_anterior = self.client.max_paginas
+        self.client.max_paginas = None
+        try:
+            for item in self._capturar(
+                self.client,
+                "processo",
+                {"numero": processo.numero_cnj, "historico_completo": True},
+                processo.unidade_id,
+                executor_id,
+                lambda: self.client.buscar_por_processo(processo.numero_cnj),
+            ):
+                if item.numero_processo != processo.numero_cnj:
+                    continue
+                self.registrar(item, resultado, processo=processo, executor_id=executor_id)
+        finally:
+            self.client.max_paginas = limite_anterior
         self.processos.update(
             processo.id, {"djen_pendente": False, "djen_consultado_em": datetime.now()}
         )
@@ -727,7 +775,7 @@ class DJENService:
     def buscar_processo(
         self, processo_id: int, user: UserInfo, unidade_id: int
     ) -> dict[str, Any]:
-        """Botão "Buscar publicações agora": uma consulta, sem esperar a rotina."""
+        """Busca todo o histórico do processo, sem esperar a rotina."""
         processo = self.processos.find_by_id(processo_id)
         if processo is None or processo.unidade_id != unidade_id:
             raise NotFoundException(resource="Processo", resource_id=processo_id)
@@ -746,7 +794,7 @@ class DJENService:
             self._descartar_pendencias()
             logger.warning(f"DJEN: busca do processo {processo_id} falhou: {erro}")
             raise BusinessLogicException(
-                "O DJEN não respondeu. Tente de novo em alguns minutos.",
+                "O DJEN não respondeu. As páginas já recebidas permanecem no acervo. Tente novamente.",
                 "DJEN_INDISPONIVEL",
             ) from erro
         except Exception:
@@ -785,114 +833,12 @@ class DJENService:
                     "A rotina do DJEN já está rodando para este NPJ. Aguarde alguns minutos.",
                     "DJEN_EM_EXECUCAO",
                 )
-            return self._sincronizar(janela_dias, max_processos)
-
-    def _sincronizar(self, janela_dias: int | None, max_processos: int | None) -> dict[str, Any]:
-        """Uma execução da rotina para o tenant ativo.
-
-        Cada fonte (OAB, processo pendente) é gravada na sua própria transação:
-        uma falha de rede no meio não perde o que já foi gravado e deixa a
-        execução `parcial`. Toda execução grava uma linha em
-        `djen_sincronizacoes`.
-        """
-        janela = janela_dias if janela_dias is not None else Config.DJEN_JANELA_DIAS
-        limite = max_processos if max_processos is not None else Config.DJEN_MAX_PROCESSOS
-        inicio = datetime.now()
-        total = ResultadoCaptura()
-        fontes = 0
-        falhas = 0
-
-        for fonte, executar in self._fontes(janela, limite):
-            fontes += 1
-            parcial = ResultadoCaptura()
-            try:
-                executar(parcial)
-                self._depois_da_fonte()
-                self.session.commit()
-                total.somar(parcial)
-            except Exception as erro:  # a falha de uma fonte não para as outras
-                self.session.rollback()
-                self._descartar_pendencias()
-                falhas += 1
-                total.erros.append(f"{fonte}: {erro}")
-                logger.warning(f"DJEN: falha em {fonte}: {erro}")
-
-        self._aplicar_retencao()
-
-        if falhas == 0:
-            status = "ok"
-        elif falhas == fontes:
-            status = "erro"
-        else:
-            status = "parcial"
-        registro = {
-            "inicio": inicio,
-            "fim": datetime.now(),
-            "status": status,
-            "parametros": {"janela_dias": janela, "max_processos": limite},
-            "novas": total.novas,
-            "atualizadas": total.atualizadas,
-            "vinculadas": total.vinculadas,
-            "mensagem": "\n".join(total.erros)[:4000] or None,
-        }
-        self.sincronizacoes.registrar(registro)
-        self.session.commit()
-        logger.info(
-            f"DJEN: tenant {self.repo.tenant_id()} {status}: {total.novas} nova(s), "
-            f"{total.atualizadas} atualizada(s), {total.vinculadas} vinculada(s)"
-        )
-        return registro
-
-    def _fontes(self, janela_dias: int, max_processos: int):
-        """(rótulo, função) de cada fonte a consultar nesta execução.
-
-        Primeiro as OABs ativas (de todas as unidades do NPJ), depois os
-        processos pendentes (plano, §4).
-        """
-        for oab in self.oabs.listar(so_ativas=True):
-            yield (
-                f"OAB {oab.rotulo}",
-                lambda resultado, o=oab: self._consultar_oab(o, janela_dias, resultado),
-            )
-        for processo in self.processos.pendentes_djen(max_processos):
-            yield (
-                f"processo {processo.id}",
-                lambda resultado, p=processo: self._consultar_processo(p, resultado, None),
-            )
+            from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+            return DjenMonitoramentoService(self).executar(janela_dias)
 
     def _aplicar_retencao(self) -> int:
-        """Apaga descartadas e pendentes sem caso com mais de N dias (plano, §8).
-
-        Pendentes contam de `capturada_em`; descartadas, da data do descarte.
-        No banco de exemplos, as não revisadas somem depois do mesmo prazo
-        (contado da criação) e as rotuladas perdem texto e destinatários depois
-        de `DJEN_EXEMPLOS_RETENCAO_DIAS`, contados do rótulo.
-        Uma falha aqui não derruba a execução: fica para a próxima.
-        """
-        agora = datetime.now()
-        limite = agora - timedelta(days=Config.DJEN_RETENCAO_DIAS)
-        limite_exemplos = agora - timedelta(days=Config.DJEN_EXEMPLOS_RETENCAO_DIAS)
-        try:
-            apagadas = self.repo.apagar_vencidas(limite)
-            exemplos_apagados = self.exemplos.apagar_nao_revisadas(limite)
-            textos_anulados = self.exemplos.anular_textos(limite_exemplos, agora)
-            self.session.commit()
-        except Exception as erro:
-            self.session.rollback()
-            logger.warning(f"DJEN: retenção falhou: {erro}")
-            return 0
-        if apagadas:
-            logger.info(f"DJEN: retenção apagou {apagadas} publicação(ões)")
-        if exemplos_apagados or textos_anulados:
-            logger.info(
-                f"DJEN: retenção dos exemplos apagou {exemplos_apagados} não revisada(s) "
-                f"e anulou o texto de {textos_anulados}"
-            )
-        return apagadas
-
-    # --- busca manual por parte ---------------------------------------------
-    # docs/plano-processos-avulsos.md, §3. A consulta não grava nada; só a
-    # importação, das publicações escolhidas, grava.
+        """O acervo e as decisões ficam disponíveis até exclusão explícita."""
+        return 0
 
     @staticmethod
     def _parametros_busca(
@@ -906,7 +852,9 @@ class DJENService:
             if nome and nome.lower() not in {n.lower() for n in limpos}:
                 limpos.append(nome[:150])
         if not limpos or any(len(n) < 3 for n in limpos):
-            raise ValidationException("Informe o nome da parte (3 letras ou mais)", field="nome")
+            raise ValidationException(
+                "Informe o nome da parte (3 letras ou mais)", field="nome"
+            )
         if len(limpos) > BUSCA_PARTE_MAX_NOMES:
             raise ValidationException(
                 f"No máximo {BUSCA_PARTE_MAX_NOMES} nomes por busca", field="nome"
@@ -924,7 +872,9 @@ class DJENService:
                 ) from erro
         inicio, fim = datas
         if fim < inicio:
-            raise ValidationException("O fim do período vem antes do início", field="ate")
+            raise ValidationException(
+                "O fim do período vem antes do início", field="ate"
+            )
         if (fim - inicio).days > BUSCA_PARTE_MAX_DIAS:
             raise ValidationException(
                 f"O período máximo é de {BUSCA_PARTE_MAX_DIAS} dias", field="ate"
@@ -943,7 +893,8 @@ class DJENService:
                 siglas.append(sigla)
         if len(siglas) > BUSCA_PARTE_MAX_TRIBUNAIS:
             raise ValidationException(
-                f"No máximo {BUSCA_PARTE_MAX_TRIBUNAIS} tribunais por busca", field="tribunal"
+                f"No máximo {BUSCA_PARTE_MAX_TRIBUNAIS} tribunais por busca",
+                field="tribunal",
             )
         return limpos, inicio, fim, siglas
 
@@ -961,35 +912,52 @@ class DJENService:
             dormir=self.client._dormir,
             max_paginas=BUSCA_PARTE_MAX_PAGINAS,
         )
-        limite = BUSCA_PARTE_MAX_PAGINAS * cliente.itens_por_pagina
         vistos: dict[int, Comunicacao] = {}
         termos: dict[int, str] = {}
         truncado = False
         try:
             for nome in nomes:
                 for tribunal in tribunais or [None]:
-                    itens = cliente.buscar_por_parte(nome, inicio, fim, tribunal)
-                    truncado = truncado or len(itens) >= limite
+                    itens = self._capturar(
+                        cliente,
+                        "parte",
+                        {
+                            "nome": nome,
+                            "de": inicio.isoformat(),
+                            "ate": fim.isoformat(),
+                            "tribunal": tribunal,
+                        },
+                        RequestContext.get_unidade_ativa(),
+                        RequestContext.get_current_user().id,
+                        lambda: cliente.buscar_por_parte(nome, inicio, fim, tribunal),
+                    )
+                    truncado = truncado or cliente.truncado
                     for item in itens:
                         vistos.setdefault(item.id_djen, item)
                         termos.setdefault(item.id_djen, nome)
         except DJENError as erro:
             logger.warning(f"DJEN: busca por parte falhou: {erro}")
             raise BusinessLogicException(
-                "O DJEN não respondeu. Tente de novo em alguns minutos.",
+                "O DJEN não respondeu. As páginas já recebidas permanecem no acervo. Tente novamente.",
                 "DJEN_INDISPONIVEL",
             ) from erro
         itens = sorted(
-            vistos.values(), key=lambda c: (c.data_disponibilizacao, c.id_djen), reverse=True
+            vistos.values(),
+            key=lambda c: (c.data_disponibilizacao, c.id_djen),
+            reverse=True,
         )
         return itens, truncado, termos
 
-    def _processos_da_unidade(self, numeros: set[str], unidade_id: int) -> dict[str, Processo]:
+    def _processos_da_unidade(
+        self, numeros: set[str], unidade_id: int
+    ) -> dict[str, Processo]:
         """Processo ativo da unidade para cada número CNJ (ambíguo não casa)."""
         resultado: dict[str, Processo] = {}
         for numero in numeros:
             achados = [
-                p for p in self.processos.find_by_numero_cnj(numero) if p.unidade_id == unidade_id
+                p
+                for p in self.processos.find_by_numero_cnj(numero)
+                if p.unidade_id == unidade_id
             ]
             if len(achados) == 1:
                 resultado[numero] = achados[0]
@@ -1007,11 +975,15 @@ class DJENService:
         """Consulta o DJEN por nome da parte e diz o que já existe no NPJ."""
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
-        nomes, inicio, fim, tribunais = self._parametros_busca(nomes, de, ate, tribunais)
+        nomes, inicio, fim, tribunais = self._parametros_busca(
+            nomes, de, ate, tribunais
+        )
         itens, truncado, _ = self._consultar_partes(nomes, inicio, fim, tribunais)
         gravadas = self.repo.por_ids_djen([i.id_djen for i in itens])
-        exemplos = self.exemplos.por_ids_djen([i.id_djen for i in itens])
-        processos = self._processos_da_unidade({i.numero_processo for i in itens}, unidade_id)
+        exemplos = self.acervo.por_ids_djen([i.id_djen for i in itens])
+        processos = self._processos_da_unidade(
+            {i.numero_processo for i in itens}, unidade_id
+        )
         resultado = []
         for item in itens:
             gravada = gravadas.get(item.id_djen)
@@ -1029,7 +1001,9 @@ class DJENService:
                     "tipo_documento": item.tipo_documento,
                     "nome_classe": djen_html.corrigir_caixa(item.nome_classe),
                     "destinatarios": item.destinatarios,
-                    "resumo": djen_html.resumo(djen_html.texto_plano(item.texto) or "", 300),
+                    "resumo": djen_html.resumo(
+                        djen_html.texto_plano(item.texto) or "", 300
+                    ),
                     "link": item.link,
                     "ativo": item.ativo,
                     "ja_no_banco": gravada is not None,
@@ -1061,8 +1035,7 @@ class DJENService:
     ) -> dict[str, Any]:
         """Grava as publicações escolhidas na busca por parte.
 
-        O conteúdo vem de uma nova consulta ao DJEN, nunca do corpo da
-        requisição. Cada publicação é vinculada ao processo da unidade com o
+        O conteúdo vem do acervo persistido, nunca do corpo da requisição. Cada publicação é vinculada ao processo da unidade com o
         mesmo número; sem processo, cria-se um processo sem caso com a parte
         informada (`id_atendido`). Tudo numa transação.
         """
@@ -1070,7 +1043,7 @@ class DJENService:
 
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
-        nomes, inicio, fim, tribunais, ids = self._selecao_da_busca(corpo)
+        ids = self._ids_selecionados(corpo)
         id_atendido = corpo.get("id_atendido")
         if id_atendido is not None:
             # Conferido antes de consultar o DJEN; mesma resposta para id
@@ -1078,16 +1051,23 @@ class DJENService:
             if (
                 isinstance(id_atendido, bool)
                 or not isinstance(id_atendido, int)
-                or AtendidoRepository().find_by_id(id_atendido, unidade_id=unidade_id) is None
+                or AtendidoRepository().find_by_id(id_atendido, unidade_id=unidade_id)
+                is None
             ):
                 raise ValidationException("Parte não encontrada", field="id_atendido")
         especie = corpo.get("especie") or ESPECIE_IMPORTADA
         if not isinstance(especie, str) or len(especie) > 25:
             raise ValidationException("Espécie inválida", field="especie")
 
-        itens, _, termos = self._consultar_partes(nomes, inicio, fim, tribunais)
-        escolhidos = [i for i in itens if i.id_djen in set(ids)]
+        registros = self.acervo.selecionadas(ids, unidade_id)
+        itens = [self._comunicacao_salva(r) for r in registros]
+        escolhidos = itens
+        termos = {}
         nao_encontradas = sorted(set(ids) - {i.id_djen for i in escolhidos})
+        if nao_encontradas:
+            raise ValidationException(
+                "Publicação não encontrada na unidade", field="ids"
+            )
         processos = self._processos_da_unidade(
             {i.numero_processo for i in escolhidos}, unidade_id
         )
@@ -1112,7 +1092,9 @@ class DJENService:
                 exemplo = next(i for i in escolhidos if i.numero_processo == numero)
                 dados = ProcessoSemCasoInput(
                     especie=especie,
-                    numero=exemplo.numero_processo_mascara or mascarar_cnj(numero) or numero,
+                    numero=exemplo.numero_processo_mascara
+                    or mascarar_cnj(numero)
+                    or numero,
                     # `processos` tem colunas legadas em latin1 no MySQL.
                     vara=djen_html.para_latin1(
                         djen_html.corrigir_caixa(exemplo.nome_orgao)
@@ -1136,7 +1118,22 @@ class DJENService:
                     executor_id=user.id,
                     exemplo=False,
                 )
-            self._rotular_busca(itens, escolhidos, termos, "pertinente", user.id)
+                gravada = self.repo.find_by_id_djen(item.id_djen)
+                if gravada is None or gravada.unidade_id != unidade_id:
+                    raise ValidationException(
+                        "Publicação vinculada a outra unidade", field="ids"
+                    )
+                if gravada.situacao != "vinculada":
+                    alvo = processos[item.numero_processo]
+                    self._vincular(
+                        gravada.id,
+                        alvo,
+                        self._caso_do_processo(alvo),
+                        user.id,
+                        manual=True,
+                    )
+                    resultado.vinculadas += 1
+            self._rotular_busca(itens, escolhidos, termos, "relevante", user.id)
             self._depois_da_fonte()
             self.session.commit()
         except Exception:
@@ -1180,34 +1177,176 @@ class DJENService:
     def marcar_nao_pertinentes(
         self, corpo: dict[str, Any], user: UserInfo
     ) -> dict[str, Any]:
-        """Grava as publicações escolhidas como exemplos não pertinentes.
+        retorno = self.classificar_acervo(
+            {**corpo, "rotulo": "irrelevante"}, user, RequestContext.get_unidade_ativa()
+        )
+        return {
+            "marcadas": retorno["classificadas"],
+            "nao_revisadas": 0,
+            "nao_encontradas": [],
+        }
 
-        Mesmo corpo e mesmos limites da importação, e o conteúdo também vem
-        de uma nova consulta ao DJEN. Não cria publicação nem processo.
-        """
+    @staticmethod
+    def _ids_selecionados(corpo):
+        ids = corpo.get("ids")
+        if (
+            not isinstance(ids, list)
+            or not 1 <= len(ids) <= IMPORTACAO_MAX_ITENS
+            or any(type(i) is not int or i <= 0 for i in ids)
+        ):
+            raise ValidationException(
+                f"Escolha de 1 a {IMPORTACAO_MAX_ITENS} publicações", field="ids"
+            )
+        return sorted(set(ids))
+
+    def classificar_acervo(self, corpo, user, unidade_id):
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
-        nomes, inicio, fim, tribunais, ids = self._selecao_da_busca(corpo)
-        itens, _, termos = self._consultar_partes(nomes, inicio, fim, tribunais)
-        escolhidos = [i for i in itens if i.id_djen in set(ids)]
-        nao_encontradas = sorted(set(ids) - {i.id_djen for i in escolhidos})
+        ids = self._ids_selecionados(corpo)
+        rotulo = corpo.get("rotulo")
+        if rotulo not in (*ROTULOS_EXPLICITOS, "nao_classificado"):
+            raise ValidationException("Classificação inválida", field="rotulo")
         try:
-            nao_revisadas = self._rotular_busca(
-                itens, escolhidos, termos, "nao_pertinente", user.id
-            )
+            registros = self.acervo.selecionadas(ids, unidade_id)
+            if len(registros) != len(ids):
+                raise ValidationException(
+                    "Publicação não encontrada na unidade", field="ids"
+                )
+            for registro in registros:
+                self.acervo.classificar(
+                    registro["id"], rotulo, "classificacao", user.id
+                )
             self.session.commit()
         except Exception:
             self.session.rollback()
             raise
-        logger.info(
-            f"DJEN: {len(escolhidos)} publicação(ões) da busca por parte marcadas como "
-            f"não pertinentes por {user.id}"
-        )
-        return {
-            "marcadas": len(escolhidos),
-            "nao_revisadas": nao_revisadas,
-            "nao_encontradas": nao_encontradas,
+        return {"classificadas": len(registros)}
+
+    def descartar_acervo(self, corpo, user, unidade_id):
+        if user.urole not in PAPEIS_GESTAO:
+            raise ForbiddenException()
+        ids = self._ids_selecionados(corpo)
+        try:
+            registros = self.acervo.selecionadas(ids, unidade_id)
+            if len(registros) != len(ids):
+                raise ValidationException(
+                    "Publicação não encontrada na unidade", field="ids"
+                )
+            for registro in registros:
+                comunicacao = self.repo.find_by_id_djen(registro["id_djen"])
+                if comunicacao and (
+                    comunicacao.unidade_id != unidade_id
+                    or comunicacao.situacao == "vinculada"
+                ):
+                    raise ValidationException(
+                        "Publicação vinculada ou de outra unidade não pode ser descartada"
+                    )
+                if comunicacao is None:
+                    cid = self.repo.criar(
+                        dict(
+                            id_publicacao=registro["id"],
+                            unidade_id=unidade_id,
+                            situacao="pendente",
+                        )
+                    )
+                else:
+                    cid = comunicacao.id
+                self.repo.atualizar(
+                    cid,
+                    dict(
+                        situacao="descartada",
+                        data_situacao=datetime.now(),
+                        id_vinculado_por=user.id,
+                    ),
+                )
+                self.acervo.classificar(
+                    registro["id"], "irrelevante", "descarte", user.id
+                )
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        return {"descartadas": len(registros)}
+
+    @staticmethod
+    def _dados_publicacao(item):
+        from dataclasses import asdict
+
+        dados = asdict(item)
+        dados["texto_html"] = dados.pop("texto")
+        dados["texto_plano"] = djen_html.texto_plano(dados["texto_html"])
+        dados["nome_orgao"] = djen_html.corrigir_caixa(item.nome_orgao)
+        dados["nome_classe"] = djen_html.corrigir_caixa(item.nome_classe)
+        return dados
+
+    @staticmethod
+    def _comunicacao_salva(registro):
+        from dataclasses import fields
+
+        dados = {
+            f.name: registro[f.name] for f in fields(Comunicacao) if f.name in registro
         }
+        dados["texto"] = registro["texto_html"]
+        return Comunicacao(**dados)
+
+    def _capturar(self, cliente, origem, parametros, unidade, executor, consultar):
+        consulta = self.acervo.iniciar_consulta(origem, parametros, unidade, executor)
+        self.session.commit()
+
+        encontradas = novas = 0
+        def pagina(itens):
+            nonlocal encontradas, novas
+            try:
+                anteriores = self.acervo.por_ids_djen([item.id_djen for item in itens])
+                self._recebidas_antes.update(anteriores)
+                for item in itens:
+                    anterior_item = self.repo.find_by_id_djen(item.id_djen)
+                    if anterior_item and (
+                        anterior_item.ativo != item.ativo
+                        or anterior_item.motivo_cancelamento != item.motivo_cancelamento
+                    ):
+                        self._alteracoes_captura.add(item.id_djen)
+                        if (
+                            anterior_item.ativo
+                            and not item.ativo
+                            and anterior_item.id_caso
+                        ):
+                            self._ao_cancelar(anterior_item, executor)
+                    pid = self.acervo.guardar(self._dados_publicacao(item))
+                    self.acervo.resultado(consulta, pid)
+                    if origem == "parte":
+                        self.registrar(item, ResultadoCaptura(), unidade_padrao=unidade,
+                            executor_id=executor, somente_com_processo=True)
+                if origem == "parte":
+                    self._depois_da_fonte()
+                quantidade = len(itens)
+                novas_pagina = sum(item.id_djen not in anteriores for item in itens)
+                self.acervo.atualizar_consulta(consulta, encontradas=encontradas + quantidade, novas=novas + novas_pagina)
+                self.session.commit()
+                encontradas += quantidade
+                novas += novas_pagina
+            except Exception:
+                self.session.rollback()
+                self._descartar_pendencias()
+                raise
+
+        anterior = cliente.ao_receber_pagina
+        cliente.ao_receber_pagina = pagina
+        try:
+            itens = consultar()
+            self.acervo.finalizar_consulta(
+                consulta, "parcial" if cliente.truncado else "ok"
+            )
+            self.session.commit()
+            return itens
+        except Exception as erro:
+            self.session.rollback()
+            self.acervo.atualizar_consulta(consulta, mensagem=str(erro)[:2000])
+            self.acervo.finalizar_consulta(consulta, "erro")
+            self.session.commit()
+            raise
+        finally:
+            cliente.ao_receber_pagina = anterior
 
     # --- banco de exemplos ----------------------------------------------------
     # docs/plano-processos-avulsos.md, "Banco de exemplos"; plano-djen.md, §8.
@@ -1241,47 +1380,18 @@ class DJENService:
         termo_busca: str | None = None,
         existente: Any = _CONSULTAR,
     ) -> bool:
-        """Upsert do exemplo por `id_djen`, na transação em curso.
+        """Classifica na mesma transação da operação e registra o histórico.
 
-        Rótulo explícito (pertinente ou não) sempre sobrescreve: vale o mais
-        recente, com texto e metadados renovados (o prazo da retenção recomeça).
-        `nao_revisada` só entra quando ainda não há exemplo; nunca rebaixa.
-        `existente` é o exemplo já lido (ou None, se não há); omitido, é lido aqui.
-        Devolve True se gravou.
+        A captura apenas cria o estado inicial. Decisões automáticas nunca
+        substituem uma avaliação anterior.
         """
-        agora = datetime.now()
-        if existente is _CONSULTAR:
-            existente = self.exemplos.por_ids_djen([dados["id_djen"]]).get(dados["id_djen"])
-        if rotulo == "nao_revisada":
-            if existente is not None:
-                return False
-            self.exemplos.criar(
-                {
-                    **dados,
-                    "termo_busca": termo_busca,
-                    "rotulo": rotulo,
-                    "origem": origem,
-                    "id_rotulado_por": None,
-                    "rotulado_em": None,
-                    "criado_em": agora,
-                }
-            )
-            return True
-        registro = {
-            **dados,
-            "rotulo": rotulo,
-            "origem": origem,
-            "id_rotulado_por": rotulado_por,
-            "rotulado_em": agora,
-            "texto_apagado_em": None,
-        }
-        if existente is None:
-            self.exemplos.criar({**registro, "termo_busca": termo_busca, "criado_em": agora})
-        else:
-            if termo_busca is not None:
-                registro["termo_busca"] = termo_busca
-            self.exemplos.atualizar(existente["id"], registro)
-        return True
+        registro = self.acervo.por_ids_djen([dados["id_djen"]]).get(dados["id_djen"])
+        pid = registro["id"] if registro else self.acervo.guardar(dados)
+        if rotulo == "nao_classificado":
+            return registro is None
+        return self.acervo.classificar(
+            pid, rotulo, origem, rotulado_por, automatico=origem == "vinculo_automatico"
+        )
 
     def _rotular_busca(
         self,
@@ -1293,7 +1403,7 @@ class DJENService:
     ) -> int:
         """Rótulo das escolhidas; as demais da consulta, ainda sem exemplo,
         entram como não revisadas. Devolve quantas não revisadas entraram."""
-        existentes = self.exemplos.por_ids_djen([i.id_djen for i in itens])
+        existentes = self.acervo.por_ids_djen([i.id_djen for i in itens])
         ids_escolhidos = {i.id_djen for i in escolhidos}
         for item in escolhidos:
             self._rotular(
@@ -1310,7 +1420,7 @@ class DJENService:
                 continue
             self._rotular(
                 self._dados_exemplo(item),
-                "nao_revisada",
+                "nao_classificado",
                 "busca_parte",
                 None,
                 termo_busca=termos.get(item.id_djen),
@@ -1321,12 +1431,16 @@ class DJENService:
 
     def resumo_exemplos(self) -> dict[str, Any]:
         """Contagens do banco de exemplos do NPJ (admin)."""
-        por_rotulo = {r: 0 for r in ROTULOS_EXPLICITOS + ("nao_revisada",)}
+        por_rotulo = {r: 0 for r in ROTULOS_EXPLICITOS + ("nao_classificado",)}
         por_origem: dict[str, int] = {}
         total = com_texto = 0
-        for linha in self.exemplos.contagens():
-            por_rotulo[linha["rotulo"]] = por_rotulo.get(linha["rotulo"], 0) + linha["total"]
-            por_origem[linha["origem"]] = por_origem.get(linha["origem"], 0) + linha["total"]
+        for linha in self.acervo.contagens():
+            por_rotulo[linha["rotulo"]] = (
+                por_rotulo.get(linha["rotulo"], 0) + linha["total"]
+            )
+            por_origem[linha["origem"]] = (
+                por_origem.get(linha["origem"], 0) + linha["total"]
+            )
             total += linha["total"]
             com_texto += linha["com_texto"]
         return {
@@ -1334,21 +1448,21 @@ class DJENService:
             "por_rotulo": por_rotulo,
             "por_origem": por_origem,
             "com_texto": com_texto,
-            "retencao_dias": Config.DJEN_EXEMPLOS_RETENCAO_DIAS,
-            "retencao_nao_revisadas_dias": Config.DJEN_RETENCAO_DIAS,
+            "retencao_dias": None,
+            "retencao_nao_revisadas_dias": None,
         }
 
-    def exportar_exemplos(self, incluir_nao_revisadas: bool = False) -> str:
+    def exportar_exemplos(self, incluir_nao_revisadas: bool = False):
         """Exemplos em JSON Lines, um por linha (admin).
 
         Por padrão só os rotulados; as não revisadas entram a pedido.
         """
-        rotulos = ROTULOS_EXPLICITOS + (("nao_revisada",) if incluir_nao_revisadas else ())
-        linhas = []
-        for exemplo in self.exemplos.para_exportar(rotulos):
+        rotulos = ROTULOS_EXPLICITOS + (
+            ("nao_classificado",) if incluir_nao_revisadas else ()
+        )
+        for exemplo in self.acervo.para_exportar(rotulos):
             registro = {campo: exemplo.get(campo) for campo in CAMPOS_EXPORTACAO}
-            linhas.append(json.dumps(registro, ensure_ascii=False, default=_serializar))
-        return "".join(f"{linha}\n" for linha in linhas)
+            yield json.dumps(registro, ensure_ascii=False, default=_serializar) + "\n"
 
 
 def _serializar(valor: Any) -> str:

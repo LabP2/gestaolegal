@@ -4,6 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import InfoCard from '$lib/components/ui/info-card.svelte';
 	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import VincularProcessoCaso from '$lib/components/djen/vincular-processo-caso.svelte';
 	import PublicacoesProcesso from '$lib/components/djen/publicacoes-processo.svelte';
 	import { api } from '$lib/api-client';
 	import { goto, invalidateAll } from '$app/navigation';
@@ -100,6 +101,9 @@
 		</div>
 		<div class="flex flex-wrap gap-2">
 			<Button variant="outline" onclick={() => history.back()}>Voltar</Button>
+			{#if semCaso && processo.status && PROCESSO_PAPEIS_SEM_CASO.includes(me.urole)}
+				<VincularProcessoCaso processoId={processo.id} />
+			{/if}
 			{#if !semCaso}
 				<Button variant="outline" href="/casos/{processo.id_caso}">
 					<Briefcase class="mr-2 h-4 w-4" />
@@ -131,7 +135,9 @@
 			<Card.Header>
 				<Card.Title>Partes</Card.Title>
 				{#if !semCaso}
-					<Card.Description>Atendidos do caso #{processo.id_caso}.</Card.Description>
+					<Card.Description
+						>Partes do processo e atendidos do caso #{processo.id_caso}.</Card.Description
+					>
 				{/if}
 			</Card.Header>
 			<Card.Content>

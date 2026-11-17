@@ -76,6 +76,8 @@ def registrar_pendente(app, id_djen: int, numero: str, tenant=TENANT_DAJ, unidad
                               unidade_padrao=unidade, oab_origem="123456/MG")
             service._depois_da_fonte()
             service.session.commit()
+    from gestaolegal.repositories.djen_repository import _dados
+    djen_comunicacoes = _dados()
     session = db_session_module.get_session()
     try:
         with sem_tenant("teste: id da publicação"):
@@ -196,7 +198,7 @@ class TestVinculoAutomatico:
         assert com["unidade_id"] == UNIDADE_BH  # da OAB
         assert _eventos_djen(caso_com_equipe) == []
 
-    def test_pendente_casa_quando_o_processo_e_cadastrado_depois(
+    def test_reconsulta_vincula_pendente_apos_cadastrar_processo(
         self, app, client, auth_headers, djen, caso_com_equipe
     ):
         numero = numero_cnj_novo()

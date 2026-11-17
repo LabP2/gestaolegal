@@ -1,0 +1,181 @@
+
+> gestaolegal-front@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /mnt/dados/gestaolegal-multitenant/web
+Getting Svelte diagnostics...
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/components/evento-dialog.svelte:32:25
+Warn: This reference only captures the initial value of `eventoFormData`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm(eventoFormData, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/processo-form.svelte:41:33
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const processoForm = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/arquivo-form.svelte:16:22
+Warn: This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	let titulo = $state(arquivo?.titulo ?? '');
+	let descricao = $state(arquivo?.descricao ?? '');
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/arquivo-form.svelte:17:25
+Warn: This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	let titulo = $state(arquivo?.titulo ?? '');
+	let descricao = $state(arquivo?.descricao ?? '');
+	let file = $state<File | null>(null);
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/assistencia-judiciaria-form.svelte:31:25
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/assistido-form.svelte:34:50
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm<AssistidoCreateFormData>(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/atendido-form.svelte:54:25
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	};
+	const form = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/caso-form.svelte:99:29
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const casoForm = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/caso-form.svelte:177:6
+Warn: This reference only captures the initial value of `isCreateMode`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// and the deferral status defaults to "aguardando deferimento".
+	if (isCreateMode) {
+		if (currentUserId) {
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/caso-form.svelte:178:7
+Warn: This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	if (isCreateMode) {
+		if (currentUserId) {
+			$formData.id_usuario_responsavel = currentUserId;
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/caso-form.svelte:179:39
+Warn: This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		if (currentUserId) {
+			$formData.id_usuario_responsavel = currentUserId;
+		}
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/caso-form.svelte:186:46
+Warn: This reference only captures the initial value of `assistidos`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	let selectedAssistidos = $state<Atendido[]>(assistidos || []);
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/login-form.svelte:10:47
+Warn: This reference only captures the initial value of `form`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const { form: formData, enhance, delayed } = form;
+</script>
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/orientacao-juridica-form.svelte:45:25
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/orientacao-juridica-form.svelte:89:45
+Warn: This reference only captures the initial value of `orientacao`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	let selectedAtendidos = $state<Atendido[]>(orientacao?.atendidos || []);
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/password-form.svelte:31:25
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/lib/forms/user-form.svelte:43:29
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const userForm = superForm(data, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:28:22
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	const { evento, caso } = $derived(data);
+	const initialForm = data.form;
+	// Evento criado de uma publicação do DJEN: tipo, data e descrição vêm da
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:94:44
+Warn: This reference only captures the initial value of `evento`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	let selectedUsuario = $state<User | null>(evento.usuario_responsavel || null);
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:14:38
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	const me = $derived(data.me);
+	let estado = $state<EstadoPresenca>(data.estado);
+	let hora = $state(data.estado.hora_sugerida);
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:15:20
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	let estado = $state<EstadoPresenca>(data.estado);
+	let hora = $state(data.estado.hora_sugerida);
+	let salvando = $state(false);
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/(dashboard)/usuarios/eu/alterar-senha/+page.svelte:23:27
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	let formData = superForm(data.form, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/esqueci-a-senha/+page.svelte:22:45
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm<ForgotPasswordData>(data.form, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/login/+page.svelte:28:36
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm<LoginData>(data.form, {
+		SPA: true,
+
+/mnt/dados/gestaolegal-multitenant/web/src/routes/redefinir-senha/[token]/+page.svelte:24:44
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const form = superForm<ResetPasswordData>(data.form, {
+		SPA: true,
+
+====================================
+svelte-check found 0 errors and 25 warnings in 17 files

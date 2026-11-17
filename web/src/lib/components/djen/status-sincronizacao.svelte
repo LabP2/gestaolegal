@@ -14,10 +14,8 @@
 	let rodando = $state(false);
 
 	const explicacao = $derived(
-		`Busca agora no DJEN as publicações de todas as OABs monitoradas ativas, de todas as ` +
-			`unidades do NPJ, nos últimos ${status.rotina.janela_dias} dias, e dos processos que ` +
-			`ainda aguardam a primeira consulta (até ${status.rotina.max_processos} por vez). ` +
-			`É a mesma rotina que roda nos dias úteis às 8h e às 14h. Pode levar alguns minutos.`
+		`Consulta todos os itens ativos de OAB, parte e processo do NPJ nos últimos ${status.rotina.janela_dias} dias. ` +
+			`A rotina automática roda todos os dias às 04h, 10h e 16h, horário de Brasília. Pode levar alguns minutos.`
 	);
 
 	async function rodar() {

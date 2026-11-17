@@ -181,6 +181,8 @@ def limpar_djen() -> None:
             if "djen_exemplos" in metadata.tables:
                 session.execute(metadata.tables["djen_exemplos"].delete())
             session.execute(djen_comunicacoes.delete())
+            for nome in ('djen_monitoramentos', 'djen_publicacao_unidades', 'djen_consulta_resultados', 'djen_consultas', 'djen_classificacao_historico', 'djen_classificacoes', 'djen_publicacoes'):
+                session.execute(metadata.tables[nome].delete())
             session.execute(djen_sincronizacoes.delete())
             session.execute(update(tenants).values(djen_ativo=False))
             # Processos de outros testes não podem ocupar a fila da rotina.

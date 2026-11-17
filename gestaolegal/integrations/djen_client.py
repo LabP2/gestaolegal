@@ -175,7 +175,7 @@ class DJENClient:
         transporte: Transporte | None = None,
         dormir: Callable[[float], None] | None = None,
         itens_por_pagina: int = ITENS_POR_PAGINA,
-        max_paginas: int = MAX_PAGINAS,
+        max_paginas: int | None = MAX_PAGINAS,
         max_tentativas: int = MAX_TENTATIVAS,
     ):
         self.base_url = (base_url or URL_PADRAO).rstrip("/")
@@ -186,6 +186,8 @@ class DJENClient:
         self.max_tentativas = max_tentativas
         # Quantas requisições foram feitas (para log e testes).
         self.requisicoes = 0
+        self.ao_receber_pagina = None
+        self.truncado = False
 
     # --- consultas -----------------------------------------------------------
 
@@ -210,7 +212,7 @@ class DJENClient:
     ) -> list[Comunicacao]:
         """Busca manual por nome da parte (docs/plano-processos-avulsos.md, §3).
 
-        Tem homônimos e ruído: nunca entra na captura automática.
+        Nomes podem ter homônimos; o vínculo a processos depende do CNJ retornado.
         """
         filtros = {
             "nomeParte": nome,
@@ -224,25 +226,35 @@ class DJENClient:
     # --- infraestrutura ------------------------------------------------------
 
     def _paginar(self, filtros: dict[str, str]) -> list[Comunicacao]:
+        self.truncado = False
         itens: list[Comunicacao] = []
         vistos: set[int] = set()
-        for pagina in range(1, self.max_paginas + 1):
+        from itertools import count
+        paginas = range(1, self.max_paginas + 1) if self.max_paginas is not None else count(1)
+        for pagina in paginas:
             corpo = self._get({**filtros, "pagina": str(pagina),
                                "itensPorPagina": str(self.itens_por_pagina)})
             brutos = corpo.get("items") or []
             if not isinstance(brutos, list):
                 raise DJENError("Resposta do DJEN sem lista de itens")
+            recebidos = []
             for bruto in brutos:
                 comunicacao = converter_item(bruto)
                 if comunicacao.id_djen not in vistos:
                     vistos.add(comunicacao.id_djen)
                     itens.append(comunicacao)
+                    recebidos.append(comunicacao)
+            if self.max_paginas is None and brutos and not recebidos:
+                raise DJENError("O DJEN repetiu uma página sem avançar; consulta incompleta")
+            if self.ao_receber_pagina:
+                self.ao_receber_pagina(recebidos)
             total = corpo.get("count")
             if len(brutos) < self.itens_por_pagina:
                 break
             if isinstance(total, int) and pagina * self.itens_por_pagina >= total:
                 break
         else:
+            self.truncado = True
             logger.warning(f"DJEN: consulta parou no limite de {self.max_paginas} páginas")
         return itens
 

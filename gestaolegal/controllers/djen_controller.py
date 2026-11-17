@@ -9,7 +9,7 @@ from datetime import date
 from functools import wraps
 from typing import Any
 
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response, request, stream_with_context
 
 from gestaolegal.common import PageParams
 from gestaolegal.exceptions import ValidationException
@@ -21,10 +21,11 @@ from gestaolegal.services.djen_service import (
     PAPEIS_ROTINA,
     PAPEIS_UNIDADE,
     DJENService,
+    link_certidao,
 )
-from gestaolegal.utils.api_decorators import authenticated, authorized
+from gestaolegal.utils.api_decorators import authorized
 from gestaolegal.utils.api_response import success_response
-from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.request_context import RequestContext, contexto_tenant
 
 djen_controller = Blueprint("djen_api", __name__)
 
@@ -49,7 +50,9 @@ def _data(nome: str) -> date | None:
     try:
         return date.fromisoformat(valor)
     except ValueError as erro:
-        raise ValidationException("Data inválida (use AAAA-MM-DD)", field=nome) from erro
+        raise ValidationException(
+            "Data inválida (use AAAA-MM-DD)", field=nome
+        ) from erro
 
 
 def _texto(nome: str, limite: int = 100) -> str | None:
@@ -81,7 +84,9 @@ def listar_publicacoes():
         "fim": _data("fim"),
         "tribunal": _texto("tribunal", 30),
         "tipo": _texto("tipo", 100),
-        "oab": _oab(_texto("oab", 20)),
+        "oab": _texto("oab", 30),
+        "nome_parte": _texto("nome_parte", 150),
+        "numero_processo": _texto("numero_processo", 30),
         "situacao": _texto("situacao", 12),
         "caso_id": caso_id,
         "processo_id": processo_id,
@@ -220,12 +225,11 @@ def buscar_processo(id: int):
     return success_response(data=resultado, message="Busca no DJEN concluída")
 
 
-
 @djen_controller.route("/djen/busca-parte", methods=["GET"])
 @authorized(*PAPEIS_GESTAO)
 @djen_habilitado
 def busca_parte():
-    """Consulta direta ao DJEN por nome da parte, sem gravar nada.
+    """Consulta o DJEN por nome da parte e persiste todas as páginas recebidas.
 
     `nome` pode se repetir (o nome do atendido e as variações); `tribunal`
     também (uma consulta por tribunal; nenhum = todos).
@@ -257,10 +261,14 @@ def importar_busca_parte():
 def nao_pertinentes_busca_parte():
     """Marca publicações da busca como não pertinentes (banco de exemplos).
 
-    Mesmo corpo da importação; não cria publicação nem processo.
+    Usa as publicações já salvas; não cria processo nem vínculo.
     """
-    dados = DJENService().marcar_nao_pertinentes(_corpo(), RequestContext.get_current_user())
-    return success_response(data=dados, message="Publicações marcadas como não pertinentes")
+    dados = DJENService().marcar_nao_pertinentes(
+        _corpo(), RequestContext.get_current_user()
+    )
+    return success_response(
+        data=dados, message="Publicações marcadas como irrelevantes"
+    )
 
 
 @djen_controller.route("/djen/exemplos/resumo", methods=["GET"])
@@ -284,12 +292,121 @@ def exportar_exemplos():
         "sim",
     )
     conteudo = DJENService().exportar_exemplos(incluir_nao_revisadas=incluir)
+    tenant_id = RequestContext.get_tenant()
+
+    def linhas():
+        # A autenticação encerra seu contexto antes de o servidor consumir
+        # o stream. Restaure somente o NPJ capturado no token, sem mantê-lo
+        # ativo entre chunks ou requisições.
+        while True:
+            with contexto_tenant(tenant_id):
+                try:
+                    linha = next(conteudo)
+                except StopIteration:
+                    return
+            yield linha
+
     nome = f"djen-exemplos-{date.today().isoformat()}.jsonl"
     return Response(
-        conteudo,
+        stream_with_context(linhas()),
         mimetype="application/x-ndjson",
         headers={
             "Content-Disposition": f'attachment; filename="{nome}"',
             "Cache-Control": "no-store",
         },
     )
+
+
+@djen_controller.route("/djen/acervo", methods=["GET"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def listar_acervo():
+    filtros = {
+        k: _texto(k) for k in ("rotulo", "tribunal", "origem", "situacao", "fonte")
+    }
+    filtros.update(inicio=_data("inicio"), fim=_data("fim"), nome_parte=_texto("nome_parte", 150), numero_processo=_texto("numero_processo", 30), oab=_texto("oab", 30))
+    dados = DJENService().acervo.listar(
+        RequestContext.get_unidade_ativa(),
+        filtros,
+        max(1, request.args.get("page", 1, type=int)),
+        max(1, min(100, request.args.get("per_page", 20, type=int))),
+    )
+    return success_response(data=dados)
+
+
+@djen_controller.route("/djen/acervo/<int:id>", methods=["GET"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def detalhe_acervo(id):
+    from gestaolegal.exceptions import NotFoundException
+
+    dados = DJENService().acervo.detalhe(id, RequestContext.get_unidade_ativa())
+    if dados is None:
+        raise NotFoundException(resource="Publicação", resource_id=id)
+    dados["link_certidao"] = link_certidao(dados.get("hash"))
+    return success_response(data=dados)
+
+
+@djen_controller.route("/djen/acervo/classificar", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def classificar_acervo():
+    return success_response(
+        data=DJENService().classificar_acervo(
+            _corpo(),
+            RequestContext.get_current_user(),
+            RequestContext.get_unidade_ativa(),
+        )
+    )
+
+
+@djen_controller.route("/djen/acervo/descartar", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def descartar_acervo():
+    return success_response(
+        data=DJENService().descartar_acervo(
+            _corpo(),
+            RequestContext.get_current_user(),
+            RequestContext.get_unidade_ativa(),
+        )
+    )
+
+
+@djen_controller.route("/djen/monitoramentos", methods=["GET", "POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def monitoramentos():
+    from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+    service = DjenMonitoramentoService()
+    user = RequestContext.get_current_user()
+    if request.method == "POST":
+        return success_response(data=service.criar(_corpo(), user, RequestContext.get_unidade_ativa()), status_code=201)
+    return success_response(data=service.listar(user))
+
+
+@djen_controller.route("/djen/monitoramentos/<int:id>", methods=["PATCH", "DELETE"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def alterar_monitoramento(id):
+    from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+    DjenMonitoramentoService().alterar(id, {} if request.method == "DELETE" else _corpo(),
+        RequestContext.get_current_user(), remover=request.method == "DELETE")
+    return success_response(message="Monitoramento atualizado")
+
+
+@djen_controller.route("/djen/monitoramentos/buscar", methods=["POST"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def buscar_monitoramento():
+    from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+    return success_response(data=DjenMonitoramentoService().buscar(_corpo(),
+        RequestContext.get_current_user(), RequestContext.get_unidade_ativa()))
+
+
+@djen_controller.route("/djen/monitoramentos/logs", methods=["GET"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def logs_monitoramento():
+    from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+    return success_response(data=DjenMonitoramentoService().logs(RequestContext.get_current_user(), request.args))

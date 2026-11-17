@@ -2,6 +2,7 @@ import hashlib
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Boolean,
     Column,
     Date,
@@ -320,7 +321,9 @@ atendido_xOrientacaoJuridica = Table(
     ),
     Column("id_atendido", Integer, nullable=True),
     coluna_tenant(),
-    fk_tenant("atendido_xOrientacaoJuridica", "id_orientacaoJuridica", "orientacao_juridica"),
+    fk_tenant(
+        "atendido_xOrientacaoJuridica", "id_orientacaoJuridica", "orientacao_juridica"
+    ),
     fk_tenant("atendido_xOrientacaoJuridica", "id_atendido", "atendidos"),
 )
 
@@ -328,9 +331,7 @@ casos = Table(
     "casos",
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
-    Column(
-        "id_usuario_responsavel", Integer, nullable=False
-    ),
+    Column("id_usuario_responsavel", Integer, nullable=False),
     Column("area_direito", String(50), nullable=False),
     Column("sub_area", String(50), nullable=True),
     Column("id_orientador", Integer, nullable=True),
@@ -442,13 +443,18 @@ eventos = Table(
 
 # Relação 1:N, preservando a tabela e os IDs das instalações legadas.
 arquivos_evento = Table(
-    "arquivosEvento", metadata,
+    "arquivosEvento",
+    metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("id_evento", Integer, nullable=True),
     Column("id_caso", Integer, nullable=True),
-    Column("link_arquivo", String(300).with_variant(
-        VARCHAR(300, charset="utf8mb4", collation="utf8mb4_0900_ai_ci"), "mysql"
-    ), nullable=True),
+    Column(
+        "link_arquivo",
+        String(300).with_variant(
+            VARCHAR(300, charset="utf8mb4", collation="utf8mb4_0900_ai_ci"), "mysql"
+        ),
+        nullable=True,
+    ),
     Column("indisponivel_origem", Boolean, nullable=False, server_default="0"),
     coluna_tenant(),
     fk_tenant("arquivosEvento", "id_evento", "eventos", ondelete="CASCADE"),
@@ -493,7 +499,9 @@ notificacao = Table(
     Column("acao", String(200), nullable=False),
     Column("data", Date, nullable=False),
     # Colunas abaixo não existiam na v2 (nulas em registros herdados).
-    Column("tipo", String(30), nullable=True),  # caso | evento | lembrete | plantao | djen
+    Column(
+        "tipo", String(30), nullable=True
+    ),  # caso | evento | lembrete | plantao | djen
     Column("id_caso", Integer, nullable=True),
     Column("id_referencia", Integer, nullable=True),  # id do evento ou lembrete
     # Resumo do conteúdo do aviso (cliente do caso, descrição do lembrete etc.).
@@ -541,8 +549,16 @@ assistenciasJudiciarias_xOrientacao_juridica = Table(
         nullable=True,
     ),
     coluna_tenant(),
-    fk_tenant("assistenciasJudiciarias_xOrientacao_juridica", "id_orientacaoJuridica", "orientacao_juridica"),
-    fk_tenant("assistenciasJudiciarias_xOrientacao_juridica", "id_assistenciaJudiciaria", "assistencias_judiciarias"),
+    fk_tenant(
+        "assistenciasJudiciarias_xOrientacao_juridica",
+        "id_orientacaoJuridica",
+        "orientacao_juridica",
+    ),
+    fk_tenant(
+        "assistenciasJudiciarias_xOrientacao_juridica",
+        "id_assistenciaJudiciaria",
+        "assistencias_judiciarias",
+    ),
 )
 
 lembretes = Table(
@@ -595,9 +611,13 @@ fila_atendimentos = Table(
     Column("psicologia", Integer, nullable=False),
     Column("prioridade", Integer, nullable=False),
     Column("data_criacao", DateTime, nullable=False),
-    Column("senha", String(10).with_variant(
-        VARCHAR(10, charset="utf8mb4", collation="utf8mb4_0900_ai_ci"), "mysql"
-    ), nullable=False),
+    Column(
+        "senha",
+        String(10).with_variant(
+            VARCHAR(10, charset="utf8mb4", collation="utf8mb4_0900_ai_ci"), "mysql"
+        ),
+        nullable=False,
+    ),
     Column("status", Integer, nullable=False),
     Column("id_atendido", Integer, nullable=False),
     Column("data_saida", DateTime, nullable=True),
@@ -725,15 +745,16 @@ TEXTO_LONGO = Text().with_variant(MEDIUMTEXT(), "mysql")
 # Publicações capturadas do Diário de Justiça Eletrônico Nacional. Uma OAB
 # cadastrada em dois NPJs recebe a mesma publicação nos dois, como registros
 # separados: a unicidade do `id_djen` é por tenant.
-djen_comunicacoes = Table(
-    "djen_comunicacoes",
+# Acervo canônico: conteúdo único por NPJ, independente das decisões.
+djen_publicacoes = Table(
+    "djen_publicacoes",
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("id_djen", BigInteger, nullable=False),  # `id` da API
     Column("hash", String(100), nullable=True),  # link da certidão
-    Column("numero_processo", String(20), nullable=False, index=True),
+    Column("numero_processo", String(20), nullable=False),
     Column("numero_processo_mascara", String(30), nullable=True),
-    Column("data_disponibilizacao", Date, nullable=False, index=True),
+    Column("data_disponibilizacao", Date, nullable=False),
     Column("sigla_tribunal", String(30), nullable=True),
     Column("nome_orgao", String(300), nullable=True),
     Column("tipo_comunicacao", String(100), nullable=True),
@@ -748,26 +769,150 @@ djen_comunicacoes = Table(
     # False = publicação cancelada no DJEN.
     Column("ativo", Boolean, nullable=False, default=True, server_default="1"),
     Column("motivo_cancelamento", Text, nullable=True),
-    Column("id_processo", Integer, nullable=True),
-    Column("id_caso", Integer, nullable=True),
-    # vinculada | pendente | descartada
-    Column("situacao", String(12), nullable=False),
-    # Quando a situação mudou para vinculada ou descartada (conta a retenção).
-    Column("data_situacao", DateTime, nullable=True),
-    # OAB monitorada ("123456/MG") por onde a publicação chegou, se foi assim.
-    Column("oab_origem", String(12), nullable=True),
     Column("capturada_em", DateTime, nullable=False),
     Column("atualizada_em", DateTime, nullable=True),
+    coluna_tenant(),
+    unica_tenant_id("djen_publicacoes"),
+    UniqueConstraint("tenant_id", "id_djen", name="uq_djen_publicacoes_tenant_djen"),
+    Index(
+        "ix_djen_publicacoes_tenant_data", "tenant_id", "data_disponibilizacao", "id"
+    ),
+    Index("ix_djen_publicacoes_tenant_numero", "tenant_id", "numero_processo", "id"),
+    mysql_charset="utf8mb4",
+    mysql_collate="utf8mb4_0900_ai_ci",
+)
+
+djen_comunicacoes = Table(
+    "djen_comunicacoes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_publicacao", Integer, nullable=False),
+    Column("id_processo", Integer, nullable=True),
+    Column("id_caso", Integer, nullable=True),
+    Column("situacao", String(12), nullable=False),
+    Column("data_situacao", DateTime, nullable=True),
+    Column("oab_origem", String(12), nullable=True),
     Column("id_vinculado_por", Integer, nullable=True),
     coluna_unidade(),
     coluna_tenant(),
     unica_tenant_id("djen_comunicacoes"),
-    UniqueConstraint("tenant_id", "id_djen", name="uq_djen_comunicacoes_tenant_id_djen"),
+    UniqueConstraint(
+        "tenant_id", "id_publicacao", name="uq_djen_comunicacoes_publicacao"
+    ),
     Index("ix_djen_comunicacoes_tenant_situacao", "tenant_id", "situacao"),
+    fk_tenant("djen_comunicacoes", "id_publicacao", "djen_publicacoes"),
     fk_tenant("djen_comunicacoes", "id_processo", "processos"),
     fk_tenant("djen_comunicacoes", "id_caso", "casos"),
     fk_tenant("djen_comunicacoes", "id_vinculado_por", "usuarios"),
     fk_tenant("djen_comunicacoes", "unidade_id", "unidades"),
+)
+
+ROTULOS_CLASSIFICACAO = ("relevante", "irrelevante", "nao_classificado")
+djen_classificacoes = Table(
+    "djen_classificacoes",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_publicacao", Integer, nullable=False),
+    Column("rotulo", String(20), nullable=False),
+    Column("origem", String(30), nullable=False),
+    Column("id_rotulado_por", Integer, nullable=True),
+    Column("rotulado_em", DateTime, nullable=True),
+    coluna_tenant(),
+    UniqueConstraint(
+        "tenant_id", "id_publicacao", name="uq_djen_classificacoes_publicacao"
+    ),
+    CheckConstraint(
+        "rotulo IN ('relevante', 'irrelevante', 'nao_classificado')",
+        name="ck_djen_classificacao_rotulo",
+    ),
+    Index(
+        "ix_djen_classificacoes_tenant_rotulo", "tenant_id", "rotulo", "id_publicacao"
+    ),
+    fk_tenant("djen_classificacoes", "id_publicacao", "djen_publicacoes"),
+    fk_tenant("djen_classificacoes", "id_rotulado_por", "usuarios"),
+)
+
+djen_classificacao_historico = Table(
+    "djen_classificacao_historico",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_publicacao", Integer, nullable=False),
+    Column("rotulo_anterior", String(20), nullable=False),
+    Column("rotulo", String(20), nullable=False),
+    Column("origem", String(30), nullable=False),
+    Column("id_rotulado_por", Integer, nullable=True),
+    Column("rotulado_em", DateTime, nullable=False),
+    coluna_tenant(),
+    Index("ix_djen_historico_publicacao", "tenant_id", "id_publicacao", "id"),
+    fk_tenant("djen_classificacao_historico", "id_publicacao", "djen_publicacoes"),
+    fk_tenant("djen_classificacao_historico", "id_rotulado_por", "usuarios"),
+)
+
+# Origem e acesso permanentes: independem da retenção dos logs.
+djen_publicacao_unidades = Table(
+    "djen_publicacao_unidades", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("id_publicacao", Integer, nullable=False),
+    Column("origem", String(20), nullable=False),
+    coluna_unidade(), coluna_tenant(),
+    UniqueConstraint("tenant_id", "id_publicacao", "unidade_id", "origem", name="uq_djen_pub_unidade_origem"),
+    fk_tenant("djen_publicacao_unidades", "id_publicacao", "djen_publicacoes"),
+    fk_tenant("djen_publicacao_unidades", "unidade_id", "unidades"),
+)
+
+djen_monitoramentos = Table(
+    "djen_monitoramentos", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("tipo", String(15), nullable=False),
+    Column("valor", String(150), nullable=False),
+    Column("tribunais", JSON, nullable=False),
+    Column("ativo", Boolean, nullable=False, server_default="1"),
+    Column("removido", Boolean, nullable=False, server_default="0"),
+    Column("automatico", Boolean, nullable=False, server_default="0"),
+    Column("criado_em", DateTime, nullable=False),
+    Column("ultimo_sucesso", Date, nullable=True),
+    coluna_unidade(), coluna_tenant(),
+    UniqueConstraint("tenant_id", "unidade_id", "tipo", "valor", name="uq_djen_monitor_unidade_item"),
+    fk_tenant("djen_monitoramentos", "unidade_id", "unidades"),
+    CheckConstraint("tipo IN ('oab', 'parte', 'processo')", name="ck_djen_monitor_tipo"),
+)
+
+djen_consultas = Table(
+    "djen_consultas",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("origem", String(20), nullable=False),
+    Column("parametros", JSON, nullable=False),
+    Column("inicio", DateTime, nullable=False),
+    Column("fim", DateTime, nullable=True),
+    Column("status", String(15), nullable=False),
+    Column("id_executor", Integer, nullable=True),
+    Column("modo", String(15), nullable=False, server_default="manual"),
+    Column("execucao_id", Integer, nullable=True),
+    Column("encontradas", Integer, nullable=False, server_default="0"),
+    Column("novas", Integer, nullable=False, server_default="0"),
+    Column("mensagem", Text, nullable=True),
+    coluna_unidade(),
+    coluna_tenant(),
+    Index("ix_djen_consultas_tenant_inicio", "tenant_id", "inicio"),
+    unica_tenant_id("djen_consultas"),
+    fk_tenant("djen_consultas", "unidade_id", "unidades"),
+    fk_tenant("djen_consultas", "id_executor", "usuarios"),
+)
+
+djen_consulta_resultados = Table(
+    "djen_consulta_resultados",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("id_consulta", Integer, nullable=False),
+    Column("id_publicacao", Integer, nullable=False),
+    coluna_tenant(),
+    UniqueConstraint(
+        "tenant_id", "id_consulta", "id_publicacao", name="uq_djen_consulta_resultado"
+    ),
+    Index("ix_djen_resultado_publicacao", "tenant_id", "id_publicacao"),
+    fk_tenant("djen_consulta_resultados", "id_consulta", "djen_consultas"),
+    fk_tenant("djen_consulta_resultados", "id_publicacao", "djen_publicacoes"),
 )
 
 # Uma linha por execução da rotina, por NPJ. A tela mostra a última.
@@ -809,48 +954,6 @@ djen_oabs = Table(
 )
 
 
-# Banco de exemplos rotulados (docs/plano-processos-avulsos.md, "Banco de
-# exemplos"; plano-djen.md, §8): publicações julgadas pertinentes ou não, para
-# treinar a sugestão automática. Separado de `djen_comunicacoes` para não
-# entrar nas listas, na caixa "Sem caso" nem nas contagens. Sem unidade e sem
-# vínculo com atendido. `texto_plano` e `destinatarios` são anulados pela
-# retenção; rótulo e metadados ficam.
-ROTULOS_EXEMPLO = ("pertinente", "nao_pertinente", "nao_revisada")
-ORIGENS_EXEMPLO = ("busca_parte", "vinculo_manual", "vinculo_automatico", "descarte")
-djen_exemplos = Table(
-    "djen_exemplos",
-    metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("id_djen", BigInteger, nullable=False),  # `id` da API
-    Column("numero_processo", String(20), nullable=False),
-    Column("data_disponibilizacao", Date, nullable=False),
-    Column("sigla_tribunal", String(30), nullable=True),
-    Column("nome_orgao", String(300), nullable=True),
-    Column("nome_classe", String(300), nullable=True),
-    Column("tipo_comunicacao", String(100), nullable=True),
-    Column("tipo_documento", String(100), nullable=True),
-    Column("destinatarios", JSON, nullable=True),
-    Column("texto_plano", TEXTO_LONGO, nullable=True),
-    # Nome buscado na busca por parte; nulo quando veio da rotina/caixa.
-    Column("termo_busca", String(150), nullable=True),
-    Column("rotulo", String(15), nullable=False),  # ROTULOS_EXEMPLO
-    Column("origem", String(20), nullable=False),  # ORIGENS_EXEMPLO
-    # Quem rotulou; nulo no vínculo automático e na não revisada.
-    Column("id_rotulado_por", Integer, nullable=True),
-    Column("rotulado_em", DateTime, nullable=True),
-    Column("criado_em", DateTime, nullable=False),
-    Column("texto_apagado_em", DateTime, nullable=True),
-    coluna_tenant(),
-    unica_tenant_id("djen_exemplos"),
-    UniqueConstraint("tenant_id", "id_djen", name="uq_djen_exemplos_tenant_id_djen"),
-    Index("ix_djen_exemplos_tenant_rotulo", "tenant_id", "rotulo"),
-    fk_tenant("djen_exemplos", "id_rotulado_por", "usuarios"),
-    # Tabela nova: utf8mb4, sem o latin1 das legadas.
-    mysql_charset="utf8mb4",
-    mysql_collate="utf8mb4_0900_ai_ci",
-)
-
-
 # Partes do processo sem caso (docs/plano-processos-avulsos.md, §1). No
 # processo de caso, as partes continuam vindo de `casos_atendidos`.
 processo_partes = Table(
@@ -862,7 +965,10 @@ processo_partes = Table(
     Column("polo", String(10), nullable=True),  # ativo | passivo | outro
     coluna_tenant(),
     UniqueConstraint(
-        "tenant_id", "id_processo", "id_atendido", name="uq_processo_partes_tenant_parte"
+        "tenant_id",
+        "id_processo",
+        "id_atendido",
+        name="uq_processo_partes_tenant_parte",
     ),
     fk_tenant("processo_partes", "id_processo", "processos"),
     fk_tenant("processo_partes", "id_atendido", "atendidos"),
@@ -877,6 +983,8 @@ atendido_nomes = Table(
     Column("id_atendido", Integer, nullable=False),
     Column("nome", String(150), nullable=False),
     coluna_tenant(),
-    UniqueConstraint("tenant_id", "id_atendido", "nome", name="uq_atendido_nomes_tenant_nome"),
+    UniqueConstraint(
+        "tenant_id", "id_atendido", "nome", name="uq_atendido_nomes_tenant_nome"
+    ),
     fk_tenant("atendido_nomes", "id_atendido", "atendidos"),
 )

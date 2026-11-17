@@ -36,7 +36,7 @@ def test_toda_tabela_de_tenant_tem_tenant_id_obrigatorio_indexado_e_com_fk():
     # 28 da multitenancy + as do DJEN (djen_comunicacoes, djen_sincronizacoes,
     # djen_oabs) + as dos processos sem caso (processo_partes, atendido_nomes)
     # + o banco de exemplos do DJEN (djen_exemplos).
-    assert len(tabelas) == 34
+    assert len(tabelas) == 40
     for tabela in tabelas:
         assert "tenant_id" in tabela.c, tabela.name
         coluna = tabela.c.tenant_id

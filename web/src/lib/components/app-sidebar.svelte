@@ -135,19 +135,14 @@
 					url: '/djen'
 				},
 				{
-					title: 'Sem caso',
-					url: '/djen/sem-caso',
+					title: 'Acervo para treino',
+					url: '/djen/classificacao',
 					roles: ['admin', 'prof', 'orient']
 				},
 				{
-					title: 'Busca por parte',
-					url: '/djen/busca-parte',
+					title: 'Monitoramento',
+					url: '/djen/monitoramento',
 					roles: ['admin', 'prof', 'orient']
-				},
-				{
-					title: 'OABs monitoradas',
-					url: '/djen/oabs',
-					roles: ['admin']
 				}
 			]
 		},

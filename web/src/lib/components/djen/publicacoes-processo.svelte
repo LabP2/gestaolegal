@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ProgressoBusca from '$lib/components/djen/progresso-busca.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
@@ -76,6 +77,7 @@
 	};
 
 	async function buscarDjen() {
+		if (buscandoDjen) return;
 		buscandoDjen = true;
 		try {
 			const r = await api.post<BuscaProcessoDjen>(`processos/${processo.id}/djen/buscar`);
@@ -91,6 +93,10 @@
 		}
 	}
 </script>
+
+{#if buscandoDjen}<ProgressoBusca
+		detalhe="Consultando todo o histórico disponível deste processo no DJEN, sem limite de período."
+	/>{/if}
 
 {#if djenAtivo}
 	<Card.Root class={className}>
@@ -109,11 +115,15 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
+			{#if processo.numero_cnj}<p class="text-sm text-muted-foreground">
+					A busca consulta todas as páginas do histórico disponível no DJEN, sem filtro de período
+					ou tribunal, e preserva as publicações já recebidas.
+				</p>{/if}
 			<div class="flex flex-wrap gap-2">
 				{#if podeBuscarDjen && processo.numero_cnj}
 					<Button variant="outline" onclick={buscarDjen} disabled={buscandoDjen}>
 						<RefreshCw class="mr-2 h-4 w-4 {buscandoDjen ? 'animate-spin' : ''}" />
-						{buscandoDjen ? 'Buscando…' : 'Buscar publicações agora'}
+						{buscandoDjen ? 'Buscando…' : 'Buscar todas as publicações'}
 					</Button>
 				{/if}
 				{#if totalPublicacoes > publicacoes.length}

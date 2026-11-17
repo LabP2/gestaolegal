@@ -250,3 +250,18 @@ e da caixa "Sem caso" como exemplos. Finalidade, retenção e acesso em
   agora vai só até `f1a2b3c4d5e6`; a nova migration tem
   `test_migration_djen_exemplos`.
 - `tests/api/djen_fixtures.py::limpar_djen` também limpa `djen_exemplos`.
+
+
+## Associação posterior a um caso
+
+Na tela de detalhes de um processo ativo sem caso, os perfis de gestão da
+unidade podem usar **Vincular a caso**. A busca permite selecionar um caso ativo
+da mesma unidade e NPJ. As partes próprias do processo são preservadas e passam
+a ser exibidas junto aos atendidos do caso.
+
+A associação atualiza as comunicações DJEN vinculadas ao processo e cria os
+eventos ainda inexistentes, com a data original de disponibilização. Mantém
+classificações e autoria dos vínculos; agrega a notificação do histórico por
+caso. Processo, comunicações, eventos e notificações são gravados atomicamente.
+Repetir a associação ao mesmo caso é idempotente; trocar para outro caso é
+recusado. A operação usa POST /api/processos/<id>/vincular-caso com caso_id.

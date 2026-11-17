@@ -369,6 +369,36 @@ class ProcessoService:
         self.update(processo_id, dados)
         return self.detalhe(processo_id, user, unidade_id)
 
+    def vincular_caso(
+        self, processo_id: int, caso_id: Any, user: UserInfo, unidade_id: int
+    ) -> dict[str, Any]:
+        from gestaolegal.services.djen_service import DJENService
+
+        if user.urole not in PAPEIS_SEM_CASO:
+            raise ForbiddenException()
+        if isinstance(caso_id, bool) or not isinstance(caso_id, int) or caso_id <= 0:
+            raise ValidationException("Informe um caso válido", field="caso_id")
+        processo = self.repository.bloquear(processo_id)
+        self._visivel(processo_id, user, unidade_id)
+        assert processo is not None
+        caso = self.caso_repository.find_by_id(caso_id, unidade_id=unidade_id)
+        if caso is None or not caso.status:
+            raise ValidationException("Caso ativo não encontrado nesta unidade", field="caso_id")
+        if not processo.status:
+            raise ValidationException("O processo está inativo")
+        if processo.id_caso is not None and processo.id_caso != caso.id:
+            raise ValidationException("O processo já está vinculado a outro caso")
+        try:
+            self.repository.update(processo.id, {"id_caso": caso.id})
+            quantidade = DJENService().associar_processo_ao_caso(processo, caso, user.id)
+            resultado = {"processo": self.detalhe(processo.id, user, unidade_id),
+                         "eventos_criados": quantidade}
+            self.repository.session.commit()
+        except Exception:
+            self.repository.session.rollback()
+            raise
+        return resultado
+
     def excluir(self, processo_id: int, user: UserInfo, unidade_id: int) -> None:
         processo = self._visivel(processo_id, user, unidade_id)
         permitidos = PAPEIS_EXCLUIR_DE_CASO if processo.id_caso else PAPEIS_SEM_CASO

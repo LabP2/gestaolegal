@@ -38,6 +38,8 @@
 
 	type Filtros = {
 		q: string;
+		nome_parte: string;
+		numero_processo: string;
 		inicio: string;
 		fim: string;
 		tribunal: string;
@@ -50,6 +52,8 @@
 		const p = url.searchParams;
 		return {
 			q: p.get('q') ?? '',
+			nome_parte: p.get('nome_parte') ?? '',
+			numero_processo: p.get('numero_processo') ?? '',
 			inicio: p.get('inicio') ?? '',
 			fim: p.get('fim') ?? '',
 			tribunal: p.get('tribunal') ?? TODOS,
@@ -65,6 +69,8 @@
 		initialFilters: filtrosDaUrl(page.url),
 		buildParams: (f) => ({
 			q: f.q.trim(),
+			nome_parte: f.nome_parte.trim(),
+			numero_processo: f.numero_processo.trim(),
 			inicio: f.inicio,
 			fim: f.fim,
 			tribunal: semTodos(f.tribunal),
@@ -126,6 +132,27 @@
 					ondebounceinput={() => applyFilters()}
 					debounceMs={500}
 					placeholder="Buscar no texto, vara, classe ou número do processo"
+				/>
+			</div>
+			<div>
+				<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">Nome da parte</label
+				><Input
+					id="djen-nome_parte"
+					bind:value={filters.nome_parte}
+					ondebounceinput={() => applyFilters()}
+					debounceMs={500}
+					placeholder="Nome completo ou parte do nome"
+				/>
+			</div>
+			<div>
+				<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
+					>Número do processo</label
+				><Input
+					id="djen-numero_processo"
+					bind:value={filters.numero_processo}
+					ondebounceinput={() => applyFilters()}
+					debounceMs={500}
+					placeholder="Com ou sem máscara"
 				/>
 			</div>
 			<div>

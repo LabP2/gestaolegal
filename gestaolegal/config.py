@@ -182,7 +182,9 @@ class Config:
         "DJEN_API_URL", "https://comunicaapi.pje.jus.br"
     ).rstrip("/")
     DJEN_SYNC_ENABLED: ClassVar[bool] = _parse_bool(os.environ.get("DJEN_SYNC_ENABLED"))
-    DJEN_JANELA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIAS", "3"))
+    DJEN_JANELA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIAS", "7"))
+    DJEN_LOG_RETENCAO_DIAS: ClassVar[int] = int(os.environ.get("DJEN_LOG_RETENCAO_DIAS", "90"))
+    DJEN_JANELA_DIURNA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIURNA_DIAS", "3"))
     DJEN_MAX_PROCESSOS: ClassVar[int] = int(os.environ.get("DJEN_MAX_PROCESSOS", "15"))
     # Publicações descartadas e pendentes sem caso são apagadas depois disto.
     DJEN_RETENCAO_DIAS: ClassVar[int] = 90

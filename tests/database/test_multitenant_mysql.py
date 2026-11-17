@@ -394,50 +394,79 @@ def test_migration_processos_avulsos(mysql_descartavel):
     assert _schema(engine) == depois
 
 
-def test_migration_djen_exemplos(mysql_descartavel):
-    """Banco de exemplos (b3c4d5e6f7a8): tabela utf8mb4, unicidade e FK composta
-    por NPJ, ida e volta."""
+def test_migration_djen_acervo(mysql_descartavel):
+    """Esquema novo, unicode, unicidade por NPJ, FKs e downgrade descartável."""
     from scripts.seed_database import seed_database
-
     engine, cfg = mysql_descartavel
     command.upgrade(cfg, AVULSOS)
     seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
     antes = _schema(engine)
     command.upgrade(cfg, "head")
     depois = _schema(engine)
-    assert set(depois) - set(antes) == {"djen_exemplos"}
-    with engine.connect() as conn:
-        collation = conn.execute(text(
-            "SELECT TABLE_COLLATION FROM information_schema.TABLES "
-            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'djen_exemplos'")).scalar_one()
-        usuario_daj = conn.execute(text("SELECT id FROM usuarios WHERE tenant_id = 1 LIMIT 1")).scalar_one()
-        usuario_outro = conn.execute(text("SELECT id FROM usuarios WHERE tenant_id = 2 LIMIT 1")).scalar_one()
-    assert collation.startswith("utf8mb4")
-
-    novo = (
-        "INSERT INTO djen_exemplos (tenant_id, id_djen, numero_processo, data_disponibilizacao, "
-        "texto_plano, destinatarios, rotulo, origem, id_rotulado_por, rotulado_em, criado_em) "
-        "VALUES (:t, :id_djen, '00000000020268130001', '2026-11-05', :texto, :dest, "
-        "'nao_pertinente', 'busca_parte', :u, NOW(), NOW())"
-    )
-    # Texto fora do latin1 (travessão, ≥, emoji) grava sem erro 1366.
+    assert set(depois) - set(antes) == {"djen_publicacoes", "djen_classificacoes", "djen_classificacao_historico", "djen_consultas", "djen_consulta_resultados", "djen_monitoramentos", "djen_publicacao_unidades"}
     texto = "Intimação — prazo ≥ 15 dias 📎"
+    novo = "INSERT INTO djen_publicacoes (tenant_id, id_djen, numero_processo, data_disponibilizacao, texto_plano, capturada_em) VALUES (:t, 1, '00000000020268130001', '2026-11-05', :texto, NOW())"
     with engine.begin() as conn:
-        conn.execute(text(novo), {"t": 1, "id_djen": 1, "texto": texto, "dest": '[{"nome": "Fulana"}]',
-                                  "u": usuario_daj})
-        # O mesmo id_djen em outro NPJ é outro exemplo.
-        conn.execute(text(novo), {"t": 2, "id_djen": 1, "texto": texto, "dest": None, "u": usuario_outro})
-        assert conn.execute(text(
-            "SELECT texto_plano FROM djen_exemplos WHERE tenant_id = 1")).scalar_one() == texto
-    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
-        conn.execute(text(novo), {"t": 1, "id_djen": 1, "texto": "x", "dest": None, "u": usuario_daj})
-    assert erro.value.orig.args[0] == 1062
-    # Quem rotulou é usuário do mesmo NPJ.
-    with pytest.raises(IntegrityError) as erro, engine.begin() as conn:
-        conn.execute(text(novo), {"t": 1, "id_djen": 2, "texto": "x", "dest": None, "u": usuario_outro})
-    assert erro.value.orig.args[0] == 1452
-
+        p1 = conn.execute(text(novo), {"t": 1, "texto": texto}).lastrowid
+        p2 = conn.execute(text(novo), {"t": 2, "texto": texto}).lastrowid
+        assert conn.execute(text("SELECT texto_plano FROM djen_publicacoes WHERE tenant_id=1")).scalar_one() == texto
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text(novo), {"t": 1, "texto": texto})
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text("INSERT INTO djen_classificacoes (tenant_id, id_publicacao, rotulo, origem) VALUES (1, :p, 'relevante', 'classificacao')"), {"p": p2})
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO djen_classificacoes (tenant_id, id_publicacao, rotulo, origem) VALUES (1, :p, 'relevante', 'classificacao')"), {"p": p1})
     command.downgrade(cfg, AVULSOS)
     assert _schema(engine) == antes
     command.upgrade(cfg, "head")
     assert _schema(engine) == depois
+
+
+def test_acervo_concorrente_mysql(mysql_descartavel):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from datetime import date
+    from flask import Flask
+    from sqlalchemy.orm import Session
+    from scripts.seed_database import seed_database
+    from gestaolegal.repositories.djen_acervo_repository import DjenAcervoRepository
+    from gestaolegal.utils.request_context import contexto_tenant
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, 'head')
+    seed_database(engine, senha='123456', tenants=('daj-ufmg', 'npj-demo'))
+    app = Flask(__name__)
+    barreira = Barrier(2)
+    def gravar():
+        with app.test_request_context(), contexto_tenant(1), Session(engine) as session:
+            repo = object.__new__(DjenAcervoRepository)
+            repo.session = session
+            barreira.wait(timeout=10)
+            pid = repo.guardar(dict(id_djen=98123, numero_processo='00000000020268130001', data_disponibilizacao=date(2026,11,5), texto_plano='Texto sintético 📎'))
+            session.commit()
+            return pid
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        ids = list(executor.map(lambda _: gravar(), range(2)))
+    assert ids[0] == ids[1]
+    with engine.connect() as conn:
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacoes')).scalar_one() == 1
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_classificacoes')).scalar_one() == 1
+
+
+def test_monitoramento_migra_acesso_e_oabs(mysql_descartavel):
+    from scripts.seed_database import seed_database
+    engine,cfg=mysql_descartavel
+    command.upgrade(cfg,'b3c4d5e6f7a8')
+    seed_database(engine,senha='123456',tenants=('daj-ufmg','npj-demo'))
+    with engine.begin() as conn:
+        pid=conn.execute(text("INSERT INTO djen_publicacoes (tenant_id,id_djen,numero_processo,data_disponibilizacao,capturada_em) VALUES (1,880001,'00000000020268130001','2026-11-01',NOW())")).lastrowid
+        qid=conn.execute(text("INSERT INTO djen_consultas (tenant_id,origem,parametros,inicio,status,unidade_id) VALUES (1,'parte','{}',NOW(),'ok',1)")).lastrowid
+        conn.execute(text("INSERT INTO djen_consulta_resultados (tenant_id,id_consulta,id_publicacao) VALUES (1,:q,:p)"),{'q':qid,'p':pid})
+        conn.execute(text("INSERT INTO djen_oabs (tenant_id,numero_oab,uf_oab,ativo,criado_em,unidade_id) VALUES (1,'123456','MG',0,NOW(),1)"))
+    command.upgrade(cfg,'head')
+    with engine.begin() as conn:
+        assert conn.execute(text('SELECT id_publicacao,unidade_id,origem FROM djen_publicacao_unidades WHERE tenant_id=1')).one()==(pid,1,'parte')
+        assert conn.execute(text('SELECT valor,ativo FROM djen_monitoramentos WHERE tenant_id=1')).one()==('123456/MG',0)
+        conn.execute(text('DELETE FROM djen_consulta_resultados WHERE tenant_id=1'))
+        conn.execute(text('DELETE FROM djen_consultas WHERE tenant_id=1'))
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacao_unidades WHERE tenant_id=1')).scalar()==1
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacoes WHERE tenant_id=1')).scalar()==1

@@ -16,13 +16,13 @@
 	import Download from '@lucide/svelte/icons/download';
 	import { toast } from 'svelte-sonner';
 
-	// Banco de exemplos rotulados do DJEN (só admin): contagens e exportação.
+	// Acervo para treinamento rotulados do DJEN (só admin): contagens e exportação.
 	let resumo = $state<ResumoExemplos | null>(null);
 	let erro = $state<string | null>(null);
 	let incluirNaoRevisadas = $state(false);
 	let exportando = $state(false);
 
-	const ROTULOS: RotuloExemplo[] = ['pertinente', 'nao_pertinente', 'nao_revisada'];
+	const ROTULOS: RotuloExemplo[] = ['relevante', 'irrelevante', 'nao_classificado'];
 
 	async function carregar() {
 		try {
@@ -51,13 +51,9 @@
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Banco de exemplos</Card.Title>
+		<Card.Title>Acervo para treinamento</Card.Title>
 		<Card.Description>
-			Publicações rotuladas como pertinentes ou não, para treinar a sugestão automática.
-			{#if resumo}
-				O texto dos rotulados é apagado {resumo.retencao_dias} dias depois do rótulo; as não revisadas
-				somem em {resumo.retencao_nao_revisadas_dias} dias.
-			{/if}
+			Publicações classificadas para treinamento. O acervo permanece salvo para avaliação posterior.
 		</Card.Description>
 	</Card.Header>
 	<Card.Content class="space-y-4">
@@ -106,7 +102,7 @@
 						checked={incluirNaoRevisadas}
 						onCheckedChange={(v) => (incluirNaoRevisadas = v === true)}
 					/>
-					Incluir as não revisadas
+					Incluir as não classificadas
 				</label>
 			</div>
 		{/if}

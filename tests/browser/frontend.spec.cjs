@@ -457,3 +457,273 @@ for (const message of [
     await expect(page.getByText(message, { exact: true })).toBeVisible();
   });
 }
+
+async function acervoSetup(page) {
+  const state = await setup(page, { user: { ...user, tenant: { sigla: 'ENS', djen_ativo: true } } });
+  const items = [1, 2].map(id => ({ id, id_djen: 98000 + id, numero_processo: '00000000020268130001', data_disponibilizacao: '2026-11-05', sigla_tribunal: 'TJMG', nome_orgao: 'Vara fictícia', resumo: 'Prazo de quinze dias.', rotulo: 'nao_classificado', origem: 'captura', situacao: 'nao_importada', comunicacao_id: null, id_processo: null, id_caso: null }));
+  const actions = [];
+  await page.route('**/api/djen/**', async route => {
+    const req = route.request(), url = new URL(req.url());
+    let data;
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON(); actions.push({ path: url.pathname, body });
+      for (const item of items.filter(i => body.ids?.includes(i.id_djen))) {
+        if (url.pathname.endsWith('/classificar')) item.rotulo = body.rotulo;
+        if (url.pathname.endsWith('/importar')) { item.rotulo = 'relevante'; item.situacao = 'vinculada'; item.comunicacao_id = item.id; item.id_processo = 71; }
+        if (url.pathname.endsWith('/descartar')) { item.rotulo = 'irrelevante'; item.situacao = 'descartada'; }
+      }
+      data = { classificadas: body.ids.length, descartadas: body.ids.length };
+    } else if (/\/acervo\/\d+$/.test(url.pathname)) {
+      const item = items.find(i => i.id === Number(url.pathname.split('/').pop()));
+      data = { ...item, texto_plano: '<script>não executar</script> Texto integral fictício', link: 'https://tribunal.exemplo.invalid/documento/98001', link_certidao: 'https://comunicaapi.pje.jus.br/api/v1/comunicacao/hashficticio/certidao', historico: [] };
+    } else if (url.pathname.endsWith('/acervo')) {
+      const filtro = url.searchParams.get('rotulo');
+      const lista = items.filter(i => !filtro || i.rotulo === filtro);
+      data = { items: lista, total: lista.length, page: 1, per_page: 20 };
+    } else if (url.pathname.endsWith('/resumo')) data = { total: 2, por_rotulo: {}, por_origem: {}, com_texto: 2 };
+    else if (url.pathname.endsWith('/status')) data = { filtros: { tribunais: [], tipos: [] } };
+    else data = { items: [], total: 0, page: 1, per_page: 20 };
+    await route.fulfill({ json: { success: true, data } });
+  });
+  return { ...state, actions, items };
+}
+
+test('DJEN: treino altera apenas rótulo e mantém decisão ao reabrir', async ({ page }) => {
+  const state = await acervoSetup(page);
+  await page.goto('/djen/classificacao');
+  await expect(page.getByRole('heading', { name: 'Acervo para treino' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
+  await page.getByRole('button', { name: 'Relevante', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toHaveCount(0);
+  expect(state.actions).toEqual([{ path: '/api/djen/acervo/classificar', body: { ids: [98001], rotulo: 'relevante', id_atendido: null } }]);
+  await page.goto('/djen/classificacao?rotulo=');
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeVisible();
+  expect(state.items[0].situacao).toBe('nao_importada');
+  await page.getByRole('link', { name: 'Ler publicação e histórico' }).first().click();
+  await expect(page).toHaveURL(/\/djen\/acervo\/1\?/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Texto da publicação' })).toContainText('<script>não executar</script>');
+  await expect(page.getByRole('link', { name: 'Documento no tribunal' })).toHaveAttribute('href', 'https://tribunal.exemplo.invalid/documento/98001');
+  await expect(page.getByRole('link', { name: 'Certidão do DJEN (PDF)' })).toHaveAttribute('target', '_blank');
+  await expect(page.getByText('Histórico da classificação', {exact:true})).toBeVisible();
+  await page.getByRole('link', { name: 'Voltar', exact:true }).click();
+  await expect(page).toHaveURL(/\/djen\/classificacao\?rotulo=$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: importar parte do acervo preserva o restante para depois', async ({ page }) => {
+  const state = await acervoSetup(page);
+  await page.goto('/djen');
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
+  await page.getByRole('button', { name: 'Importar selecionadas' }).click();
+  await expect(page.getByRole('link', { name: 'Processo #71' })).toBeVisible();
+  expect(state.items[0].rotulo).toBe('relevante');
+  expect(state.items[1].rotulo).toBe('nao_classificado');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98002' })).toBeVisible();
+  expect(state.actions).toHaveLength(1);
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: descarte operacional marca irrelevante', async ({ page }) => {
+  const state = await acervoSetup(page);
+  await page.goto('/djen');
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98002' }).check();
+  await page.getByRole('button', { name: 'Descartar e marcar irrelevante' }).click();
+  await expect(page.locator('li span').filter({ hasText: /^Descartada$/ })).toBeVisible();
+  expect(state.items[1].rotulo).toBe('irrelevante');
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: monitoramento cadastra, pausa e navega pelas quatro abas', async ({ page }) => {
+  await setup(page, { user: { ...user, tenant: { sigla: 'ENS', djen_ativo: true } } });
+  let items = [];
+  const actions = [];
+  await page.route('**/api/djen/monitoramentos**', async route => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname;
+    const body = req.method() === 'GET' ? null : req.postDataJSON();
+    let data;
+    if (path.endsWith('/logs')) data = {items: [],total:0,page:1,per_page:30,retencao_dias:90};
+    else if (req.method() === 'POST') {
+      actions.push(body);
+      items = [{id:1,tipo:body.tipo,valor:body.valor,tribunais:[],ativo:true,automatico:false,unidade_id:1,ultimo_sucesso:null}]; data=items;
+    } else if(req.method()==='PATCH') {items[0].ativo=body.ativo;data={};}
+    else data=items;
+    await route.fulfill({json:{success:true,data}});
+  });
+  await page.goto('/djen/monitoramento');
+  await expect(page.getByRole('heading',{name:'Monitoramento do DJEN'})).toBeVisible();
+  await page.getByPlaceholder('123456/MG').fill('123456/MG');
+  await page.getByRole('button',{name:'Adicionar ao monitoramento',exact:true}).click();
+  await expect(page.getByText('123456/MG',{exact:true})).toBeVisible();
+  expect(actions[0].tipo).toBe('oab');
+  await page.setViewportSize({width: 768, height: 1024});
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/djen-monitoramento.png', fullPage: true });
+  await page.getByRole('button',{name:'Pausar',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Retomar',exact:true})).toBeVisible();
+  await page.getByRole('link',{name:'Nome da Parte',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Adicionar nomes ao monitoramento'})).toBeVisible();
+  await page.getByRole('link',{name:'Número do Processo',exact:true}).click();
+  await expect(page.getByPlaceholder('0000000-00.0000.0.00.0000')).toBeVisible();
+  await page.getByRole('link',{name:'Logs de varredura',exact:true}).click();
+  await expect(page.getByText('Nenhuma consulta encontrada.')).toBeVisible();
+});
+
+test("processo sem caso: seleciona caso e atualiza detalhes após vincular", async ({ page }) => {
+  const { errors } = await setup(page);
+  const processo = {
+    id: 91, especie: "Ação", numero: "0000001-00.2026.8.13.0000",
+    id_caso: null, unidade_id: 1, status: true, id_criado_por: 1,
+    partes: [], total_publicacoes: 2
+  };
+  let enviado;
+  await page.route("**/api/processos/91", (route) =>
+    route.fulfill({ json: { success: true, data: processo } }));
+  await page.route("**/api/caso/?*", (route) =>
+    route.fulfill({ json: { success: true, data: { ...empty, items: [caso], total: 1 } } }));
+  await page.route("**/api/processos/91/vincular-caso", async (route) => {
+    enviado = route.request().postDataJSON();
+    processo.id_caso = 21;
+    await route.fulfill({ json: { success: true, data: { processo, eventos_criados: 2 } } });
+  });
+  await page.goto("/processos/91");
+  await page.getByRole("button", { name: "Vincular a caso", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Confirmar vínculo" })).toBeDisabled();
+  await page.getByLabel("Número do caso ou texto da busca").fill("21");
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await page.getByRole("radio").check();
+  await page.getByRole("button", { name: "Confirmar vínculo" }).click();
+  await expect(page.getByRole("link", { name: "Caso #21", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vincular a caso", exact: true })).toHaveCount(0);
+  expect(enviado).toEqual({ caso_id: 21 });
+  expect(errors).toEqual([]);
+});
+
+for (const tipo of ['oab', 'parte', 'processo']) {
+  test(`DJEN: buscar todos os ${tipo} ativos continua após falha`, async ({ page }) => {
+    await setup(page, { user: { ...user, tenant: { sigla: 'ENS', djen_ativo: true } } });
+    const items = [1,2,3].map(id=>({id,tipo,valor:`Item ${id}`,tribunais:[],ativo:id!==3,unidade_id:id===2?2:1,ultimo_sucesso:null,automatico:false}));
+    items.push({...items[0],id:4,tipo:tipo==='oab'?'parte':'oab',valor:'Outro tipo'});
+    const calls=[];
+    await page.route('**/api/djen/monitoramentos**', async route=>{
+      const req=route.request(), path=new URL(req.url()).pathname;
+      if(path.endsWith('/buscar')){
+        calls.push(req.postDataJSON());
+        if(calls.length===1) return route.fulfill({status:503,json:{success:false,error:{message:'Falha simulada'}}});
+        return route.fulfill({json:{success:true,data:[{status:'ok',encontradas:2,vinculadas:1}]}});
+      }
+      await route.fulfill({json:{success:true,data:path.endsWith('/logs')?{items:[],total:0,page:1,per_page:30,retencao_dias:90}:items}});
+    });
+    await page.goto(`/djen/monitoramento?aba=${tipo}`);
+    await page.getByRole('button',{name:'Buscar todos',exact:true}).click();
+    await expect.poll(()=>calls.length).toBe(2);
+    expect(calls.map(c=>c.valor)).toEqual(['Item 1','Item 2']);
+    expect(calls.map(c=>c.unidade_id)).toEqual([1,2]);
+    for(const c of calls){
+      expect(c.tipo).toBe(tipo);
+      expect(c.de).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(c.ate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(c.tribunais).toEqual([]);
+      expect(c.historico_completo).toBeUndefined();
+    }
+    await expect(page.getByText(/1 item\(ns\) com falha/)).toBeVisible();
+    await expect(page.getByRole('button',{name:'Buscar todos',exact:true})).toBeEnabled();
+  });
+}
+
+test('DJEN: CNJ vinculado é link e histórico completo ignora filtros',async({page})=>{
+  const state = await acervoSetup(page);
+  state.items.forEach(i => i.numero_processo = '00000010020268130001');
+  const calls=[];
+  const item={id:1,tipo:'processo',valor:'00000010020268130001',processo_id:77,tribunais:[],ativo:true,automatico:true,unidade_id:1,ultimo_sucesso:null};
+  await page.route('**/api/djen/monitoramentos**',async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname;
+    let data;
+    if(path.endsWith('/buscar')){calls.push(req.postDataJSON());data=[{status:'ok',encontradas:3,vinculadas:3}];}
+    else data=path.endsWith('/logs')?{items:[],total:0,page:1,per_page:30,retencao_dias:90}:[item];
+    await route.fulfill({json:{success:true,data}});
+  });
+  await page.goto('/djen/monitoramento?aba=processo');
+  await expect(page.getByRole('link',{name:item.valor,exact:true})).toHaveAttribute('href','/processos/77');
+  await page.getByRole('button',{name:'Buscar todas as publicações',exact:true}).last().click();
+  await expect.poll(()=>calls.length).toBe(1);
+  expect(calls[0]).toEqual({tipo:'processo',valor:item.valor,unidade_id:1,historico_completo:true});
+  await expect(page).toHaveURL(`/djen?numero_processo=${item.valor}`);
+  await expect(page.getByLabel('Número do processo', {exact:true})).toHaveValue(item.valor);
+  await expect(page.getByRole('link',{name:'Ler publicação e histórico'})).toHaveCount(2);
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: detalhes do processo busca histórico com progresso',async({page})=>{
+  await setup(page,{user:{...user,tenant:{sigla:'ENS',djen_ativo:true}}});
+  const processo={id:91,especie:'Ação',numero:'00000010020268130001',numero_cnj:'00000010020268130001',id_caso:null,unidade_id:1,status:true,id_criado_por:1,partes:[],total_publicacoes:0};
+  await page.route('**/api/processos/91',r=>r.fulfill({json:{success:true,data:processo}}));
+  let concluir;
+  const aguardar=new Promise(resolve=>{concluir=resolve;});
+  let chamadas=0;
+  await page.route('**/api/processos/91/djen/buscar',async r=>{
+    chamadas++;await aguardar;
+    await r.fulfill({json:{success:true,data:{novas:3,atualizadas:0,vinculadas:3,djen_consultado_em:'2026-11-17T12:00:00'}}});
+  });
+  await page.goto('/processos/91');
+  await page.getByRole('button',{name:'Buscar todas as publicações',exact:true}).click();
+  await expect(page.getByRole('progressbar')).toBeVisible();
+  concluir();
+  await expect(page.getByText('3 publicação(ões) nova(s) no DJEN.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  expect(chamadas).toBe(1);
+});
+
+test('DJEN: detalhes do acervo usam o ID operacional correto e preservam filtros',async({page})=>{
+  const state=await acervoSetup(page);
+  Object.assign(state.items[0],{rotulo:'relevante',situacao:'vinculada',comunicacao_id:5,id_processo:77,id_caso:31});
+  await page.route('**/api/djen/publicacoes/5',r=>r.fulfill({json:{success:true,data:{
+    ...state.items[0],id:5,ativo:true,tipo_comunicacao:'Intimação',
+    destinatarios:[],advogados:[],texto_html_seguro:'<p>Texto operacional seguro.</p>',pode_vincular:false
+  }}}));
+  await page.goto('/djen?rotulo=relevante');
+  await page.getByRole('link',{name:'Ler publicação e histórico',exact:true}).click();
+  await expect(page).toHaveURL(/\/djen\/acervo\/1\?/);
+  await expect(page.getByRole('link',{name:'Abrir operação',exact:true})).toHaveAttribute('href','/djen/publicacoes/5');
+  await expect(page.getByRole('link',{name:'Abrir processo',exact:true})).toHaveAttribute('href','/processos/77');
+  await expect(page.getByRole('link',{name:'Abrir caso',exact:true})).toHaveAttribute('href','/casos/31');
+  await expect(page.getByText('Destinatários',{exact:true})).toBeVisible();
+  await expect(page.getByText('Advogados',{exact:true})).toBeVisible();
+  await page.getByRole('link',{name:'Voltar',exact:true}).click();
+  await expect(page).toHaveURL(/\/djen\?rotulo=relevante$/);
+  await page.getByRole('link',{name:'Ler publicação e histórico',exact:true}).click();
+  await page.getByRole('link',{name:'Abrir operação',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Intimação',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Texto da publicação'})).toHaveText('Texto operacional seguro.');
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: monitoramento por nome explica tribunal obrigatório e permite corrigir', async ({ page }) => {
+  const { errors } = await setup(page, { user: { ...user, tenant: { sigla: 'ENS', djen_ativo: true } } });
+  const actions = [];
+  await page.route('**/api/djen/monitoramentos**', async route => {
+    const req = route.request();
+    if (req.method() === 'POST') actions.push(req.postDataJSON());
+    const data = new URL(req.url()).pathname.endsWith('/logs')
+      ? { items: [], total: 0, page: 1, per_page: 30, retencao_dias: 90 } : [];
+    await route.fulfill({ json: { success: true, data } });
+  });
+  await page.goto('/djen/monitoramento?aba=parte');
+  await page.getByLabel('Nome da parte', { exact: true }).fill('Pessoa de Teste');
+  await page.getByRole('button', { name: 'Adicionar nomes ao monitoramento' }).click();
+  const tribunais = page.getByRole('button', { name: 'Tribunais', exact: true });
+  await expect(tribunais).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('alert').filter({ hasText: 'Para monitorar por nome' })).toBeVisible();
+  expect(actions).toEqual([]);
+  await tribunais.click();
+  await page.getByRole('option', { name: 'TJMG', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(tribunais).not.toHaveAttribute('aria-invalid', 'true');
+  await page.getByRole('button', { name: 'Adicionar nomes ao monitoramento' }).click();
+  await expect.poll(() => actions.length).toBe(1);
+  expect(actions[0]).toEqual({ tipo: 'parte', valor: 'Pessoa de Teste', tribunais: ['TJMG'] });
+  expect(errors).toEqual([]);
+});
