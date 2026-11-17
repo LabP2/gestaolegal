@@ -12,11 +12,13 @@
 	let { user }: { user: { nome: string; email: string } } = $props();
 	const sidebar = useSidebar();
 
-	const initials = user.nome
-		.split(' ')
-		.slice(0, 2)
-		.map((name) => name[0])
-		.join('');
+	const initials = $derived(
+		user.nome
+			.split(' ')
+			.slice(0, 2)
+			.map((name) => name[0])
+			.join('')
+	);
 
 	function logout() {
 		if (typeof document !== 'undefined') {

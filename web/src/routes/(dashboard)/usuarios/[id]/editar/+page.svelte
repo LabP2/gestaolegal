@@ -1,22 +1,9 @@
 <script lang="ts">
 	import UserForm from '$lib/forms/user-form.svelte';
 	import type { PageData } from './$types';
-	import { toast } from 'svelte-sonner';
 	import Button from '$lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
-
-	function onUpdate(data: any) {
-		toast.success('Usuário atualizado com sucesso');
-	}
-
-	function onError(error: App.Error | Error | string) {
-		if (typeof error === 'string') {
-			toast.error(error);
-			return;
-		}
-		toast.error(error.message as string);
-	}
 </script>
 
 <div class="min-h-screen bg-background">
@@ -33,5 +20,7 @@
 			</div>
 		</div>
 	</div>
-	<UserForm data={data.form} userId={data.user.id} isCreateMode={false} {onUpdate} {onError} />
+	{#key data.user.id}
+		<UserForm data={data.form} userId={data.user.id} isCreateMode={false} />
+	{/key}
 </div>

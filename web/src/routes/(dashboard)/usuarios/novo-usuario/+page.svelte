@@ -5,7 +5,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 
 	let { data }: PageProps = $props();
-	const { me } = data;
+	const { me } = $derived(data);
 	const isAdmin = $derived(me.urole === 'admin');
 </script>
 

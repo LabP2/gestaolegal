@@ -20,8 +20,6 @@
 		options: readonly { value: string; label: string }[];
 	} = $props();
 
-	placeholder = placeholder ?? `Digite o ${name}`;
-
 	let selectedOptionLabel = $derived(options.find((option) => option.value === value)?.label);
 </script>
 

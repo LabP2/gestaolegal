@@ -15,7 +15,8 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			fetch
 		);
 
-		const formData = {
+		// Dados da API ainda não validados: o schema abaixo verifica enums e campos legados.
+		const formData: Record<string, unknown> = {
 			nome: assistencia.nome,
 			regiao: assistencia.regiao,
 			areas_atendidas: assistencia.areas_atendidas ?? [],

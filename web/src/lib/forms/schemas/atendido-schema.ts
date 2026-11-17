@@ -189,3 +189,24 @@ export type AtendidoUpdateFormSchema = typeof atendidoUpdateFormSchema;
 export type AtendidoUpdateFormData = z.infer<typeof atendidoUpdateFormSchema>;
 
 export type AtendidoSearchFormSchema = typeof atendidoSearchSchema;
+
+// Exceção restrita aos três campos legados encontrados no ensaio. O estado
+// original vem do GET; o servidor também confere o registro persistido.
+export function legacyEditSchema(original: Record<string, unknown>) {
+	const fields = ['cpf', 'procurou_outro_local', 'pj_constituida'] as const;
+	const relaxed = z.object({
+		...baseAtendidoFormSchema.shape,
+		cpf: z.string(),
+		procurou_outro_local: z.string(),
+		pj_constituida: z.string()
+	});
+	return relaxed.superRefine((value, ctx) => {
+		const checked = baseAtendidoFormSchema.safeParse(value);
+		if (!checked.success)
+			for (const issue of checked.error.issues) {
+				const field = issue.path[0] as (typeof fields)[number];
+				if (fields.includes(field) && value[field] === (original[field] ?? '')) continue;
+				ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+			}
+	});
+}

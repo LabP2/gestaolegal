@@ -34,23 +34,28 @@
 		</div>
 
 		<div class="space-y-8">
-			<AtendidoForm
-				data={data.atendidoForm}
-				atendidoId={data.atendido.id}
-				isCreateMode={false}
-				{onError}
-			/>
+			{#key data.atendido.id}
+				<AtendidoForm
+					data={data.atendidoForm}
+					legacyOriginal={data.legacyOriginal}
+					atendidoId={data.atendido.id}
+					isCreateMode={false}
+					{onError}
+				/>
+			{/key}
 
 			{#if data.isAssistido && data.assistidoForm}
 				<div class="border-t pt-6">
 					<h2 class="mb-6 text-2xl font-bold">Informações de Assistido</h2>
-					<AssistidoForm
-						pessoaJuridica={data.atendido.pj_constituida === 'sim'}
-						data={data.assistidoForm}
-						atendidoId={data.atendido.id}
-						{onError}
-						isAssistido={true}
-					/>
+					{#key data.atendido.id}
+						<AssistidoForm
+							pessoaJuridica={data.atendido.pj_constituida === 'sim'}
+							data={data.assistidoForm}
+							atendidoId={data.atendido.id}
+							{onError}
+							isAssistido={true}
+						/>
+					{/key}
 				</div>
 			{/if}
 		</div>

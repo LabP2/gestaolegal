@@ -779,3 +779,21 @@ def test_seletor_nao_duplica_pessoa_com_fichas_legadas_repetidas(
     assert [a['id'] for a in data['items']] == [aid]
     # Não deixe a duplicata proposital contaminar testes que reutilizam IDs.
     clean_tables('assistidos', 'atendidos')
+
+
+def test_edicao_legado_preserva_pendencias_e_valida_correcao(client, auth_headers, sample_atendido_data):
+    payload = {**sample_atendido_data, "cpf": "", "procurou_outro_local": "", "pj_constituida": ""}
+    created = client.post('/api/atendido/', json=payload, headers=auth_headers)
+    url = f'/api/atendido/{get_success_data(created)["id"]}'
+    changed = client.put(url, json={"celular": "(31) 98888-1234"}, headers=auth_headers)
+    assert changed.status_code == 200
+    assert get_success_data(changed)['cpf'] == ''
+    assert get_success_data(changed)['procurou_outro_local'] == ''
+    for field, value in [('cpf', '111.111.111-11'), ('procurou_outro_local', 'talvez'), ('pj_constituida', None)]:
+        assert client.put(url, json={field: value}, headers=auth_headers).status_code == 400
+    fixed = client.put(url, json={'cpf': '529.982.247-25', 'procurou_outro_local': 'nao', 'pj_constituida': 'nao'}, headers=auth_headers)
+    assert fixed.status_code == 200
+    for field in ['cpf', 'procurou_outro_local', 'pj_constituida']:
+        for value in ['', None]:
+            assert client.put(url, json={field: value}, headers=auth_headers).status_code == 400
+    assert get_success_data(client.get(url, headers=auth_headers))['cpf'] == '529.982.247-25'

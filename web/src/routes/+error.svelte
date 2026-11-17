@@ -4,8 +4,6 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { AlertTriangle, Home, RefreshCw } from '@lucide/svelte';
 
-	let { error }: { error: App.Error } = $props();
-
 	const status = $derived($page.status);
 	// Sem mensagem da API, o texto segue o status: um 404 não é "erro inesperado".
 	const fallback = $derived(
@@ -15,7 +13,7 @@
 				? 'Você não tem permissão para acessar esta página.'
 				: 'Ocorreu um erro inesperado'
 	);
-	const errorMessage = $derived(error?.message || fallback);
+	const errorMessage = $derived($page.error?.message || fallback);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">

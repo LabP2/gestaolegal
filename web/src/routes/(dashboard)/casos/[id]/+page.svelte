@@ -32,7 +32,7 @@
 	import { formatDateOnly } from '$lib/utils/date';
 
 	let { data }: PageProps = $props();
-	const { caso, eventoFormData, eventos: initialEventos } = data;
+	const { caso, eventoFormData, eventos: initialEventos } = $derived(data);
 	const unidadeCaso = $derived(
 		data.me?.unidades?.find((unidade) => unidade.id === caso.unidade_id)
 	);
@@ -73,7 +73,7 @@
 		indeferimento: 'Indeferimento'
 	};
 
-	let arquivos = $state(caso.arquivos || []);
+	let arquivos = $derived(caso.arquivos || []);
 	let fileInput: HTMLInputElement;
 	let replaceInput: HTMLInputElement;
 	let isUploading = $state(false);
@@ -90,7 +90,7 @@
 		return date.toLocaleString('pt-BR');
 	}
 
-	const caseInfoData = [
+	const caseInfoData = $derived([
 		{
 			label: 'Área do Direito',
 			value: caso.area_direito,
@@ -102,23 +102,23 @@
 		...(caso.justif_indeferimento
 			? [{ label: 'Justificativa de Indeferimento', value: caso.justif_indeferimento }]
 			: [])
-	];
+	]);
 
-	const responsiblesData = [
+	const responsiblesData = $derived([
 		{ label: 'Usuário Responsável', value: caso.usuario_responsavel?.nome || '--' },
 		{ label: 'Orientador', value: caso.orientador?.nome || '--' },
 		{ label: 'Estagiário', value: caso.estagiario?.nome || '--' },
 		{ label: 'Colaborador', value: caso.colaborador?.nome || '--' }
-	];
+	]);
 
-	const auditInfoData = [
+	const auditInfoData = $derived([
 		{ label: 'Criado Por', value: caso.criado_por?.nome },
 		{ label: 'Data de Criação', value: caso.data_criacao, formatter: formatDateTime },
 		...(caso.modificado_por ? [{ label: 'Modificado Por', value: caso.modificado_por.nome }] : []),
 		...(caso.data_modificacao
 			? [{ label: 'Data de Modificação', value: caso.data_modificacao, formatter: formatDateTime }]
 			: [])
-	];
+	]);
 
 	const badges: Record<TipoEvento, { text: string; variant: BadgeVariant }> = {
 		[TIPO_EVENTO.AUDIENCIA]: { text: 'Audiência', variant: 'default' },
@@ -199,7 +199,7 @@
 
 	let eventoDialogOpen = $state(false);
 
-	let eventos = $state(initialEventos);
+	let eventos = $derived(initialEventos);
 	let eventoTipoFiltro = $state('todos');
 	let eventoOrigemFiltro = $state('todos');
 

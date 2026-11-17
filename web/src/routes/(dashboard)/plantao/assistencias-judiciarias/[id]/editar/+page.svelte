@@ -31,5 +31,7 @@
 			</div>
 		</div>
 	</div>
-	<AssistenciaJudiciariaForm data={data.form} assistenciaId={data.assistencia.id} {onError} />
+	{#key data.assistencia.id}
+		<AssistenciaJudiciariaForm data={data.form} assistenciaId={data.assistencia.id} {onError} />
+	{/key}
 </div>

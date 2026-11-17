@@ -96,7 +96,7 @@ def test_nao_mexe_na_pasta_de_outro_tenant(raiz):
     assert not (raiz / "1" / "casos" / "do_outro.pdf").exists()
 
 
-def test_cli_devolve_o_numero_de_falhas(raiz, capsys):
+def test_cli_devolve_falha(raiz, capsys):
     (raiz / "1" / "casos").mkdir(parents=True)
     (raiz / "1" / "casos" / "abc_parecer.pdf").write_bytes(b"ja estava")
 
@@ -110,3 +110,11 @@ def test_cli_devolve_o_numero_de_falhas(raiz, capsys):
 def test_raiz_inexistente_aborta(tmp_path):
     with pytest.raises(SystemExit):
         mover(str(tmp_path / "nao-existe"))
+
+
+def test_cli_nao_reporta_sucesso_com_256_conflitos(tmp_path, capsys):
+    for directory in ['casos', '1/casos']:
+        (tmp_path / directory).mkdir(parents=True)
+        for i in range(256):
+            (tmp_path / directory / f'{i}.pdf').write_bytes(b'preservar')
+    assert main(['--raiz-privada', str(tmp_path), '--dry-run']) == 1

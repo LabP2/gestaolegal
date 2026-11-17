@@ -20,7 +20,7 @@
 		maxDisplayItems?: number;
 	} = $props();
 
-	placeholder = placeholder ?? `Selecione ${name}`;
+	const resolvedPlaceholder = $derived(placeholder ?? `Selecione ${name}`);
 
 	let selectedOptionsLabels = $derived(
 		options.filter((option) => value?.includes(option.value)).map((option) => option.label)
@@ -28,11 +28,11 @@
 
 	let displayText = $derived.by(() => {
 		if (!value || value.length === 0) {
-			return placeholder;
+			return resolvedPlaceholder;
 		}
 
 		if (selectedOptionsLabels.length === 0) {
-			return placeholder;
+			return resolvedPlaceholder;
 		}
 
 		if (selectedOptionsLabels.length <= maxDisplayItems) {

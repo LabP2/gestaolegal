@@ -57,12 +57,7 @@ export async function apiFetch(
 		headers.set('X-Unidade-Id', String(unidadeId));
 	}
 
-	if (
-		options.body &&
-		typeof options.body === 'string' &&
-		!headers.has('Content-Type') &&
-		!(options.body instanceof FormData)
-	) {
+	if (options.body && typeof options.body === 'string' && !headers.has('Content-Type')) {
 		headers.set('Content-Type', 'application/json');
 	}
 

@@ -24,6 +24,7 @@ from gestaolegal.repositories.repository import (
     WhereClause,
 )
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.cpf import cpf_valido
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ class AtendidoService:
             logger.error(f"Update failed: atendido not found with id: {atendido_id}")
             raise NotFoundException(resource="Atendido", resource_id=atendido_id)
 
+        self._validar_edicao_legado(existing, atendido_input)
         update_data = atendido_input.model_dump(exclude_none=True)
 
         endereco_data = self.__extract_endereco_data_for_update(update_data)
@@ -162,6 +164,21 @@ class AtendidoService:
             self.repository.update(atendido_id, update_data)
         logger.info(f"Atendido updated successfully with id: {atendido_id}")
         return self.find_by_id(atendido_id)
+
+    @staticmethod
+    def _validar_edicao_legado(existing: Atendido, atendido_input: AtendidoUpdateInput) -> None:
+        # Conferir o estado persistido, nunca uma alegação de legado do cliente.
+        supplied = atendido_input.model_dump(exclude_unset=True)
+        for field in ("cpf", "procurou_outro_local", "pj_constituida"):
+            if field not in supplied or supplied[field] == getattr(existing, field):
+                continue
+            value = supplied[field]
+            if field == "cpf":
+                valid = isinstance(value, str) and cpf_valido(value)
+            else:
+                valid = value in ("sim", "nao")
+            if not valid:
+                raise ValidationException("Informe um valor válido para o campo alterado", field=field)
 
     def create_assistido(
         self, id_atendido: int, assistido_input: AssistidoCreateInput
@@ -241,6 +258,7 @@ class AtendidoService:
 
         try:
             if atendido_input:
+                self._validar_edicao_legado(atendido, atendido_input)
                 update_data = atendido_input.model_dump(exclude_none=True)
 
                 endereco_data = self.__extract_endereco_data_for_update(update_data)

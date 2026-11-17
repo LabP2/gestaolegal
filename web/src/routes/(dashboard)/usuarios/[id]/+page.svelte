@@ -7,10 +7,10 @@
 
 	let { data }: PageProps = $props();
 
-	const { user, me, canView = true } = data;
+	const { user, me, canView = true } = $derived(data);
 	const isAdmin = $derived(me.urole === 'admin');
 
-	const personalData = [
+	const personalData = $derived([
 		{
 			label: 'Data de Nascimento',
 			value: new Date(user.nascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
@@ -21,9 +21,9 @@
 		{ label: 'Profissão', value: user.profissao },
 		{ label: 'OAB', value: user.oab },
 		{ label: 'Email', value: user.email }
-	];
+	]);
 
-	const addressData = [
+	const addressData = $derived([
 		{ label: 'Logradouro', value: user.endereco.logradouro },
 		{ label: 'Número', value: user.endereco.numero },
 		{ label: 'Complemento', value: user.endereco.complemento },
@@ -31,9 +31,9 @@
 		{ label: 'CEP', value: user.endereco.cep },
 		{ label: 'Cidade', value: user.endereco.cidade },
 		{ label: 'Estado', value: user.endereco.estado }
-	];
+	]);
 
-	const registrationData = [
+	const registrationData = $derived([
 		{ label: 'Email', value: user.email },
 		{
 			label: 'Unidades',
@@ -49,13 +49,13 @@
 			value: user.data_saida,
 			formatter: (value: string) => new Date(value).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 		}
-	];
+	]);
 
-	const academicData = [{ label: 'Possui bolsa', value: user.bolsista }];
+	const academicData = $derived([{ label: 'Possui bolsa', value: user.bolsista }]);
 
-	const agendaAtendimento = [
+	const agendaAtendimento = $derived([
 		{ label: 'Dia da semana e horário do atendimento', value: user.horario_atendimento }
-	];
+	]);
 </script>
 
 <div class="space-y-6">

@@ -25,14 +25,16 @@
 	</div>
 
 	<div class="rounded-lg border bg-card p-6">
-		<CasoForm
-			data={data.form}
-			casoId={data.caso.id}
-			caso={data.caso}
-			{onError}
-			isCreateMode={false}
-			usuarios={data.usuarios}
-			assistidos={data.assistidos}
-		/>
+		{#key data.caso.id}
+			<CasoForm
+				data={data.form}
+				casoId={data.caso.id}
+				caso={data.caso}
+				{onError}
+				isCreateMode={false}
+				usuarios={data.usuarios}
+				assistidos={data.assistidos}
+			/>
+		{/key}
 	</div>
 </div>

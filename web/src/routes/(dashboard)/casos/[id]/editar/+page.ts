@@ -15,7 +15,8 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			api.get<{ items: UserOption[] }>('user/opcoes', {}, fetch)
 		]);
 
-		const casoData = {
+		// Dados da API ainda não validados: o schema abaixo verifica enums e campos legados.
+		const casoData: Record<string, unknown> = {
 			id_usuario_responsavel: caso.id_usuario_responsavel,
 			area_direito: caso.area_direito,
 			sub_area: caso.sub_area,

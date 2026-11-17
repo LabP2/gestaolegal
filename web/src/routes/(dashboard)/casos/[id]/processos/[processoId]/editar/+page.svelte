@@ -5,7 +5,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
-	const { processo } = data;
+	const { processo } = $derived(data);
 
 	function onUpdate(data: any) {
 		toast.success('Processo atualizado com sucesso');
@@ -36,12 +36,14 @@
 			</div>
 		</div>
 	</div>
-	<ProcessoForm
-		data={data.form}
-		casoId={processo.id_caso ?? undefined}
-		processoId={processo.id}
-		{onUpdate}
-		{onError}
-		isCreateMode={false}
-	/>
+	{#key processo.id}
+		<ProcessoForm
+			data={data.form}
+			casoId={processo.id_caso ?? undefined}
+			processoId={processo.id}
+			{onUpdate}
+			{onError}
+			isCreateMode={false}
+		/>
+	{/key}
 </div>

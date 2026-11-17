@@ -1,0 +1,74 @@
+{
+  "atendidos": {
+    "original_rows": 4086,
+    "restored_rows": 4086,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "casos": {
+    "original_rows": 950,
+    "restored_rows": 950,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "eventos": {
+    "original_rows": 1183,
+    "restored_rows": 1183,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "assistidos": {
+    "original_rows": 950,
+    "restored_rows": 950,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "arquivosCaso": {
+    "original_rows": 247,
+    "restored_rows": 247,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "arquivosEvento": {
+    "original_rows": 461,
+    "restored_rows": 461,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "assistencias_judiciarias": {
+    "original_rows": 1,
+    "restored_rows": 1,
+    "missing_ids": [],
+    "field_differences": {}
+  },
+  "enderecos": {
+    "original_rows": 4359,
+    "current_rows": 4362,
+    "missing": 0,
+    "field_differences": {}
+  },
+  "processos": {
+    "original_rows": 86,
+    "current_rows": 91,
+    "missing": 0,
+    "field_differences": {}
+  },
+  "historicos": {
+    "original_rows": 1461,
+    "current_rows": 1465,
+    "missing": 0,
+    "field_differences": {}
+  },
+  "casos_atendidos": {
+    "original_rows": 980,
+    "current_rows": 982,
+    "missing": 0,
+    "field_differences": {}
+  },
+  "assistidos_pessoa_juridica": {
+    "original_rows": 10,
+    "current_rows": 10,
+    "missing": 0,
+    "field_differences": {}
+  }
+}

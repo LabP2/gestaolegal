@@ -15,7 +15,7 @@
 	import NomesDjen from '$lib/components/atendidos/nomes-djen.svelte';
 
 	let { data }: { data: PageData } = $props();
-	let { atendido } = data;
+	const { atendido } = $derived(data);
 	const casos = $derived(data.casos ?? []);
 	const orientacoes = $derived(data.orientacoes ?? []);
 

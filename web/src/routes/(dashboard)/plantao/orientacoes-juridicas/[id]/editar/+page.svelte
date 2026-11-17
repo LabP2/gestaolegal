@@ -31,10 +31,12 @@
 			</div>
 		</div>
 	</div>
-	<OrientacaoJuridicaForm
-		data={data.form}
-		orientacao={data.orientacao}
-		orientacaoId={data.orientacao.id}
-		{onError}
-	/>
+	{#key data.orientacao.id}
+		<OrientacaoJuridicaForm
+			data={data.form}
+			orientacao={data.orientacao}
+			orientacaoId={data.orientacao.id}
+			{onError}
+		/>
+	{/key}
 </div>

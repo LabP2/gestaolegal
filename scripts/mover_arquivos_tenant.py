@@ -28,7 +28,7 @@ Uso:
     uv run python scripts/mover_arquivos_tenant.py --raiz-privada /data/gestaolegal/uploads --dry-run
     uv run python scripts/mover_arquivos_tenant.py --raiz-privada /data/gestaolegal/uploads
 
-O código de saída é o número de conflitos e erros (0 = tudo no lugar).
+O código de saída é 1 se houver conflitos ou erros; 0 indica sucesso.
 """
 
 import argparse
@@ -144,7 +144,8 @@ def main(argv: list[str] | None = None) -> int:
 
     relatorio = mover(args.raiz_privada, args.tenant_id, args.dry_run)
     _imprimir(relatorio, args.dry_run)
-    return relatorio.falhas
+    # Códigos acima de 255 são truncados pelo shell (256 viraria sucesso).
+    return 1 if relatorio.falhas else 0
 
 
 if __name__ == "__main__":

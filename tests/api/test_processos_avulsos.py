@@ -13,6 +13,8 @@ from sqlalchemy import select
 from gestaolegal.database import session as db_session_module
 from gestaolegal.database.tables import (
     assistidos,
+    casos,
+    casos_atendidos,
     atendido_nomes,
     atendidos,
     djen_comunicacoes,
@@ -64,6 +66,18 @@ def _sem_sobras(app: Flask):
     session = db_session_module.get_session()
     try:
         with sem_tenant("teste: registros anteriores"):
+            # O banco SQLite compartilhado reusa IDs removidos por outros
+            # módulos. Remover referências órfãs ANTES de criar os cenários,
+            # para um caso novo não herdar processos/partes de outro teste.
+            session.execute(processos.delete().where(
+                processos.c.id_caso.is_not(None),
+                ~select(casos.c.id).where(casos.c.id == processos.c.id_caso).exists(),
+            ))
+            session.execute(casos_atendidos.delete().where(
+                ~select(casos.c.id).where(casos.c.id == casos_atendidos.c.id_caso).exists()
+                | ~select(atendidos.c.id).where(atendidos.c.id == casos_atendidos.c.id_atendido).exists()
+            ))
+            session.commit()
             anteriores = {t.name: set(session.execute(select(t.c.id)).scalars()) for t in tabelas}
     finally:
         session.close()
