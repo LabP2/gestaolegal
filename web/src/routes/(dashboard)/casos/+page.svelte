@@ -32,6 +32,7 @@
 	];
 
 	type CasoFilters = {
+		per_page: string;
 		search: string;
 		numero_caso: string;
 		show_inactive: boolean;
@@ -43,6 +44,7 @@
 	function filtrosDaUrl(url: URL): CasoFilters {
 		const q = url.searchParams;
 		return {
+			per_page: q.get('per_page') ?? '20',
 			search: q.get('search') ?? '',
 			numero_caso: q.get('numero_caso') ?? '',
 			show_inactive: q.get('show_inactive') === 'true',
@@ -56,6 +58,7 @@
 	const { filters, applyFilters, setFilters } = usePaginatedFilters<CasoFilters>({
 		initialFilters: filtrosDaUrl(page.url),
 		buildParams: (f) => ({
+			per_page: f.per_page,
 			search: f.search,
 			numero_caso: f.numero_caso,
 			show_inactive: f.show_inactive ? 'true' : 'false',
@@ -182,7 +185,21 @@
 				</div>
 			</div>
 
+			<Button
+				variant="ghost"
+				class="mb-4"
+				onclick={() => {
+					setFilters({ ...filtrosDaUrl(new URL('/casos', page.url)), per_page: filters.per_page });
+					applyFilters();
+				}}>Limpar filtros</Button
+			>
+
 			<DataTable
+				tamanhosPagina
+				onPageSizeChange={(n) => {
+					setFilters({ per_page: String(n) });
+					applyFilters();
+				}}
 				data={casosListados}
 				onPageChange={(page) => applyFilters({ page })}
 				columns={[

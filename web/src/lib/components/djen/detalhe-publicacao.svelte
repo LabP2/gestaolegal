@@ -24,12 +24,12 @@
 	} = $props();
 	const situacoes: Record<string, string> = {
 		...SITUACAO_PUBLICACAO_LABEL,
-		nao_importada: 'Não importada'
+		nao_importada: 'Não analisado'
 	};
 	const rotulos = {
 		relevante: 'Relevante',
 		irrelevante: 'Irrelevante',
-		nao_classificado: 'Não classificado'
+		nao_classificado: 'Não analisado'
 	};
 	function linkSeguro(valor?: string | null) {
 		if (!valor) return null;
@@ -212,7 +212,9 @@
 			<Card.Content>
 				<ul class="space-y-2 text-sm">
 					{#each historico as h}<li>
-							{formatDateTime(h.rotulado_em)}: {rotulos[h.rotulo_anterior]} → {rotulos[h.rotulo]} · {h.origem}
+							{h.contexto_nome ? `${h.contexto_nome} · ` : ''}{formatDateTime(h.rotulado_em)}: {rotulos[
+								h.rotulo_anterior
+							]} → {rotulos[h.rotulo]} · {h.origem}
 							· {h.id_rotulado_por ? `Usuário #${h.id_rotulado_por}` : 'Automático'}
 						</li>
 					{:else}<li>Ainda não classificada.</li>{/each}

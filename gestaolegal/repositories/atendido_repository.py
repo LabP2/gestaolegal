@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import unicodedata
 from typing import Any
 
 from sqlalchemy import delete as sql_delete
@@ -33,6 +34,58 @@ class AtendidoRepository(BaseRepository):
     def __init__(self):
         super().__init__()
 
+    def sugerir_por_nomes(
+        self, nomes: list[str], unidade_id: int
+    ) -> dict[str, list[dict]]:
+        """Nomes e variações exatos; homônimos permanecem candidatos distintos."""
+
+        def normalizar(nome):
+            return " ".join(
+                "".join(
+                    c
+                    for c in unicodedata.normalize("NFKD", nome or "")
+                    if not unicodedata.combining(c)
+                )
+                .casefold()
+                .split()
+            )
+
+        procurados = {normalizar(n) for n in nomes if normalizar(n)}
+        encontrados = {n: {} for n in procurados}
+        if not procurados:
+            return {n: [] for n in nomes}
+        stmt = self.escopo(
+            select(
+                atendidos.c.id,
+                atendidos.c.nome,
+                atendido_nomes.c.nome.label("variacao"),
+            )
+            .outerjoin(
+                atendido_nomes,
+                (
+                    (atendido_nomes.c.id_atendido == atendidos.c.id)
+                    & self.no_tenant(atendido_nomes)
+                ),
+            )
+            .where(atendidos.c.unidade_id == unidade_id, atendidos.c.status == 1),
+            atendidos,
+        )
+        for row in self.session.execute(stmt).mappings():
+            for nome in (row["nome"], row["variacao"]):
+                chave = normalizar(nome)
+                if chave in encontrados:
+                    encontrados[chave][row["id"]] = {
+                        "id": row["id"],
+                        "nome": row["nome"],
+                    }
+        return {
+            n: sorted(
+                encontrados.get(normalizar(n), {}).values(),
+                key=lambda a: (a["nome"], a["id"]),
+            )
+            for n in nomes
+        }
+
     def find_by_id(self, id: int, unidade_id: int | None = None) -> Atendido | None:
         stmt = self.escopo(select(atendidos).where(atendidos.c.id == id), atendidos)
         if unidade_id is not None:
@@ -41,7 +94,9 @@ class AtendidoRepository(BaseRepository):
         return from_dict(Atendido, dict(result._mapping)) if result else None
 
     def find_by_email(self, email: str) -> Atendido | None:
-        stmt = self.escopo(select(atendidos).where(atendidos.c.email == email), atendidos)
+        stmt = self.escopo(
+            select(atendidos).where(atendidos.c.email == email), atendidos
+        )
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Atendido, dict(result._mapping)) if result else None
 
@@ -139,7 +194,9 @@ class AtendidoRepository(BaseRepository):
             digits = re.sub(r"[^0-9]", "", term)
             if digits and re.fullmatch(r"[0-9.\-\s]+", term):
                 cpf = func.replace(
-                    func.replace(func.replace(atendidos.c.cpf, ".", ""), "-", ""), " ", ""
+                    func.replace(func.replace(atendidos.c.cpf, ".", ""), "-", ""),
+                    " ",
+                    "",
                 )
                 conditions.append(cpf.like(f"%{digits}%"))
             stmt = stmt.where(or_(*conditions))
@@ -185,7 +242,9 @@ class AtendidoRepository(BaseRepository):
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        check_stmt = self.escopo(select(atendidos).where(atendidos.c.id == id), atendidos)
+        check_stmt = self.escopo(
+            select(atendidos).where(atendidos.c.id == id), atendidos
+        )
         existing = self.session.execute(check_stmt).first()
 
         if not existing:
@@ -205,7 +264,8 @@ class AtendidoRepository(BaseRepository):
 
     def find_assistido_by_atendido_id(self, atendido_id: int) -> Assistido | None:
         stmt = self.escopo(
-            select(assistidos).where(assistidos.c.id_atendido == atendido_id), assistidos
+            select(assistidos).where(assistidos.c.id_atendido == atendido_id),
+            assistidos,
         )
         result = self.session.execute(stmt).one_or_none()
         if not result:
@@ -265,19 +325,18 @@ class AtendidoRepository(BaseRepository):
 
     def update_assistido(self, id_atendido: int, data: dict[str, Any]) -> None:
         check_stmt = self.escopo(
-            select(assistidos).where(assistidos.c.id_atendido == id_atendido), assistidos
+            select(assistidos).where(assistidos.c.id_atendido == id_atendido),
+            assistidos,
         )
         existing = self.session.execute(check_stmt).first()
 
         if not existing:
             raise ValueError(f"Assistido for atendido {id_atendido} not found")
 
-        stmt = (
-            self.escopo(
-                sql_update(assistidos).where(assistidos.c.id_atendido == id_atendido),
-                assistidos,
-            ).values(**data)
-        )
+        stmt = self.escopo(
+            sql_update(assistidos).where(assistidos.c.id_atendido == id_atendido),
+            assistidos,
+        ).values(**data)
         self.session.execute(stmt)
 
     def salvar_pessoa_juridica(self, id_assistido: int, dados: dict[str, Any]) -> None:

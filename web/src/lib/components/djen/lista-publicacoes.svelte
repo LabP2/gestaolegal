@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
+	import FiltroTribunais from './filtro-tribunais.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import * as Select from '$lib/components/ui/select';
@@ -37,12 +39,13 @@
 	const podeVerSemCaso = $derived(DJEN_PAPEIS_GESTAO.includes(urole));
 
 	type Filtros = {
+		per_page: string;
 		q: string;
 		nome_parte: string;
 		numero_processo: string;
 		inicio: string;
 		fim: string;
-		tribunal: string;
+		tribunal: string[];
 		tipo: string;
 		oab: string;
 		situacao: string;
@@ -51,12 +54,16 @@
 	function filtrosDaUrl(url: URL): Filtros {
 		const p = url.searchParams;
 		return {
+			per_page: p.get('per_page') ?? '20',
 			q: p.get('q') ?? '',
 			nome_parte: p.get('nome_parte') ?? '',
 			numero_processo: p.get('numero_processo') ?? '',
 			inicio: p.get('inicio') ?? '',
 			fim: p.get('fim') ?? '',
-			tribunal: p.get('tribunal') ?? TODOS,
+			tribunal: p
+				.getAll('tribunal')
+				.flatMap((t) => t.split(','))
+				.filter(Boolean),
 			tipo: p.get('tipo') ?? TODOS,
 			oab: p.get('oab') ?? '',
 			situacao: p.get('situacao') ?? TODOS
@@ -68,12 +75,13 @@
 	const { filters, applyFilters, setFilters } = usePaginatedFilters<Filtros>({
 		initialFilters: filtrosDaUrl(page.url),
 		buildParams: (f) => ({
+			per_page: f.per_page,
 			q: f.q.trim(),
 			nome_parte: f.nome_parte.trim(),
 			numero_processo: f.numero_processo.trim(),
 			inicio: f.inicio,
 			fim: f.fim,
-			tribunal: semTodos(f.tribunal),
+			tribunal: f.tribunal.join(','),
 			tipo: semTodos(f.tipo),
 			oab: f.oab.trim(),
 			situacao: situacaoFixa ?? semTodos(f.situacao)
@@ -107,9 +115,9 @@
 	});
 
 	const situacaoBadge = {
-		vinculada: { text: 'Vinculada', variant: 'default' as const },
-		pendente: { text: 'Sem caso', variant: 'outline' as const },
-		descartada: { text: 'Descartada', variant: 'secondary' as const },
+		vinculada: { text: 'Importado', variant: 'default' as const },
+		pendente: { text: 'Não analisado', variant: 'outline' as const },
+		descartada: { text: 'Descartado', variant: 'secondary' as const },
 		cancelada: { text: 'Cancelada no DJEN', variant: 'destructive' as const }
 	};
 </script>
@@ -168,23 +176,8 @@
 				<label for="djen-fim" class="mb-1 block text-sm font-medium">Até</label>
 				<Input id="djen-fim" type="date" bind:value={filters.fim} onchange={() => applyFilters()} />
 			</div>
-			<div>
-				<span class="mb-1 block text-sm font-medium">Tribunal</span>
-				<Select.Root
-					type="single"
-					bind:value={filters.tribunal}
-					onValueChange={() => applyFilters()}
-				>
-					<Select.Trigger class="w-[140px]" aria-label="Tribunal">
-						{filters.tribunal === TODOS ? 'Todos' : filters.tribunal}
-					</Select.Trigger>
-					<Select.Content>
-						<Select.Item value={TODOS}>Todos</Select.Item>
-						{#each status.filtros.tribunais as t (t)}
-							<Select.Item value={t}>{t}</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
+			<div class="w-full sm:w-56">
+				<FiltroTribunais bind:value={filters.tribunal} onchange={() => applyFilters()} />
 			</div>
 			<div>
 				<span class="mb-1 block text-sm font-medium">Tipo</span>
@@ -231,7 +224,20 @@
 			{/if}
 		</div>
 
+		<Button
+			variant="ghost"
+			class="mb-4"
+			onclick={() => {
+				setFilters({ ...filtrosDaUrl(new URL('/djen', page.url)), per_page: filters.per_page });
+				applyFilters();
+			}}>Limpar filtros</Button
+		>
 		<DataTable
+			tamanhosPagina
+			onPageSizeChange={(n) => {
+				setFilters({ per_page: String(n) });
+				applyFilters();
+			}}
 			data={linhas}
 			emptyText="Nenhuma publicação encontrada."
 			onPageChange={(p) => applyFilters({ page: p })}

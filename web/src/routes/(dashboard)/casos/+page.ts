@@ -4,7 +4,8 @@ import { error } from '@sveltejs/kit';
 import { ApiException } from '$lib/types';
 
 export const load = async ({ url, fetch }) => {
-	const urlParams = url.searchParams;
+	const urlParams = new URLSearchParams(url.searchParams);
+	if (!urlParams.has('per_page')) urlParams.set('per_page', '20');
 
 	try {
 		const data = await api.get<Paginated<ListCaso>>(`caso?${urlParams.toString()}`, {}, fetch);

@@ -39,7 +39,7 @@ from gestaolegal.models.djen import (
     ResultadoCaptura,
 )
 from gestaolegal.models.processo import Processo
-from gestaolegal.models.processo_input import ParteInput, ProcessoSemCasoInput
+from gestaolegal.models.processo_input import ParteInput, ProcessoDjenInput
 from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.caso_repository import CasoRepository
 from gestaolegal.repositories.djen_repository import (
@@ -513,6 +513,7 @@ class DJENService:
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
         comunicacao = self._visivel(id, user, unidade_id)
+        self.acervo.contextos_operacao = {}
         if comunicacao.situacao == "vinculada":
             raise ValidationException("A publicação já está vinculada a um processo")
         if isinstance(processo_id, bool) or not isinstance(processo_id, int):
@@ -538,6 +539,7 @@ class DJENService:
         if user.urole not in PAPEIS_GESTAO:
             raise ForbiddenException()
         comunicacao = self._visivel(id, user, unidade_id)
+        self.acervo.contextos_operacao = {}
         if comunicacao.situacao == "vinculada":
             raise ValidationException(
                 "Publicação vinculada a um caso não pode ser descartada"
@@ -1055,11 +1057,16 @@ class DJENService:
                 is None
             ):
                 raise ValidationException("Parte não encontrada", field="id_atendido")
+        sem_parte = corpo.get("sem_parte", False)
+        if not isinstance(sem_parte, bool) or (sem_parte and id_atendido is not None):
+            raise ValidationException("Opção sem parte inválida", field="sem_parte")
         especie = corpo.get("especie") or ESPECIE_IMPORTADA
         if not isinstance(especie, str) or len(especie) > 25:
             raise ValidationException("Espécie inválida", field="especie")
 
         registros = self.acervo.selecionadas(ids, unidade_id)
+        from gestaolegal.services.djen_contexto_service import DjenContextoService
+        self.acervo.contextos_operacao = DjenContextoService().preparar_operacao(registros, corpo, unidade_id)
         itens = [self._comunicacao_salva(r) for r in registros]
         escolhidos = itens
         termos = {}
@@ -1072,7 +1079,7 @@ class DJENService:
             {i.numero_processo for i in escolhidos}, unidade_id
         )
         sem_processo = sorted({i.numero_processo for i in escolhidos} - set(processos))
-        if sem_processo and id_atendido is None:
+        if sem_processo and id_atendido is None and not sem_parte:
             raise ValidationException(
                 "Informe a parte do processo sem caso para os números sem processo: "
                 + ", ".join(mascarar_cnj(n) or n for n in sem_processo),
@@ -1090,7 +1097,7 @@ class DJENService:
                         field="ids",
                     )
                 exemplo = next(i for i in escolhidos if i.numero_processo == numero)
-                dados = ProcessoSemCasoInput(
+                dados = ProcessoDjenInput(
                     especie=especie,
                     numero=exemplo.numero_processo_mascara
                     or mascarar_cnj(numero)
@@ -1104,7 +1111,7 @@ class DJENService:
                     identificacao=djen_html.para_latin1(
                         djen_html.corrigir_caixa(exemplo.nome_classe)
                     ),
-                    partes=[ParteInput(id_atendido=id_atendido)],
+                    partes=[ParteInput(id_atendido=id_atendido)] if id_atendido is not None else [],
                 )
                 novo = servico.criar_sem_caso(dados, user, unidade_id)
                 processos[numero] = self.processos.find_by_id(novo["id"])
@@ -1228,6 +1235,8 @@ class DJENService:
         ids = self._ids_selecionados(corpo)
         try:
             registros = self.acervo.selecionadas(ids, unidade_id)
+            from gestaolegal.services.djen_contexto_service import DjenContextoService
+            self.acervo.contextos_operacao = DjenContextoService().preparar_operacao(registros, corpo, unidade_id)
             if len(registros) != len(ids):
                 raise ValidationException(
                     "Publicação não encontrada na unidade", field="ids"

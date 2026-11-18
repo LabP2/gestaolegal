@@ -21,10 +21,7 @@
 	import type { Component } from 'svelte';
 	import { cn } from '$lib/utils';
 	import { goto } from '$app/navigation';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import ChevronsLeft from '@lucide/svelte/icons/chevrons-left';
-	import ChevronsRight from '@lucide/svelte/icons/chevrons-right';
+	import Paginacao from './paginacao.svelte';
 
 	type ActionButton = {
 		title: string;
@@ -50,7 +47,9 @@
 		tableClass,
 		emptyText = 'Nenhum registro encontrado.',
 		actions,
-		onPageChange
+		onPageChange,
+		tamanhosPagina = false,
+		onPageSizeChange
 	} = $props<{
 		columns: Column[];
 		data: Paginated<T>;
@@ -58,14 +57,12 @@
 		emptyText?: string;
 		actions?: { class?: string; buttons: ActionButton[] };
 		onPageChange?: (page: number) => void | Promise<void>;
+		tamanhosPagina?: boolean;
+		onPageSizeChange?: (n: number) => void | Promise<void>;
 	}>();
 
 	let isScrolled = $state(false);
 	let scrollContainer: HTMLDivElement;
-
-	let totalPages = $derived(Math.ceil(data.total / data.per_page));
-	let startItem = $derived((data.page - 1) * data.per_page + 1);
-	let endItem = $derived(Math.min(data.page * data.per_page, data.total));
 
 	async function handlePageChange(newPage: number) {
 		if (onPageChange) {
@@ -331,57 +328,15 @@
 	{/if}
 </div>
 
-{#if data.total > 0}
-	<div
-		class="flex items-center justify-between rounded-b-md border-x border-b bg-muted/50 px-4 py-3"
-	>
-		<div class="text-sm text-muted-foreground">
-			Mostrando <span class="font-medium">{startItem}</span> a
-			<span class="font-medium">{endItem}</span>
-			de <span class="font-medium">{data.total}</span> resultados
-		</div>
-		<div class="flex items-center space-x-2">
-			<div class="mr-4 text-sm text-muted-foreground">
-				Página {data.page} de {totalPages}
-			</div>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(1)}
-				disabled={data.page === 1}
-				title="Primeira página"
-			>
-				<ChevronsLeft class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(data.page - 1)}
-				disabled={data.page === 1}
-				title="Página anterior"
-			>
-				<ChevronLeft class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(data.page + 1)}
-				disabled={data.page >= totalPages}
-				title="Próxima página"
-			>
-				<ChevronRight class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(totalPages)}
-				disabled={data.page >= totalPages}
-				title="Última página"
-			>
-				<ChevronsRight class="h-4 w-4" />
-			</Button>
-		</div>
-	</div>
+{#if data.total > 0 || tamanhosPagina}
+	<Paginacao
+		total={data.total}
+		page={data.page}
+		per_page={data.per_page}
+		tamanhos={tamanhosPagina}
+		onPageChange={handlePageChange}
+		{onPageSizeChange}
+	/>
 {/if}
 
 <style>

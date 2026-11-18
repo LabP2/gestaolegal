@@ -408,6 +408,10 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("PATCH", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}, json=lambda _: {"ativo": False}),
     ("DELETE", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}),
     ("POST", "/api/djen/monitoramentos/buscar"): Rota("escrita", json=lambda _: {"tipo": "oab", "valor": "123456/MG", "de": "2026-11-01", "ate": "2026-11-07"}),
+    ("GET", "/api/djen/contextos"): Rota("colecao"),
+    ("POST", "/api/djen/contextos"): Rota("escrita", json=lambda _: {"nome":"Contexto próprio", "nomes":["Parte sintética"], "tribunais":[]}),
+    ("POST", "/api/djen/contextos/<int:cid>/classificar"): Rota("id", {"cid":"contexto"}, json=lambda _: {"ids":[ID_DJEN_DAJ], "rotulo":"relevante"}),
+    ("POST", "/api/djen/contextos/<int:cid>/treinar"): Rota("id", {"cid":"contexto"}, json=lambda _: {}),
     ("GET", "/api/djen/acervo"): Rota("colecao"),
     ("GET", "/api/djen/acervo/<int:id>"): Rota("id", {"id": "acervo"}),
     ("POST", "/api/djen/acervo/classificar"): Rota("escrita", json=lambda _: {"ids": [ID_DJEN_DAJ], "rotulo": "irrelevante"}),
@@ -685,6 +689,8 @@ def _criar_dados_da_daj(client: FlaskClient, h: dict[str, str]) -> Ids:
                 sigla_tribunal=MARCA, nome_orgao=f"{MARCA} vara", tipo_comunicacao=MARCA,
                 texto_html=f"<p>{MARCA} publicação</p>", texto_plano=f"{MARCA} publicação",
                 capturada_em=agora)).lastrowid
+            ids["contexto"] = session.execute(metadata.tables['djen_contextos'].insert().values(
+                tenant_id=TENANT_DAJ, unidade_id=UNIDADE_BH, nome=MARCA, nomes=[MARCA], tribunais=[], criado_em=agora)).lastrowid
             ids["acervo"] = acervo_id
             ids["publicacao"] = session.execute(metadata.tables['djen_comunicacoes'].insert().values(
                 tenant_id=TENANT_DAJ, id_publicacao=acervo_id, situacao='vinculada',

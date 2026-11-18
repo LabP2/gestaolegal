@@ -139,7 +139,7 @@ class DjenComunicacaoRepository(BaseRepository):
         participante_id: int | None = None,
         inicio: date | None = None,
         fim: date | None = None,
-        tribunal: str | None = None,
+        tribunal: str | list[str] | None = None,
         tipo: str | None = None,
         oab: str | None = None,
         situacao: str | None = None,
@@ -199,7 +199,7 @@ class DjenComunicacaoRepository(BaseRepository):
         if fim:
             stmt = stmt.where(t.c.data_disponibilizacao <= fim)
         if tribunal:
-            stmt = stmt.where(t.c.sigla_tribunal == tribunal)
+            stmt = stmt.where(t.c.sigla_tribunal.in_([tribunal] if isinstance(tribunal, str) else tribunal))
         if tipo:
             stmt = stmt.where(t.c.tipo_comunicacao == tipo)
         stmt = filtrar_identificacao(stmt, t, self.session.get_bind().dialect.name,

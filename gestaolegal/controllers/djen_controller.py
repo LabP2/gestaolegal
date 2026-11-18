@@ -60,6 +60,15 @@ def _texto(nome: str, limite: int = 100) -> str | None:
     return valor[:limite] or None
 
 
+def _tribunais() -> list[str]:
+    # Aceita links antigos com um tribunal e parâmetros repetidos ou separados por vírgula.
+    valores = [sigla.strip() for valor in request.args.getlist("tribunal")
+               for sigla in valor.split(",") if sigla.strip()]
+    if len(valores) > 100 or any(len(sigla) > 30 for sigla in valores):
+        raise ValidationException("Filtro de tribunais inválido", field="tribunal")
+    return list(dict.fromkeys(valores))
+
+
 def _oab(valor: str | None) -> str | None:
     """`123456/MG`, `123456MG` ou `MG123456` -> `123456/MG`."""
     if not valor:
@@ -82,7 +91,7 @@ def listar_publicacoes():
     filtros: dict[str, Any] = {
         "inicio": _data("inicio"),
         "fim": _data("fim"),
-        "tribunal": _texto("tribunal", 30),
+        "tribunal": _tribunais(),
         "tipo": _texto("tipo", 100),
         "oab": _texto("oab", 30),
         "nome_parte": _texto("nome_parte", 150),
@@ -322,9 +331,11 @@ def exportar_exemplos():
 @djen_habilitado
 def listar_acervo():
     filtros = {
-        k: _texto(k) for k in ("rotulo", "tribunal", "origem", "situacao", "fonte")
+        k: _texto(k) for k in ("rotulo", "origem", "situacao", "fonte", "sugestao")
     }
     filtros.update(inicio=_data("inicio"), fim=_data("fim"), nome_parte=_texto("nome_parte", 150), numero_processo=_texto("numero_processo", 30), oab=_texto("oab", 30))
+    filtros['tribunal'] = _tribunais()
+    filtros['contexto_id'] = request.args.get('contexto_id', type=int)
     dados = DJENService().acervo.listar(
         RequestContext.get_unidade_ativa(),
         filtros,
@@ -410,3 +421,30 @@ def buscar_monitoramento():
 def logs_monitoramento():
     from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
     return success_response(data=DjenMonitoramentoService().logs(RequestContext.get_current_user(), request.args))
+
+
+@djen_controller.route('/djen/contextos', methods=['GET', 'POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def contextos_djen():
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    servico = DjenContextoService()
+    unidade = RequestContext.get_unidade_ativa()
+    return success_response(data=servico.criar(_corpo(), unidade) if request.method == 'POST' else servico.listar(unidade))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>/classificar', methods=['POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def classificar_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().classificar(cid, _corpo(),
+        RequestContext.get_unidade_ativa(), RequestContext.get_current_user().id))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>/treinar', methods=['POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def treinar_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().solicitar_treino(cid, RequestContext.get_unidade_ativa()), status_code=202)

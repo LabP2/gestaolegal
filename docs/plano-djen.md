@@ -621,3 +621,57 @@ plano não decidia, sempre pelo caminho mais conservador. Revisar antes do merge
 - O CNJ monitorado abre os detalhes quando há um único processo correspondente
   no mesmo NPJ e unidade. Sem cadastro correspondente, continua como texto.
   Abrir o link seleciona a unidade do processo.
+
+### Contextos de classificação e sugestões — 17/11/2026
+
+A operação usa **não analisado**, **importado** e **descartado**. Os valores
+internos `nao_importada`/`pendente`, `vinculada` e `descartada` continuam
+compatíveis com processos e eventos. Relevância pertence ao treino, por contexto.
+
+Em **Acervo para treino**, criar um contexto com nome livre, variações do nome da
+parte (separadas por ponto e vírgula) e tribunais (vazio significa todos).
+O contexto pertence ao NPJ e à unidade ativa. Os nomes são comparados com os
+**destinatários estruturados**, ignorando caixa e acentos; não com o texto inteiro.
+Os filtros do contexto são fixados na criação. Para outra finalidade/filtro,
+criar outro contexto evita misturar exemplos já avaliados.
+
+A migration `27f86bd31ac9` acrescenta `djen_contextos`,
+`djen_publicacao_contextos`, `djen_contexto_historico` e `djen_modelos`.
+A relação publicação–contexto é única por NPJ e contém o rótulo, sua origem,
+autor, data e última sugestão/versionamento. Conteúdo não é duplicado.
+As tabelas anteriores de classificação permanecem para compatibilidade e auditoria,
+identificadas como legado nos detalhes; **não alimentam os modelos novos**.
+
+- Criar contexto inclui publicações já capturadas compatíveis com seus filtros.
+- Novas capturas também passam a integrar os contextos compatíveis.
+- Publicações anteriormente importadas/descartadas recebem rótulos iniciais
+  relevante/irrelevante. Importação automática também rotula.
+- A avaliação manual no treino tem prioridade e não é sobrescrita pela operação.
+- Na lista operacional, um contexto selecionado recebe a avaliação da operação.
+  Em “Todos os contextos”, o usuário marca quais contextos avaliar. Sem marcar
+  nenhum, a ação apenas importa/descarta. Contextos não escolhidos ficam intactos,
+  inclusive na próxima captura.
+- As ações operacionais nas telas antigas de busca e detalhe não avaliam contextos;
+  para isso usar a lista filtrada ou a tela de treino.
+- Classificar no treino nunca importa, descarta, cria processos ou eventos.
+
+O filtro **Contexto de classificação** mantém uma publicação por linha.
+Cada contexto mostra sua sugestão, identificando a versão do modelo; divergências
+são destacadas. O filtro **Sugestão do modelo** é separado da situação operacional.
+Previsões não alteram rótulos. Ao avaliar, o histórico conserva a sugestão e a
+versão do modelo disponíveis naquele momento.
+
+O botão **Treinar modelo experimental** usa TF-IDF + regressão logística por
+contexto. Exige 200 exemplos rotulados, pelo menos 50 de cada classe e 10 processos
+distintos. “Não analisado” é excluído. A avaliação separa treino/teste por CNJ,
+sem aprender o vocabulário do teste; exige ambas as classes nas duas partições.
+São apresentados precisão, revocação e F1. O artefato final usa os exemplos
+rotulados disponíveis; armazena vocabulário, IDF, coeficientes, intercepto,
+amostra de treinamento e métricas em JSON, sem desserialização de pickle.
+O modelo mais recente fornece sugestões experimentais às publicações não
+analisadas, sem ações automáticas. Novo treino depende de clique explícito.
+As métricas incluem rótulos operacionais e não substituem uma avaliação humana
+independente. LightGBM não faz parte desta primeira implementação.
+
+A imagem Python usa Debian slim para instalar as dependências científicas
+pré-compiladas. O lockfile inclui scikit-learn, NumPy e SciPy.

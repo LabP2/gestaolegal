@@ -10,7 +10,6 @@
 	{publicacao}
 	textoPlano={publicacao.texto_plano}
 	historico={publicacao.historico}
-	rotulo={publicacao.rotulo}
 	voltar={data.voltar}
 >
 	{#snippet acoes()}

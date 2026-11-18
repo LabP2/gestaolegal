@@ -403,7 +403,7 @@ def test_migration_djen_acervo(mysql_descartavel):
     antes = _schema(engine)
     command.upgrade(cfg, "head")
     depois = _schema(engine)
-    assert set(depois) - set(antes) == {"djen_publicacoes", "djen_classificacoes", "djen_classificacao_historico", "djen_consultas", "djen_consulta_resultados", "djen_monitoramentos", "djen_publicacao_unidades"}
+    assert set(depois) - set(antes) == {"djen_publicacoes", "djen_classificacoes", "djen_classificacao_historico", "djen_consultas", "djen_consulta_resultados", "djen_monitoramentos", "djen_publicacao_unidades", "djen_contextos", "djen_modelos", "djen_publicacao_contextos", "djen_contexto_historico"}
     texto = "Intimação — prazo ≥ 15 dias 📎"
     novo = "INSERT INTO djen_publicacoes (tenant_id, id_djen, numero_processo, data_disponibilizacao, texto_plano, capturada_em) VALUES (:t, 1, '00000000020268130001', '2026-11-05', :texto, NOW())"
     with engine.begin() as conn:
@@ -470,3 +470,132 @@ def test_monitoramento_migra_acesso_e_oabs(mysql_descartavel):
         conn.execute(text('DELETE FROM djen_consultas WHERE tenant_id=1'))
         assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacao_unidades WHERE tenant_id=1')).scalar()==1
         assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacoes WHERE tenant_id=1')).scalar()==1
+
+
+def test_contextos_migration_e_fk_de_tenant(mysql_descartavel):
+    from scripts.seed_database import seed_database
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, 'head')
+    seed_database(engine, senha='123456', tenants=('daj-ufmg', 'npj-demo'))
+    with engine.begin() as conn:
+        pid = conn.execute(text("INSERT INTO djen_publicacoes (tenant_id,id_djen,numero_processo,data_disponibilizacao,capturada_em) VALUES (1,880002,'00000000020268130001','2026-11-01',NOW())")).lastrowid
+        cid = conn.execute(text("INSERT INTO djen_contextos (tenant_id,unidade_id,nome,nomes,tribunais,criado_em) VALUES (1,1,'Teste','[\"Parte Teste\"]','[]',NOW())")).lastrowid
+        conn.execute(text("INSERT INTO djen_publicacao_contextos (tenant_id,id_publicacao,contexto_id,rotulo,origem) VALUES (1,:p,:c,'nao_classificado','captura')"), {'p':pid,'c':cid})
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text("INSERT INTO djen_publicacao_contextos (tenant_id,id_publicacao,contexto_id,rotulo,origem) VALUES (2,:p,:c,'relevante','classificacao')"), {'p':pid,'c':cid})
+    command.downgrade(cfg, '19e72ac50bd8')
+    with engine.connect() as conn:
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacoes WHERE id=:p'), {'p':pid}).scalar_one() == 1
+    command.upgrade(cfg, 'head')
+    with engine.connect() as conn:
+        assert conn.execute(text('SELECT COUNT(*) FROM djen_contextos')).scalar_one() == 0
+
+
+def test_contextos_funcional_e_concorrencia_mysql(mysql_descartavel, monkeypatch, tmp_path):
+    """API real: upsert, isolamento e duas transações concorrentes sobre rótulo."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from sqlalchemy.orm import sessionmaker
+    from scripts.seed_database import seed_database
+    engine, cfg = mysql_descartavel
+    command.upgrade(cfg, 'head')
+    seed_database(engine, senha='123456', tenants=('daj-ufmg', 'npj-demo'))
+    for nome in ('DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_NAME', 'JWT_SECRET_KEY'):
+        monkeypatch.setenv(nome, 'teste-descartavel')
+    from gestaolegal import create_app
+    from gestaolegal.config import Config as AppConfig
+    from gestaolegal.database import session as db
+    from gestaolegal.database.guarda_tenant import instalar_guarda
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
+    monkeypatch.setattr(db, 'engine', engine)
+    monkeypatch.setattr(db, 'SessionLocal', sessionmaker(bind=engine))
+    class TestConfig(AppConfig):
+        TESTING = True
+        MAIL_SUPPRESS_SEND = True
+        PRIVATE_FILES_ROOT = str(tmp_path)
+        JWT_SECRET_KEY = 'teste-descartavel-contextos-chave-com-mais-de-32-bytes'
+    app = create_app(TestConfig)
+    with sem_tenant('fixture MySQL descartável'), engine.begin() as conn:
+        conn.execute(text('UPDATE tenants SET djen_ativo=1'))
+        uid = conn.execute(text('SELECT id FROM unidades WHERE tenant_id=1 LIMIT 1')).scalar_one()
+        pid = conn.execute(text("INSERT INTO djen_publicacoes (tenant_id,id_djen,numero_processo,data_disponibilizacao,capturada_em,destinatarios) VALUES (1,999123,'00000000020268130001','2026-11-01',NOW(),'[{\"nome\":\"Parte Sintetica\"}]')")).lastrowid
+        conn.execute(text("INSERT INTO djen_publicacao_unidades (tenant_id,id_publicacao,unidade_id,origem) VALUES (1,:p,:u,'parte')"), {'p':pid,'u':uid})
+        conn.execute(text("INSERT INTO djen_classificacoes (tenant_id,id_publicacao,rotulo,origem) VALUES (1,:p,'nao_classificado','captura')"), {'p':pid})
+    instalar_guarda(engine)
+    client = app.test_client()
+    def login(email):
+        resp = client.post('/api/auth/login', json={'email':email,'password':'123456'})
+        assert resp.status_code == 200, resp.json
+        h = {'Authorization':'Bearer '+resp.json['data']['token']}
+        me = client.get('/api/user/me',headers=h).json['data']
+        return {**h,'X-Unidade-Id':str(me['unidades'][0]['id'])}
+    h, outro = login('admin@ufmg.br'), login('admin@npjdemo.br')
+    response = client.post('/api/djen/contextos', headers=h, json={'nome':'Contexto MySQL','nomes':['Parte Sintetica'],'tribunais':[]})
+    assert response.status_code == 200, response.json
+    cid = response.json['data']['id']
+    assert client.post(f'/api/djen/contextos/{cid}/classificar',headers=outro,json={'ids':[999123],'rotulo':'relevante'}).status_code == 404
+    with app.test_request_context(), contexto_tenant(1):
+        s = DjenContextoService()
+        s.sincronizar(s.obter(cid,uid))  # executa ON DUPLICATE KEY UPDATE
+        s.session.commit()
+    manual_pronto, liberar = Event(), Event()
+    def manual():
+        with app.test_request_context(), contexto_tenant(1):
+            s = DjenContextoService()
+            s.rotular(pid,cid,'irrelevante','classificacao',None)
+            manual_pronto.set()
+            assert liberar.wait(10)
+            s.session.commit()
+    def automatico():
+        assert manual_pronto.wait(10)
+        with app.test_request_context(), contexto_tenant(1):
+            s = DjenContextoService()
+            s.rotular(pid,cid,'relevante','importacao',None)
+            s.session.commit()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(manual)
+        assert manual_pronto.wait(10)
+        b = pool.submit(automatico)
+        try:
+            # O segundo escritor precisa aguardar o lock da transação manual.
+            from concurrent.futures import TimeoutError
+            with pytest.raises(TimeoutError):
+                b.result(timeout=.3)
+        finally:
+            liberar.set()
+        a.result(timeout=10)
+        b.result(timeout=10)
+    response = client.get('/api/djen/acervo',headers=h,query_string={'contexto_id':cid})
+    assert response.status_code == 200, response.json
+    assert response.json['data']['items'][0]['rotulo'] == 'irrelevante'
+    with sem_tenant('asserções MySQL descartável'), engine.connect() as conn:
+        assert conn.exec_driver_sql('SELECT COUNT(*) FROM djen_publicacao_contextos WHERE contexto_id=%s',(cid,)).scalar_one() == 1
+        assert conn.exec_driver_sql('SELECT COUNT(*) FROM djen_contexto_historico').scalar_one() == 1
+
+    # Dois pedidos concorrentes geram uma única execução persistida.
+    with engine.begin() as conn:
+        for i in range(240):
+            positivo = i % 2 == 0
+            pub = conn.exec_driver_sql(
+                "INSERT INTO djen_publicacoes (tenant_id,id_djen,numero_processo,data_disponibilizacao,capturada_em,texto_plano) VALUES (1,%s,%s,'2026-11-01',NOW(),%s)",
+                (900000+i, f"{i//4:020d}", 'bolsa assistencia estudantil' if positivo else 'licitacao contrato fornecedor')).lastrowid
+            conn.exec_driver_sql("INSERT INTO djen_publicacao_contextos (tenant_id,id_publicacao,contexto_id,rotulo,origem) VALUES (1,%s,%s,%s,'classificacao')", (pub,cid,'relevante' if positivo else 'irrelevante'))
+    from threading import Barrier
+    barreira = Barrier(2)
+    def pedir():
+        with app.test_client() as paralelo:
+            barreira.wait(timeout=10)
+            resposta = paralelo.post(f'/api/djen/contextos/{cid}/treinar', headers=h,json={})
+            assert resposta.status_code == 202, resposta.json
+            return resposta.json['data']['treino_token']
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tokens = list(pool.map(lambda _: pedir(), range(2)))
+    assert tokens[0] == tokens[1]
+    from scripts.processar_djen_modelos import executar_item
+    modelo = executar_item(app,1,cid,uid,tokens[0])
+    assert modelo['metricas']['total'] == 241
+    assert executar_item(app,1,cid,uid,tokens[0]) is None
+    listado = client.get('/api/djen/contextos',headers=h).json['data'][0]
+    assert listado['treino_status'] == 'concluido'
+    assert listado['modelo']['id'] == modelo['id']

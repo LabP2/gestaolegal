@@ -1,6 +1,6 @@
 # See: https://github.com/astral-sh/uv-docker-example/blob/main/Dockerfile
 
-FROM python:3.11.3-alpine AS base
+FROM python:3.11-slim AS base
 
 COPY --from=ghcr.io/astral-sh/uv:0.7.17 /uv /uvx /bin/
 

@@ -320,7 +320,7 @@ class ProcessoService:
     def criar_sem_caso(
         self, dados: ProcessoSemCasoInput, user: UserInfo, unidade_id: int
     ) -> dict[str, Any]:
-        """Processo sem caso, com ao menos uma parte. Não faz commit."""
+        """Processo sem caso; importação DJEN pode adiar as partes. Não faz commit."""
         if user.urole not in PAPEIS_SEM_CASO:
             raise ForbiddenException()
         partes = self._conferir_partes(dados.partes, unidade_id)

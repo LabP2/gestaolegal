@@ -72,6 +72,13 @@ class DjenAcervoRepository(BaseRepository):
         return pid
 
     def classificar(self, pid, rotulo, origem, usuario, automatico=False):
+        # Legado permanece para auditoria/compatibilidade, nunca treina novos modelos.
+        if origem != "classificacao":
+            from gestaolegal.services.djen_contexto_service import DjenContextoService
+
+            DjenContextoService().propagar(
+                pid, rotulo, origem, usuario, getattr(self, "contextos_operacao", None)
+            )
         atual = (
             self.session.execute(
                 self.escopo(
@@ -135,7 +142,10 @@ class DjenAcervoRepository(BaseRepository):
 
     def acessivel(self, unidade):
         consultas = self.escopo(
-            select(acesso.c.id).where(acesso.c.id_publicacao == p.c.id, acesso.c.unidade_id == unidade), acesso
+            select(acesso.c.id).where(
+                acesso.c.id_publicacao == p.c.id, acesso.c.unidade_id == unidade
+            ),
+            acesso,
         )
         operacional = self.escopo(
             select(o.c.id).where(
@@ -155,15 +165,56 @@ class DjenAcervoRepository(BaseRepository):
         return [dict(row) for row in self.session.execute(stmt).mappings()]
 
     def listar(self, unidade, filtros, page, per_page):
+        from gestaolegal.services.djen_contexto_service import DjenContextoService
+        from gestaolegal.database.tables import djen_publicacao_contextos as pc
+
+        contextos = DjenContextoService()
+        contexto = filtros.get("contexto_id")
+        if contexto:
+            contextos.obter(contexto, unidade)
         stmt = self._select().where(self.acessivel(unidade))
-        stmt = filtrar_identificacao(stmt, p, self.session.get_bind().dialect.name,
-            filtros.get('nome_parte'), filtros.get('numero_processo'), filtros.get('oab'))
+        if contexto:
+            stmt = stmt.where(
+                exists(
+                    self.escopo(
+                        select(pc.c.id).where(
+                            pc.c.id_publicacao == p.c.id, pc.c.contexto_id == contexto
+                        ),
+                        pc,
+                    )
+                )
+            )
+            if filtros.get("rotulo"):
+                stmt = stmt.where(
+                    exists(
+                        self.escopo(
+                            select(pc.c.id).where(
+                                pc.c.id_publicacao == p.c.id,
+                                pc.c.contexto_id == contexto,
+                                pc.c.rotulo == filtros["rotulo"],
+                            ),
+                            pc,
+                        )
+                    )
+                )
+        stmt = filtrar_identificacao(
+            stmt,
+            p,
+            self.session.get_bind().dialect.name,
+            filtros.get("nome_parte"),
+            filtros.get("numero_processo"),
+            filtros.get("oab"),
+        )
+        tribunais = filtros.get("tribunal")
+        if tribunais:
+            stmt = stmt.where(p.c.sigla_tribunal.in_(
+                [tribunais] if isinstance(tribunais, str) else tribunais
+            ))
         for chave, col in [
             ("rotulo", c.c.rotulo),
-            ("tribunal", p.c.sigla_tribunal),
             ("origem", c.c.origem),
         ]:
-            if filtros.get(chave):
+            if filtros.get(chave) and not (contexto and chave == "rotulo"):
                 stmt = stmt.where(col == filtros[chave])
         if filtros.get("inicio"):
             stmt = stmt.where(p.c.data_disponibilizacao >= filtros["inicio"])
@@ -172,16 +223,44 @@ class DjenAcervoRepository(BaseRepository):
         if filtros.get("situacao"):
             op = self.escopo(select(o.c.id).where(o.c.id_publicacao == p.c.id), o)
             stmt = stmt.where(
-                ~exists(op)
+                (~exists(op) | exists(op.where(o.c.situacao == "pendente")))
                 if filtros["situacao"] == "nao_importada"
                 else exists(op.where(o.c.situacao == filtros["situacao"]))
             )
         if filtros.get("fonte"):
             fonte = self.escopo(
-                select(acesso.c.id).where(acesso.c.id_publicacao == p.c.id,
-                    acesso.c.unidade_id == unidade, acesso.c.origem == filtros["fonte"]), acesso
+                select(acesso.c.id).where(
+                    acesso.c.id_publicacao == p.c.id,
+                    acesso.c.unidade_id == unidade,
+                    acesso.c.origem == filtros["fonte"],
+                ),
+                acesso,
             )
             stmt = stmt.where(exists(fonte))
+        if filtros.get("sugestao"):
+            from gestaolegal.database.tables import djen_contextos as ctx
+
+            previsoes = self.escopo(
+                select(pc.c.id)
+                .select_from(
+                    pc.join(
+                        ctx,
+                        (pc.c.contexto_id == ctx.c.id)
+                        & (pc.c.tenant_id == ctx.c.tenant_id),
+                    )
+                )
+                .where(pc.c.id_publicacao == p.c.id, ctx.c.unidade_id == unidade),
+                pc,
+                ctx,
+            )
+            if contexto:
+                previsoes = previsoes.where(pc.c.contexto_id == contexto)
+            if filtros["sugestao"] == "sem_sugestao":
+                stmt = stmt.where(~exists(previsoes.where(pc.c.sugestao.is_not(None))))
+            else:
+                stmt = stmt.where(
+                    exists(previsoes.where(pc.c.sugestao == filtros["sugestao"]))
+                )
         total = self.session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -193,6 +272,7 @@ class DjenAcervoRepository(BaseRepository):
             p.c.data_disponibilizacao,
             p.c.sigla_tribunal,
             p.c.nome_orgao,
+            p.c.destinatarios,
             c.c.rotulo,
             c.c.origem,
             func.substr(p.c.texto_plano, 1, 240).label("resumo"),
@@ -215,7 +295,20 @@ class DjenAcervoRepository(BaseRepository):
         operacoes = {
             x["id_publicacao"]: dict(x) for x in self.session.execute(ops).mappings()
         }
+        relacoes = contextos.relacoes([x["id"] for x in itens], unidade, contexto)
+        from gestaolegal.repositories.atendido_repository import AtendidoRepository
+
+        nomes = [d.get("nome", "") for item in itens for d in (item["destinatarios"] or [])]
+        sugestoes = AtendidoRepository().sugerir_por_nomes(nomes, unidade)
         for item in itens:
+            item["partes"] = list(dict.fromkeys(d.get("nome") for d in (item.pop("destinatarios") or []) if d.get("nome")))
+            candidatos = {a["id"]: a for nome in item["partes"] for a in sugestoes.get(nome, [])}
+            item["atendidos_sugeridos"] = list(candidatos.values())
+            item["contextos"] = [
+                r for r in relacoes if r["id_publicacao"] == item["id"]
+            ]
+            if contexto and item["contextos"]:
+                item["rotulo"] = item["contextos"][0]["rotulo"]
             operacional = operacoes.get(item["id"], {})
             item.update(
                 situacao=operacional.get("situacao", "nao_importada"),
@@ -223,7 +316,13 @@ class DjenAcervoRepository(BaseRepository):
                 id_processo=operacional.get("id_processo"),
                 id_caso=operacional.get("id_caso"),
             )
-        return dict(items=itens, total=total, page=page, per_page=per_page)
+        return dict(
+            items=itens,
+            total=total,
+            page=page,
+            per_page=per_page,
+            contextos=contextos.listar(unidade),
+        )
 
     def detalhe(self, pid, unidade):
         row = (
@@ -237,19 +336,57 @@ class DjenAcervoRepository(BaseRepository):
             return None
         dados = dict(row)
         dados.pop("texto_html", None)
-        operacao = self.session.execute(
-            self.escopo(
-                select(o).where(o.c.id_publicacao == pid, o.c.unidade_id == unidade), o
+        operacao = (
+            self.session.execute(
+                self.escopo(
+                    select(o).where(
+                        o.c.id_publicacao == pid, o.c.unidade_id == unidade
+                    ),
+                    o,
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         dados.update(
             situacao=operacao["situacao"] if operacao else "nao_importada",
             comunicacao_id=operacao["id"] if operacao else None,
             id_processo=operacao["id_processo"] if operacao else None,
             id_caso=operacao["id_caso"] if operacao else None,
         )
+        from gestaolegal.database.tables import (
+            djen_contexto_historico as ch,
+            djen_publicacao_contextos as pc,
+            djen_contextos as ctx,
+        )
+
         dados["historico"] = [
             dict(x)
+            for x in self.session.execute(
+                self.escopo(
+                    select(ch, ctx.c.nome.label("contexto_nome"))
+                    .select_from(
+                        ch.join(
+                            pc,
+                            (ch.c.relacao_id == pc.c.id)
+                            & (ch.c.tenant_id == pc.c.tenant_id),
+                        ).join(
+                            ctx,
+                            (pc.c.contexto_id == ctx.c.id)
+                            & (pc.c.tenant_id == ctx.c.tenant_id),
+                        )
+                    )
+                    .where(pc.c.id_publicacao == pid, ctx.c.unidade_id == unidade)
+                    .order_by(ch.c.id.desc()),
+                    ch,
+                    pc,
+                    ctx,
+                )
+            ).mappings()
+        ]
+        # Auditoria anterior aos contextos é identificada como legado, sem alimentar modelos.
+        dados["historico"] += [
+            dict(x, contexto_nome="Legado (sem contexto)")
             for x in self.session.execute(
                 self.escopo(
                     select(h).where(h.c.id_publicacao == pid).order_by(h.c.id.desc()), h
@@ -267,7 +404,9 @@ class DjenAcervoRepository(BaseRepository):
                         parametros=parametros,
                         unidade_id=unidade,
                         id_executor=executor,
-                        inicio=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None),
+                        inicio=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(
+                            tzinfo=None
+                        ),
                         status="executando",
                     )
                 )
@@ -277,15 +416,25 @@ class DjenAcervoRepository(BaseRepository):
     def dar_acesso(self, pid, unidade, origem):
         from sqlalchemy.dialects.mysql import insert as mi
         from sqlalchemy.dialects.sqlite import insert as si
-        valores = self.valores(dict(id_publicacao=pid, unidade_id=unidade, origem=origem))
+
+        valores = self.valores(
+            dict(id_publicacao=pid, unidade_id=unidade, origem=origem)
+        )
         if self.session.get_bind().dialect.name == "mysql":
             stmt = mi(acesso).values(**valores).on_duplicate_key_update(id=acesso.c.id)
         else:
             stmt = si(acesso).values(**valores).on_conflict_do_nothing()
         self.session.execute(stmt)
+        from gestaolegal.services.djen_contexto_service import DjenContextoService
+
+        DjenContextoService().sincronizar_publicacao(pid)
 
     def resultado(self, consulta, pid):
-        query = self.session.execute(self.escopo(select(q).where(q.c.id == consulta), q)).mappings().one()
+        query = (
+            self.session.execute(self.escopo(select(q).where(q.c.id == consulta), q))
+            .mappings()
+            .one()
+        )
         self.dar_acesso(pid, query["unidade_id"], query["origem"])
         stmt = self.escopo(
             select(r.c.id).where(r.c.id_consulta == consulta, r.c.id_publicacao == pid),
@@ -299,12 +448,15 @@ class DjenAcervoRepository(BaseRepository):
             )
 
     def atualizar_consulta(self, consulta, **valores):
-        self.session.execute(self.escopo(update(q).where(q.c.id == consulta), q).values(**valores))
+        self.session.execute(
+            self.escopo(update(q).where(q.c.id == consulta), q).values(**valores)
+        )
 
     def finalizar_consulta(self, consulta, status):
         self.session.execute(
             self.escopo(update(q).where(q.c.id == consulta), q).values(
-                status=status, fim=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+                status=status,
+                fim=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None),
             )
         )
 

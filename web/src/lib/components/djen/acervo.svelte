@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import Contextos from './contextos.svelte';
+	import FiltroTribunais from './filtro-tribunais.svelte';
+	import PublicacoesTabela from './publicacoes-tabela.svelte';
+	import Paginacao from '$lib/components/paginacao.svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { onDestroy, tick } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '$lib/api-client';
 	import { Input } from '$lib/components/ui/input';
@@ -7,39 +13,46 @@
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import AtendidoSelectorDialog from '$lib/components/atendido-selector-dialog.svelte';
+	import ImportarPublicacao from './importar-publicacao.svelte';
+	import ImportarLote from './importar-lote.svelte';
 	import { mensagemDeErro } from '$lib/utils/erros';
+	import { formatDateOnly } from '$lib/utils/date';
 	import { toast } from 'svelte-sonner';
-	import type { Atendido } from '$lib/types';
 	import type { AcervoPagina, RotuloExemplo } from '$lib/types/djen';
 	let { dados, treino = false }: { dados: AcervoPagina; treino?: boolean } = $props();
 	let selecionados = $state<number[]>([]);
-	let atendidosIds = $state<number[]>([]);
-	let atendidos = $state<Atendido[]>([]);
-	let parte = $state('');
-	let filtroRotulo = $state('todos');
+	let tribunais = $state<string[]>([]);
 	let filtroSituacao = $state('todos');
 	let filtroFonte = $state('todos');
+	let filtroSugestao = $state('todos');
+	let filtroContexto = $state('todos');
 	const fontes: Record<string, string> = {
 		parte: 'Nome da parte',
 		oab: 'OAB',
 		processo: 'Número do processo'
 	};
 	$effect(() => {
-		filtroRotulo =
-			(page.url.searchParams.get('rotulo') ?? (treino ? 'nao_classificado' : '')) || 'todos';
+		tribunais = page.url.searchParams
+			.getAll('tribunal')
+			.flatMap((t) => t.split(','))
+			.filter(Boolean);
 		filtroSituacao = page.url.searchParams.get('situacao') || 'todos';
 		filtroFonte = page.url.searchParams.get('fonte') || 'todos';
+		filtroSugestao = page.url.searchParams.get('sugestao') || 'todos';
+		filtroContexto = page.url.searchParams.get('contexto_id') || 'todos';
 	});
+	const contextoId = $derived(page.url.searchParams.get('contexto_id') || '');
+	let contextosAvaliados = $state<number[]>([]);
 	let ocupado = $state(false);
 	$effect(() => {
 		dados;
 		selecionados = [];
+		contextosAvaliados = [];
 	});
 	const rotulos = {
 		relevante: 'Relevante',
 		irrelevante: 'Irrelevante',
-		nao_classificado: 'Não classificado'
+		nao_classificado: 'Não analisado'
 	};
 	const estilosPublicacao: Record<RotuloExemplo, string> = {
 		relevante: 'border-green-600 bg-card dark:border-green-500',
@@ -66,21 +79,37 @@
 			'border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200'
 	};
 	const situacoes: Record<string, string> = {
-		nao_importada: 'Não importada',
-		pendente: 'Pendente',
-		vinculada: 'Importada / vinculada',
-		descartada: 'Descartada'
+		nao_importada: 'Não analisado',
+		pendente: 'Não analisado',
+		vinculada: 'Importado',
+		descartada: 'Descartado'
 	};
 	function selecionar(id: number, valor: boolean) {
 		selecionados = valor
 			? [...new Set([...selecionados, id])]
 			: selecionados.filter((x) => x !== id);
 	}
-	async function agir(acao: string, rotulo?: RotuloExemplo) {
+	async function agir(
+		acao: string,
+		rotulo?: RotuloExemplo,
+		ids = selecionados,
+		atendido: number | null = null
+	) {
 		ocupado = true;
 		try {
-			const url = acao === 'importar' ? 'djen/busca-parte/importar' : `djen/acervo/${acao}`;
-			await api.post(url, { ids: selecionados, rotulo, id_atendido: parte ? Number(parte) : null });
+			const url =
+				acao === 'classificar'
+					? `djen/contextos/${contextoId}/classificar`
+					: acao === 'importar'
+						? 'djen/busca-parte/importar'
+						: `djen/acervo/${acao}`;
+			await api.post(url, {
+				ids,
+				rotulo,
+				contexto_ids: contextoId ? [Number(contextoId)] : contextosAvaliados,
+				id_atendido: atendido,
+				...(acao === 'importar' ? { sem_parte: atendido === null } : {})
+			});
 			selecionados = [];
 			await invalidateAll();
 			toast.success('Alterações salvas.');
@@ -90,10 +119,34 @@
 			ocupado = false;
 		}
 	}
-	function paginaUrl(n: number) {
-		const p = new URLSearchParams(page.url.searchParams);
-		p.set('page', String(n));
-		return `?${p}`;
+	async function limparContexto() {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.delete('contexto_id');
+		params.delete('page');
+		await goto(`?${params}`);
+	}
+	let formulario = $state<HTMLFormElement>();
+	let timer: ReturnType<typeof setTimeout>;
+	onDestroy(() => clearTimeout(timer));
+	async function filtrar() {
+		clearTimeout(timer);
+		if (ocupado || !formulario) return;
+		const params = new URLSearchParams();
+		for (const [chave, valor] of new FormData(formulario))
+			if (String(valor).trim()) params.set(chave, String(valor).trim());
+		params.set('per_page', page.url.searchParams.get('per_page') || '20');
+		await goto(`?${params}`, { keepFocus: true, noScroll: true, replaceState: true });
+	}
+	function agendarFiltro(atraso = 500) {
+		clearTimeout(timer);
+		timer = setTimeout(async () => {
+			await tick();
+			await filtrar();
+		}, atraso);
+	}
+	async function limparFiltros() {
+		clearTimeout(timer);
+		await goto(`?per_page=${dados.per_page}`, { keepFocus: true, noScroll: true });
 	}
 </script>
 
@@ -108,223 +161,389 @@
 				: 'Todas as publicações capturadas ficam salvas para importar e trabalhar depois.'}
 		</p>
 	</header>
-	<form class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-6" method="GET">
-		<div class="w-full sm:w-64">
-			<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">Nome da parte</label
-			><Input
-				id="djen-nome_parte"
-				name="nome_parte"
-				value={page.url.searchParams.get('nome_parte') ?? ''}
-				placeholder="Nome completo ou parte do nome"
-			/>
-		</div>
-		<div class="w-full sm:w-64">
-			<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
-				>Número do processo</label
-			><Input
-				id="djen-numero_processo"
-				name="numero_processo"
-				value={page.url.searchParams.get('numero_processo') ?? ''}
-				placeholder="Com ou sem máscara"
-			/>
-		</div>
-		<div class="w-full sm:w-64">
-			<label for="djen-oab" class="mb-1 block text-sm font-medium">OAB</label><Input
-				id="djen-oab"
-				name="oab"
-				value={page.url.searchParams.get('oab') ?? ''}
-				placeholder="Número ou número/UF"
-			/>
-		</div>
-		<div class="w-full sm:w-[200px]">
-			<span class="mb-1 block text-sm font-medium">Classificação</span>
-			<input type="hidden" name="rotulo" value={filtroRotulo === 'todos' ? '' : filtroRotulo} />
-			<Select.Root type="single" bind:value={filtroRotulo}>
-				<Select.Trigger class="w-full data-[placeholder]:text-foreground" aria-label="Classificação"
-					>{rotulos[filtroRotulo as RotuloExemplo] ?? 'Todas'}</Select.Trigger
+	{#if treino}<Contextos contextos={dados.contextos ?? []} {treino} ocupadoExterno={ocupado} />{/if}
+	{#if !treino}
+		<form
+			class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-6"
+			method="GET"
+			bind:this={formulario}
+			oninput={() => agendarFiltro()}
+			onsubmit={(e) => {
+				e.preventDefault();
+				filtrar();
+			}}
+		>
+			<fieldset disabled={ocupado} class="contents">
+				<div class="w-full sm:w-64">
+					<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">Nome da parte</label
+					><Input
+						id="djen-nome_parte"
+						name="nome_parte"
+						value={page.url.searchParams.get('nome_parte') ?? ''}
+						placeholder="Nome completo ou parte do nome"
+					/>
+				</div>
+				<div class="w-full sm:w-64">
+					<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
+						>Número do processo</label
+					><Input
+						id="djen-numero_processo"
+						name="numero_processo"
+						value={page.url.searchParams.get('numero_processo') ?? ''}
+						placeholder="Com ou sem máscara"
+					/>
+				</div>
+				<div class="w-full sm:w-64">
+					<label for="djen-oab" class="mb-1 block text-sm font-medium">OAB</label><Input
+						id="djen-oab"
+						name="oab"
+						value={page.url.searchParams.get('oab') ?? ''}
+						placeholder="Número ou número/UF"
+					/>
+				</div>
+
+				<div class="w-full sm:w-[220px]">
+					<span class="mb-1 block text-sm font-medium">Situação</span>
+					<input
+						type="hidden"
+						name="situacao"
+						value={filtroSituacao === 'todos' ? '' : filtroSituacao}
+					/>
+					<Select.Root
+						type="single"
+						bind:value={filtroSituacao}
+						onValueChange={() => agendarFiltro(0)}
+					>
+						<Select.Trigger class="w-full data-[placeholder]:text-foreground" aria-label="Situação"
+							>{situacoes[filtroSituacao] ?? 'Todas'}</Select.Trigger
+						>
+						<Select.Content>
+							<Select.Item value="todos">Todas</Select.Item>
+							{#each Object.entries(situacoes).filter(([k]) => k !== 'pendente') as [valor, nome]}<Select.Item
+									value={valor}>{nome}</Select.Item
+								>{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="w-full sm:w-[200px]">
+					<span class="mb-1 block text-sm font-medium">Origem da consulta</span>
+					<input type="hidden" name="fonte" value={filtroFonte === 'todos' ? '' : filtroFonte} />
+					<Select.Root
+						type="single"
+						bind:value={filtroFonte}
+						onValueChange={() => agendarFiltro(0)}
+					>
+						<Select.Trigger
+							class="w-full data-[placeholder]:text-foreground"
+							aria-label="Origem da consulta">{fontes[filtroFonte] ?? 'Todas'}</Select.Trigger
+						>
+						<Select.Content>
+							<Select.Item value="todos">Todas</Select.Item>
+							{#each Object.entries(fontes) as [valor, nome]}<Select.Item value={valor}
+									>{nome}</Select.Item
+								>{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="w-full sm:w-56">
+					<input type="hidden" name="tribunal" value={tribunais.join(',')} />
+					<FiltroTribunais
+						bind:value={tribunais}
+						disabled={ocupado}
+						onchange={() => agendarFiltro(0)}
+					/>
+				</div>
+				<div class="w-full sm:w-auto">
+					<label for="djen-inicio" class="mb-1 block text-sm font-medium">De</label>
+					<Input
+						id="djen-inicio"
+						type="date"
+						name="inicio"
+						value={page.url.searchParams.get('inicio') ?? ''}
+					/>
+				</div>
+				<div class="w-full sm:w-auto">
+					<label for="djen-fim" class="mb-1 block text-sm font-medium">Até</label>
+					<Input
+						id="djen-fim"
+						type="date"
+						name="fim"
+						value={page.url.searchParams.get('fim') ?? ''}
+					/>
+				</div>
+
+				<details
+					class="w-full border-t pt-3"
+					open={!!contextoId || !!page.url.searchParams.get('sugestao')}
 				>
-				<Select.Content>
-					<Select.Item value="todos">Todas</Select.Item>
-					{#each Object.entries(rotulos) as [valor, nome]}<Select.Item value={valor}
-							>{nome}</Select.Item
-						>{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
-		<div class="w-full sm:w-[220px]">
-			<span class="mb-1 block text-sm font-medium">Situação</span>
-			<input
-				type="hidden"
-				name="situacao"
-				value={filtroSituacao === 'todos' ? '' : filtroSituacao}
-			/>
-			<Select.Root type="single" bind:value={filtroSituacao}>
-				<Select.Trigger class="w-full data-[placeholder]:text-foreground" aria-label="Situação"
-					>{situacoes[filtroSituacao] ?? 'Todas'}</Select.Trigger
+					<summary class="cursor-pointer text-sm text-muted-foreground">Filtros avançados</summary>
+					<div class="mt-3 flex flex-wrap items-end gap-3">
+						<div class="w-full sm:w-64">
+							<label for="contexto-operacional" class="mb-1 block text-sm font-medium"
+								>Contexto de classificação</label
+							>
+							<input
+								type="hidden"
+								name="contexto_id"
+								value={filtroContexto === 'todos' ? '' : filtroContexto}
+							/>
+							<Select.Root
+								type="single"
+								bind:value={filtroContexto}
+								onValueChange={() => agendarFiltro(0)}
+								disabled={ocupado}
+							>
+								<Select.Trigger
+									id="contexto-operacional"
+									class="w-full"
+									aria-label="Contexto de classificação"
+									><span class="truncate"
+										>{dados.contextos?.find((c) => String(c.id) === filtroContexto)?.nome ??
+											'Todos os contextos'}</span
+									></Select.Trigger
+								>
+								<Select.Content>
+									<Select.Item value="todos">Todos os contextos</Select.Item>
+									{#each dados.contextos ?? [] as ctx}<Select.Item value={String(ctx.id)}
+											>{ctx.nome}</Select.Item
+										>{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<div class="w-full sm:w-52">
+							<label for="sugestao-djen" class="mb-1 block text-sm font-medium"
+								>Sugestão do modelo</label
+							>
+							<input
+								type="hidden"
+								name="sugestao"
+								value={filtroSugestao === 'todos' ? '' : filtroSugestao}
+							/>
+							<Select.Root
+								type="single"
+								bind:value={filtroSugestao}
+								onValueChange={() => agendarFiltro(0)}
+							>
+								<Select.Trigger id="sugestao-djen" class="w-full" aria-label="Sugestão do modelo"
+									>{filtroSugestao === 'todos'
+										? 'Todas'
+										: filtroSugestao === 'sem_sugestao'
+											? 'Sem sugestão'
+											: rotulos[filtroSugestao as RotuloExemplo]}</Select.Trigger
+								>
+								<Select.Content
+									><Select.Item value="todos">Todas</Select.Item><Select.Item value="relevante"
+										>Relevante</Select.Item
+									><Select.Item value="irrelevante">Irrelevante</Select.Item><Select.Item
+										value="sem_sugestao">Sem sugestão</Select.Item
+									></Select.Content
+								>
+							</Select.Root>
+						</div>
+					</div>
+				</details>
+				<Button type="submit" disabled={ocupado}>Filtrar</Button>
+				<Button type="button" variant="ghost" disabled={ocupado} onclick={limparFiltros}
+					>Limpar filtros</Button
 				>
-				<Select.Content>
-					<Select.Item value="todos">Todas</Select.Item>
-					{#each Object.entries(situacoes) as [valor, nome]}<Select.Item value={valor}
-							>{nome}</Select.Item
-						>{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
-		<div class="w-full sm:w-[200px]">
-			<span class="mb-1 block text-sm font-medium">Origem da consulta</span>
-			<input type="hidden" name="fonte" value={filtroFonte === 'todos' ? '' : filtroFonte} />
-			<Select.Root type="single" bind:value={filtroFonte}>
-				<Select.Trigger
-					class="w-full data-[placeholder]:text-foreground"
-					aria-label="Origem da consulta">{fontes[filtroFonte] ?? 'Todas'}</Select.Trigger
+			</fieldset>
+		</form>
+	{/if}
+	{#if !treino && contextoId}
+		<div class="flex flex-wrap items-center gap-2 text-sm">
+			<Badge variant="secondary" class="max-w-full gap-2 rounded-full px-3 py-1">
+				<span class="break-words"
+					>Contexto: {dados.contextos?.find((c) => String(c.id) === contextoId)?.nome ??
+						contextoId}</span
 				>
-				<Select.Content>
-					<Select.Item value="todos">Todas</Select.Item>
-					{#each Object.entries(fontes) as [valor, nome]}<Select.Item value={valor}
-							>{nome}</Select.Item
-						>{/each}
-				</Select.Content>
-			</Select.Root>
+				<button
+					type="button"
+					class="shrink-0 rounded px-1 hover:bg-muted"
+					aria-label="Limpar contexto de classificação"
+					onclick={limparContexto}
+					disabled={ocupado}>×</button
+				>
+			</Badge>
 		</div>
-		<div class="w-full sm:w-28">
-			<label for="djen-tribunal" class="mb-1 block text-sm font-medium">Tribunal</label>
-			<Input
-				id="djen-tribunal"
-				name="tribunal"
-				value={page.url.searchParams.get('tribunal') ?? ''}
-				placeholder="TJMG"
-			/>
-		</div>
-		<div class="w-full sm:w-auto">
-			<label for="djen-inicio" class="mb-1 block text-sm font-medium">De</label>
-			<Input
-				id="djen-inicio"
-				type="date"
-				name="inicio"
-				value={page.url.searchParams.get('inicio') ?? ''}
-			/>
-		</div>
-		<div class="w-full sm:w-auto">
-			<label for="djen-fim" class="mb-1 block text-sm font-medium">Até</label>
-			<Input id="djen-fim" type="date" name="fim" value={page.url.searchParams.get('fim') ?? ''} />
-		</div>
-		<Button type="submit">Filtrar</Button>
-	</form>
-	<div class="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-6">
-		<span>{selecionados.length} selecionada(s)</span>
-		{#if treino}
-			{#each Object.entries(rotulos) as [rotulo, nome]}<Button
+	{/if}
+	{#if treino && !contextoId}
+		<p class="py-8 text-center text-muted-foreground">
+			Selecione ou crie um contexto para começar.
+		</p>
+	{:else}
+		<div
+			class={`flex flex-wrap items-end gap-3 ${treino ? 'py-2' : 'rounded-lg border bg-card p-6'}`}
+		>
+			<span>{selecionados.length} selecionada(s)</span>
+			{#if treino}
+				{#each Object.entries(rotulos) as [rotulo, nome]}<Button
+						variant="outline"
+						disabled={ocupado || !selecionados.length || !contextoId}
+						onclick={() => agir('classificar', rotulo as RotuloExemplo)}>{nome}</Button
+					>{/each}
+			{:else}
+				{#if !contextoId && dados.contextos?.length}
+					<details class="w-full text-sm">
+						<summary class="cursor-pointer text-muted-foreground"
+							>Avaliar contextos ao importar ou descartar{contextosAvaliados.length
+								? ` (${contextosAvaliados.length} selecionado(s))`
+								: ''}</summary
+						>
+						<fieldset class="mt-3 space-y-2 rounded-md border p-3">
+							<legend class="text-sm">Aplicar avaliação também aos contextos selecionados</legend>
+							<p class="text-xs text-muted-foreground">
+								Sem seleção, apenas importa ou descarta. Avaliações manuais anteriores são
+								preservadas.
+							</p>
+							{#each dados.contextos as ctx}<label
+									class="mr-4 inline-flex items-center gap-2 text-sm"
+									><input
+										type="checkbox"
+										value={ctx.id}
+										bind:group={contextosAvaliados}
+									/>{ctx.nome}</label
+								>{/each}
+						</fieldset>
+					</details>
+				{/if}
+				<ImportarLote
+					itens={dados.items}
+					{selecionados}
+					total={dados.total}
+					contextoIds={contextoId ? [Number(contextoId)] : contextosAvaliados}
+					bind:ocupado
+				/>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="h-9 rounded-md border px-3 text-sm"
+						disabled={ocupado || !selecionados.length}>Mais ações</DropdownMenu.Trigger
+					>
+					<DropdownMenu.Content>
+						<DropdownMenu.Item onclick={() => agir('importar')}
+							>Importar selecionadas sem parte</DropdownMenu.Item
+						>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+				<Button
 					variant="outline"
 					disabled={ocupado || !selecionados.length}
-					onclick={() => agir('classificar', rotulo as RotuloExemplo)}>{nome}</Button
-				>{/each}
-		{:else}
-			<AtendidoSelectorDialog
-				bind:selectedAtendidosIds={atendidosIds}
-				onSelect={(itens) => {
-					atendidos = itens;
-					parte = itens[0] ? String(itens[0].id) : '';
+					onclick={() => agir('descartar')}>Descartar selecionadas</Button
+				>
+			{/if}
+		</div>
+		<p class="text-sm text-muted-foreground">
+			{dados.total} publicação(ões). Não selecionar mantém o estado atual.
+		</p>
+		<label class="flex items-center gap-2 text-sm"
+			><Checkbox
+				disabled={ocupado || !dados.items.length}
+				checked={dados.items.length > 0 &&
+					dados.items.every((i) => selecionados.includes(i.id_djen))}
+				onCheckedChange={(checked) => {
+					selecionados = checked === true ? dados.items.map((i) => i.id_djen) : [];
 				}}
+			/>Selecionar esta página</label
+		>
+		{#if !treino}
+			<PublicacoesTabela
+				itens={dados.items}
+				{selecionados}
+				{ocupado}
+				{selecionar}
+				importar={(id, atendido) => agir('importar', undefined, [id], atendido)}
 			/>
-			<div class="w-full sm:w-64">
-				<span class="mb-1 block text-sm font-medium">Parte para processos novos</span>
-				<Select.Root type="single" bind:value={parte}>
-					<Select.Trigger class="w-full" aria-label="Parte para processos novos"
-						><span class="truncate"
-							>{atendidos.find((a) => String(a.id) === parte)?.nome ??
-								'Selecione se necessário'}</span
-						></Select.Trigger
+		{:else}
+			<ul class="space-y-3">
+				{#each dados.items as item (item.id)}
+					<li
+						class={`flex gap-3 rounded-lg border-2 p-4 transition-colors ${estilosPublicacao[treino ? (contextoId ? item.rotulo : 'nao_classificado') : item.situacao === 'vinculada' ? 'relevante' : item.situacao === 'descartada' ? 'irrelevante' : 'nao_classificado']}`}
 					>
-					<Select.Content>
-						{#each atendidos as a}<Select.Item value={String(a.id)}>{a.nome}</Select.Item>{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-			<Button disabled={ocupado || !selecionados.length} onclick={() => agir('importar')}
-				>Importar selecionadas</Button
-			>
-			<Button
-				variant="outline"
-				disabled={ocupado || !selecionados.length}
-				onclick={() => agir('descartar')}>Descartar e marcar irrelevante</Button
-			>
+						<Checkbox
+							class="mt-1"
+							aria-label={`Selecionar publicação ${item.id_djen}`}
+							disabled={ocupado}
+							checked={selecionados.includes(item.id_djen)}
+							onCheckedChange={(checked) => selecionar(item.id_djen, checked === true)}
+						/>
+						<div class="min-w-0 flex-1 space-y-2">
+							<div class="flex flex-wrap gap-3 text-sm">
+								<strong>{item.numero_processo}</strong><span
+									>{formatDateOnly(item.data_disponibilizacao)}</span
+								><span>{item.sigla_tribunal}</span>
+							</div>
+							<div class="flex flex-wrap gap-2">
+								{#if treino && contextoId}
+									<Badge
+										variant="outline"
+										class={`rounded-full px-3 py-1 ${estilosRotulo[item.rotulo]}`}
+										title="Classificação de relevância"
+									>
+										<span aria-hidden="true" class="size-1.5 rounded-full bg-current"
+										></span>{rotulos[item.rotulo]}
+									</Badge>
+								{/if}
+								{#if !treino}
+									<Badge
+										variant="outline"
+										class={`rounded-full px-3 py-1 ${estilosSituacao[item.situacao] ?? ''}`}
+										title="Situação da importação">{situacoes[item.situacao]}</Badge
+									>
+								{/if}
+							</div>
+							{#if !treino}
+								{#if new Set((item.contextos ?? [])
+										.map((c) => c.sugestao)
+										.filter(Boolean)).size > 1}<Badge variant="outline">Sugestões divergentes</Badge
+									>{/if}
+								{#each item.contextos ?? [] as ctx}<p class="text-sm">
+										<strong>{ctx.nome}:</strong>
+										{ctx.sugestao
+											? `Sugestão: ${rotulos[ctx.sugestao]} · modelo #${ctx.modelo_id}`
+											: 'Sem sugestão'}{#if ctx.rotulo !== 'nao_classificado'}
+											· Avaliação registrada: {rotulos[ctx.rotulo]}{/if}
+									</p>{/each}
+							{/if}
+							<p class="text-sm">
+								<strong>Partes:</strong>
+								{(item.partes ?? []).join(' · ') || 'Não informadas pelo DJEN'}
+							</p>
+							<p class="text-sm text-muted-foreground">{item.nome_orgao}</p>
+							<p class="line-clamp-3 text-sm">{item.resumo}</p>
+							{#if !treino && item.situacao !== 'vinculada'}
+								<ImportarPublicacao
+									{item}
+									{ocupado}
+									importar={(id) => agir('importar', undefined, [item.id_djen], id)}
+								/>
+							{/if}
+							<div
+								class={`flex flex-wrap gap-4 text-sm ${item.rotulo === 'irrelevante' ? 'text-slate-600 dark:text-slate-300' : 'text-primary'}`}
+							>
+								<a
+									class="underline"
+									href={`/djen/acervo/${item.id}?voltar=${encodeURIComponent(page.url.pathname + page.url.search)}`}
+									>Ler publicação e histórico</a
+								>{#if item.comunicacao_id}<a
+										class="underline"
+										href={`/djen/publicacoes/${item.comunicacao_id}`}>Abrir operação</a
+									>{/if}{#if item.id_processo}<a
+										class="underline"
+										href={`/processos/${item.id_processo}`}>Processo #{item.id_processo}</a
+									>{/if}{#if item.id_caso}<a class="underline" href={`/casos/${item.id_caso}`}
+										>Caso #{item.id_caso}</a
+									>{/if}
+							</div>
+						</div>
+					</li>
+				{:else}<li class="p-6">Nenhuma publicação neste filtro.</li>{/each}
+			</ul>
 		{/if}
-	</div>
-	<p class="text-sm text-muted-foreground">
-		{dados.total} publicação(ões). Não selecionar mantém o estado atual.
-	</p>
-	<label class="flex items-center gap-2 text-sm"
-		><Checkbox
-			disabled={ocupado || !dados.items.length}
-			checked={dados.items.length > 0 && dados.items.every((i) => selecionados.includes(i.id_djen))}
-			onCheckedChange={(checked) => {
-				selecionados = checked === true ? dados.items.map((i) => i.id_djen) : [];
-			}}
-		/>Selecionar esta página</label
-	>
-	<ul class="space-y-3">
-		{#each dados.items as item (item.id)}
-			<li
-				class={`flex gap-3 rounded-lg border-2 p-4 transition-colors ${estilosPublicacao[item.rotulo]}`}
-			>
-				<Checkbox
-					class="mt-1"
-					aria-label={`Selecionar publicação ${item.id_djen}`}
-					disabled={ocupado}
-					checked={selecionados.includes(item.id_djen)}
-					onCheckedChange={(checked) => selecionar(item.id_djen, checked === true)}
-				/>
-				<div class="min-w-0 flex-1 space-y-2">
-					<div class="flex flex-wrap gap-3 text-sm">
-						<strong>{item.numero_processo}</strong><span>{item.data_disponibilizacao}</span><span
-							>{item.sigla_tribunal}</span
-						>
-					</div>
-					<div class="flex flex-wrap gap-2">
-						<Badge
-							variant="outline"
-							class={`rounded-full px-3 py-1 ${estilosRotulo[item.rotulo]}`}
-							title="Classificação de relevância"
-						>
-							<span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{rotulos[
-								item.rotulo
-							]}
-						</Badge>
-						<Badge
-							variant="outline"
-							class={`rounded-full px-3 py-1 ${estilosSituacao[item.situacao] ?? ''}`}
-							title="Situação da importação">{situacoes[item.situacao]}</Badge
-						>
-					</div>
-					<p class="text-sm text-muted-foreground">{item.nome_orgao}</p>
-					<p class="line-clamp-3 text-sm">{item.resumo}</p>
-					<div
-						class={`flex flex-wrap gap-4 text-sm ${item.rotulo === 'irrelevante' ? 'text-slate-600 dark:text-slate-300' : 'text-primary'}`}
-					>
-						<a
-							class="underline"
-							href={`/djen/acervo/${item.id}?voltar=${encodeURIComponent(page.url.pathname + page.url.search)}`}
-							>Ler publicação e histórico</a
-						>{#if item.comunicacao_id}<a
-								class="underline"
-								href={`/djen/publicacoes/${item.comunicacao_id}`}>Abrir operação</a
-							>{/if}{#if item.id_processo}<a
-								class="underline"
-								href={`/processos/${item.id_processo}`}>Processo #{item.id_processo}</a
-							>{/if}{#if item.id_caso}<a class="underline" href={`/casos/${item.id_caso}`}
-								>Caso #{item.id_caso}</a
-							>{/if}
-					</div>
-				</div>
-			</li>
-		{:else}<li class="p-6">Nenhuma publicação neste filtro.</li>{/each}
-	</ul>
-	<nav class="flex gap-4 text-sm" aria-label="Paginação">
-		{#if dados.page > 1}<a class="underline" href={paginaUrl(dados.page - 1)}>Anterior</a>{/if}<span
-			>Página {dados.page}</span
-		>{#if dados.page * dados.per_page < dados.total}<a
-				class="underline"
-				href={paginaUrl(dados.page + 1)}>Próxima</a
-			>{/if}
-	</nav>
+		<Paginacao
+			total={dados.total}
+			page={dados.page}
+			per_page={dados.per_page}
+			disabled={ocupado}
+			tamanhos={!treino}
+		/>
+	{/if}
 </div>

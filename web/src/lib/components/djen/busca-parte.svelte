@@ -17,11 +17,9 @@
 	import {
 		BUSCA_PARTE_MAX_DIAS,
 		DJEN_PAPEIS_GESTAO,
-		ROTULO_EXEMPLO_LABEL,
 		type Atendido,
 		type AtendidoNome,
 		type ImportacaoBuscaParte,
-		type NaoPertinentesBuscaParte,
 		type ResultadoBuscaParte
 	} from '$lib/types';
 	import X from '@lucide/svelte/icons/x';
@@ -238,7 +236,8 @@
 			de: resultado!.de,
 			ate: resultado!.ate,
 			tribunal: resultado!.tribunais,
-			ids
+			ids,
+			contexto_ids: []
 		};
 	}
 
@@ -250,14 +249,13 @@
 		const naoEncontradas: number[] = [];
 		try {
 			for (let i = 0; i < marcados.length; i += LOTE_IMPORTACAO) {
-				const lote = await api.post<NaoPertinentesBuscaParte>(
-					'djen/busca-parte/nao-pertinentes',
+				const lote = await api.post<{ descartadas: number }>(
+					'djen/acervo/descartar',
 					corpoDoLote(marcados.slice(i, i + LOTE_IMPORTACAO))
 				);
-				marcadas += lote.marcadas;
-				naoEncontradas.push(...lote.nao_encontradas);
+				marcadas += lote.descartadas;
 			}
-			const partes = [`${marcadas} marcada(s) como irrelevante(s)`];
+			const partes = [`${marcadas} descartada(s)`];
 			if (naoEncontradas.length) {
 				partes.push(`${naoEncontradas.length} não encontrada(s) no DJEN`);
 			}
@@ -502,7 +500,7 @@
 							>
 								{marcandoNaoPertinentes
 									? 'Marcando…'
-									: `Marcar como irrelevantes (${marcados.length})`}
+									: `Descartar publicações (${marcados.length})`}
 							</Button>
 						</div>
 						<p class="text-xs text-muted-foreground">
@@ -543,17 +541,7 @@
 											{#if item.tipo_comunicacao}
 												<span class="text-muted-foreground">{item.tipo_comunicacao}</span>
 											{/if}
-											{#if item.rotulo === 'relevante' || item.rotulo === 'irrelevante'}
-												<Badge
-													variant={item.rotulo === 'relevante' ? 'secondary' : 'outline'}
-													class={item.rotulo === 'irrelevante'
-														? 'border-amber-300 text-amber-800 dark:border-amber-700 dark:text-amber-200'
-														: ''}
-													title="Rótulo no banco de exemplos"
-												>
-													{ROTULO_EXEMPLO_LABEL[item.rotulo]}
-												</Badge>
-											{/if}
+
 											{#if item.ja_no_banco}
 												{#if item.publicacao_id}
 													<a href="/djen/publicacoes/{item.publicacao_id}">

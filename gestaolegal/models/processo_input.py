@@ -28,8 +28,12 @@ class ProcessoCreateInput(ProcessoNumeroInput):
     link: str | None = None
     probabilidade: str | None = None
     posicao_assistido: str | None = None
-    valor_causa_inicial: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
-    valor_causa_atual: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
+    valor_causa_inicial: Decimal | None = Field(
+        default=None, max_digits=15, decimal_places=2
+    )
+    valor_causa_atual: Decimal | None = Field(
+        default=None, max_digits=15, decimal_places=2
+    )
     data_distribuicao: date | None = None
     data_transito_em_julgado: date | None = None
     obs: str | None = None
@@ -44,8 +48,12 @@ class ProcessoUpdateInput(ProcessoNumeroInput):
     link: str | None = None
     probabilidade: str | None = None
     posicao_assistido: str | None = None
-    valor_causa_inicial: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
-    valor_causa_atual: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
+    valor_causa_inicial: Decimal | None = Field(
+        default=None, max_digits=15, decimal_places=2
+    )
+    valor_causa_atual: Decimal | None = Field(
+        default=None, max_digits=15, decimal_places=2
+    )
     data_distribuicao: date | None = None
     data_transito_em_julgado: date | None = None
     obs: str | None = None
@@ -69,3 +77,9 @@ class ProcessoSemCasoInput(ProcessoCreateInput):
         if value is not None:
             raise ValueError("Processo sem caso não recebe id_caso")
         return value
+
+
+class ProcessoDjenInput(ProcessoSemCasoInput):
+    """Importação explícita do DJEN permite identificar as partes posteriormente."""
+
+    partes: list[ParteInput] = Field(default_factory=list)

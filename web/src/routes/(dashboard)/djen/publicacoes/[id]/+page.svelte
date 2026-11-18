@@ -35,7 +35,7 @@
 		{#if publicacao.pode_vincular && publicacao.situacao === 'pendente'}
 			<ConfirmAction
 				title="Descartar esta publicação?"
-				description="A publicação será marcada como irrelevante e permanecerá no acervo para consulta posterior."
+				description="A publicação será descartada e permanecerá no acervo. Para avaliar relevância, use o contexto na tela de treino."
 				confirmText="Descartar"
 				cancelText="Voltar"
 				triggerText="Descartar"

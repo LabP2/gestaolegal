@@ -3,9 +3,9 @@
 export type SituacaoPublicacao = 'vinculada' | 'pendente' | 'descartada';
 
 export const SITUACAO_PUBLICACAO_LABEL: Record<SituacaoPublicacao, string> = {
-	vinculada: 'Vinculada',
-	pendente: 'Sem caso',
-	descartada: 'Descartada'
+	vinculada: 'Importado',
+	pendente: 'Não analisado',
+	descartada: 'Descartado'
 };
 
 /** Papéis que veem a caixa "Sem caso" e podem vincular ou descartar (§7). */
@@ -180,7 +180,7 @@ export type RotuloExemplo = 'relevante' | 'irrelevante' | 'nao_classificado';
 export const ROTULO_EXEMPLO_LABEL: Record<RotuloExemplo, string> = {
 	relevante: 'Relevante',
 	irrelevante: 'Irrelevante',
-	nao_classificado: 'Não classificado'
+	nao_classificado: 'Não analisado'
 };
 
 export type OrigemExemplo =
@@ -225,6 +225,9 @@ export interface ResumoExemplos {
 export const BUSCA_PARTE_MAX_DIAS = 30;
 
 export interface AcervoItem {
+	partes?: string[];
+	atendidos_sugeridos?: { id: number; nome: string }[];
+	contextos?: ClassificacaoContexto[];
 	id: number;
 	id_djen: number;
 	numero_processo: string;
@@ -239,7 +242,33 @@ export interface AcervoItem {
 	id_processo: number | null;
 	id_caso: number | null;
 }
+export interface ContextoDjen {
+	treino_status?: 'ocioso' | 'na_fila' | 'executando' | 'concluido' | 'erro';
+	treino_erro?: string | null;
+	treino_solicitado_em?: string | null;
+	treino_iniciado_em?: string | null;
+	treino_finalizado_em?: string | null;
+	id: number;
+	nome: string;
+	nomes: string[];
+	tribunais: string[];
+	contagens: Partial<Record<RotuloExemplo, number>>;
+	pode_treinar: boolean;
+	modelo: {
+		id: number;
+		metricas: { precisao: number; revocacao: number; f1: number; total: number };
+	} | null;
+}
+export interface ClassificacaoContexto {
+	contexto_id: number;
+	nome: string;
+	rotulo: RotuloExemplo;
+	origem: string;
+	sugestao: 'relevante' | 'irrelevante' | null;
+	modelo_id: number | null;
+}
 export interface AcervoPagina {
+	contextos?: ContextoDjen[];
 	items: AcervoItem[];
 	total: number;
 	page: number;
@@ -255,6 +284,7 @@ export interface AcervoDetalhe extends Omit<Partial<Publicacao>, 'situacao'> {
 	texto_plano: string | null;
 	rotulo: RotuloExemplo;
 	historico: {
+		contexto_nome?: string;
 		rotulo_anterior: RotuloExemplo;
 		rotulo: RotuloExemplo;
 		origem: string;

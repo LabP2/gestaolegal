@@ -104,6 +104,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  djen-ml-worker:
+    extends:
+      service: djen-worker
+    command: ["python", "-m", "scripts.processar_djen_modelos"]
+
   db:
     image: mysql:8.0.42
     command: --authentication-policy=caching_sha2_password
