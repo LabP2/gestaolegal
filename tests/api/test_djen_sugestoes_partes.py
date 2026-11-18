@@ -120,3 +120,37 @@ def test_filtro_multiplos_tribunais_no_acervo_e_operacao(client, auth_headers, l
             assert {item['sigla_tribunal'] for item in itens} == {
                 {91001: 'TJMG', 91002: 'TRT3'}[id_djen] for id_djen in esperado
             }
+
+
+def test_polo_filtra_a_mesma_parte_no_acervo_e_operacao(client, auth_headers, lote):
+    from sqlalchemy import select
+    from gestaolegal.database.tables import djen_publicacoes
+
+    with contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        for id_djen, polo in [(91001, 'A'), (91002, 'P')]:
+            session.execute(update(djen_publicacoes).where(
+                djen_publicacoes.c.tenant_id == TENANT_DAJ,
+                djen_publicacoes.c.id_djen == id_djen,
+            ).values(destinatarios=[{'nome': 'UFMG', 'polo': polo},
+                                    {'nome': 'Outra parte', 'polo': 'P' if polo == 'A' else 'A'}]))
+        session.commit()
+        numeros = dict(session.execute(select(djen_publicacoes.c.id_djen, djen_publicacoes.c.numero_processo).where(
+            djen_publicacoes.c.tenant_id == TENANT_DAJ,
+            djen_publicacoes.c.id_djen.in_([91001, 91002]),
+        )).all())
+    r = client.post('/api/djen/busca-parte/importar', headers=auth_headers,
+                    json={'ids': [91001, 91002], 'sem_parte': True, 'contexto_ids': []})
+    assert r.status_code == 200, r.json
+    for rota in ['/api/djen/acervo', '/api/djen/publicacoes']:
+        for query, ids in [
+            ('nome_parte=UFMG&polo=A', [91001]),
+            ('nome_parte=UFMG&polo=P', [91002]),
+            ('nome_parte=Outra&polo=P', [91001]),
+            ('nome_parte=UFMG', [91001, 91002]),
+            ('polo=A', [91001, 91002]),
+        ]:
+            r = client.get(f'{rota}?{query}', headers=auth_headers)
+            assert r.status_code == 200, r.json
+            assert {i['numero_processo'] for i in get_success_data(r)['items']} == {numeros[i] for i in ids}
+        assert client.get(f'{rota}?polo=X', headers=auth_headers).status_code == 400

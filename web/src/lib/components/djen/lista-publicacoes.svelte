@@ -42,6 +42,7 @@
 		per_page: string;
 		q: string;
 		nome_parte: string;
+		polo: string;
 		numero_processo: string;
 		inicio: string;
 		fim: string;
@@ -57,6 +58,7 @@
 			per_page: p.get('per_page') ?? '20',
 			q: p.get('q') ?? '',
 			nome_parte: p.get('nome_parte') ?? '',
+			polo: p.get('polo') ?? TODOS,
 			numero_processo: p.get('numero_processo') ?? '',
 			inicio: p.get('inicio') ?? '',
 			fim: p.get('fim') ?? '',
@@ -78,6 +80,7 @@
 			per_page: f.per_page,
 			q: f.q.trim(),
 			nome_parte: f.nome_parte.trim(),
+			polo: semTodos(f.polo),
 			numero_processo: f.numero_processo.trim(),
 			inicio: f.inicio,
 			fim: f.fim,
@@ -151,6 +154,22 @@
 					debounceMs={500}
 					placeholder="Nome completo ou parte do nome"
 				/>
+			</div>
+			<div class="w-full sm:w-40">
+				<span class="mb-1 block text-sm font-medium">Polo da parte</span>
+				<Select.Root type="single" bind:value={filters.polo} onValueChange={() => applyFilters()}>
+					<Select.Trigger class="w-full" aria-label="Polo da parte"
+						>{filters.polo === 'A'
+							? 'Ativo'
+							: filters.polo === 'P'
+								? 'Passivo'
+								: 'Todos'}</Select.Trigger
+					>
+					<Select.Content
+						><Select.Item value={TODOS}>Todos</Select.Item><Select.Item value="A">Ativo</Select.Item
+						><Select.Item value="P">Passivo</Select.Item></Select.Content
+					>
+				</Select.Root>
 			</div>
 			<div>
 				<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"

@@ -95,6 +95,7 @@ def listar_publicacoes():
         "tipo": _texto("tipo", 100),
         "oab": _texto("oab", 30),
         "nome_parte": _texto("nome_parte", 150),
+        "polo": _texto("polo", 12),
         "numero_processo": _texto("numero_processo", 30),
         "situacao": _texto("situacao", 12),
         "caso_id": caso_id,
@@ -334,6 +335,7 @@ def listar_acervo():
         k: _texto(k) for k in ("rotulo", "origem", "situacao", "fonte", "sugestao")
     }
     filtros.update(inicio=_data("inicio"), fim=_data("fim"), nome_parte=_texto("nome_parte", 150), numero_processo=_texto("numero_processo", 30), oab=_texto("oab", 30))
+    filtros['polo'] = _texto('polo', 12)
     filtros['tribunal'] = _tribunais()
     filtros['contexto_id'] = request.args.get('contexto_id', type=int)
     dados = DJENService().acervo.listar(

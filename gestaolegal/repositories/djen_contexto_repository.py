@@ -225,6 +225,8 @@ class DjenContextoRepository(BaseRepository):
                 raise ValidationException("Contextos inválidos")
             for cid in escolhidos:
                 self.obter(cid, unidade)
+            if not escolhidos:
+                return {pub["id"]: [] for pub in registros}
         relacoes = self.relacoes([p["id"] for p in registros], unidade)
         resultado = {}
         for pub in registros:
@@ -243,6 +245,8 @@ class DjenContextoRepository(BaseRepository):
     def propagar(self, pid, rotulo, origem, usuario, destinos=None):
         # Capturas/vínculos automáticos alcançam todos os contextos compatíveis.
         # Operações manuais usam o mapa de escolhas validado antes da transação.
+        if destinos is not None and not destinos.get(pid):
+            return
         if destinos is None:
             self.sincronizar_publicacao(pid)
         stmt = self.escopo(select(r).where(r.c.id_publicacao == pid), r)

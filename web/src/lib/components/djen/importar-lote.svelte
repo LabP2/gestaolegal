@@ -21,8 +21,11 @@
 		contextoIds: number[];
 		ocupado?: boolean;
 	} = $props();
-	type Grupo = { id: number; nome: string; ids: number[] };
+	type Grupo = { id: number | null; nome: string; ids: number[] };
 	let aberto = $state(false);
+	let todas = $state(false);
+	let semParte = $state(false);
+	let amostra = $state<AcervoItem[]>([]);
 	let grupos = $state<Grupo[]>([]);
 	let ignoradas = $state(0);
 	let processadas = $state(0);
@@ -41,7 +44,14 @@
 		}
 	});
 
-	async function preparar(todas: boolean) {
+	function abrir() {
+		todas = selecionados.length === 0;
+		semParte = false;
+		amostra = itens.filter((item) => selecionados.includes(item.id_djen));
+		preparar();
+	}
+
+	async function preparar() {
 		aberto = true;
 		ocupado = preparando = true;
 		grupos = [];
@@ -51,7 +61,7 @@
 		contextos = [...contextoIds];
 		origem = page.url.href;
 		try {
-			let lista = itens.filter((item) => selecionados.includes(item.id_djen));
+			let lista = amostra;
 			if (todas) {
 				lista = [];
 				const params = new URLSearchParams(page.url.searchParams);
@@ -73,18 +83,18 @@
 				for (const parte of item.atendidos_sugeridos ?? []) ids.add(parte.id);
 				porProcesso.set(item.numero_processo, ids);
 			}
-			const porParte = new Map<number, Grupo>();
+			const porParte = new Map<number | null, Grupo>();
 			for (const item of lista) {
 				const candidatos = item.atendidos_sugeridos ?? [];
 				if (
 					item.situacao === 'vinculada' ||
-					candidatos.length !== 1 ||
-					(porProcesso.get(item.numero_processo)?.size ?? 0) > 1
+					(!semParte &&
+						(candidatos.length !== 1 || (porProcesso.get(item.numero_processo)?.size ?? 0) > 1))
 				) {
 					ignoradas++;
 					continue;
 				}
-				const parte = candidatos[0];
+				const parte = semParte ? { id: null, nome: 'Sem parte associada' } : candidatos[0];
 				const grupo = porParte.get(parte.id) ?? { ...parte, ids: [] };
 				grupo.ids.push(item.id_djen);
 				porParte.set(parte.id, grupo);
@@ -116,14 +126,14 @@
 					await api.post('djen/busca-parte/importar', {
 						ids,
 						id_atendido: grupo.id,
-						sem_parte: false,
+						sem_parte: grupo.id === null,
 						contexto_ids: contextos
 					});
 					grupo.ids = grupo.ids.slice(ids.length);
 					processadas += ids.length;
 				}
 			}
-			toast.success(`${processadas} publicações importadas com as partes confirmadas.`);
+			toast.success(`${processadas} publicações importadas.`);
 		} catch (e) {
 			erro = mensagemDeErro(e, 'A importação foi interrompida.');
 		} finally {
@@ -147,21 +157,7 @@
 	}}
 />
 
-<Button
-	class="h-auto max-w-full py-2 whitespace-normal"
-	disabled={ocupado || !selecionados.length}
-	onclick={() => preparar(false)}
->
-	Importar selecionadas com partes sugeridas
-</Button>
-<Button
-	class="h-auto max-w-full py-2 whitespace-normal"
-	variant="outline"
-	disabled={ocupado || !total}
-	onclick={() => preparar(true)}
->
-	Importar todas do filtro com partes sugeridas
-</Button>
+<Button disabled={ocupado || !total} onclick={abrir}>Importar</Button>
 <Dialog.Root
 	open={aberto}
 	onOpenChange={(valor) => {
@@ -179,12 +175,60 @@
 		}}
 	>
 		<Dialog.Header>
-			<Dialog.Title>Confirmar partes e importar em lote</Dialog.Title>
+			<Dialog.Title>Importar publicações</Dialog.Title>
 			<Dialog.Description>
-				Revise os atendidos sugeridos. Processos novos serão criados sem caso com a parte
-				confirmada. Processos existentes mantêm suas partes e recebem as publicações.
+				Confira o alcance da importação e as partes antes de confirmar.
 			</Dialog.Description>
 		</Dialog.Header>
+		<fieldset
+			disabled={preparando || importando || processadas > 0}
+			class="space-y-2 rounded-md border p-3 text-sm"
+		>
+			<legend class="px-1 font-medium">Publicações para importar</legend>
+			<label class="flex items-center gap-2"
+				><input
+					type="radio"
+					name="alcance-importacao"
+					checked={!todas}
+					disabled={!amostra.length}
+					onchange={() => {
+						todas = false;
+						preparar();
+					}}
+				/>Selecionadas ({amostra.length})</label
+			>
+			<label class="flex items-center gap-2"
+				><input
+					type="radio"
+					name="alcance-importacao"
+					checked={todas}
+					onchange={() => {
+						todas = true;
+						preparar();
+					}}
+				/>Todas do filtro ({total})</label
+			>
+		</fieldset>
+		{#if !processadas}
+			<details class="text-sm">
+				<summary class="cursor-pointer text-muted-foreground">Opções de importação</summary>
+				<label class="mt-3 flex items-center gap-2"
+					><input
+						type="checkbox"
+						checked={semParte}
+						disabled={preparando || importando}
+						onchange={(e) => {
+							semParte = e.currentTarget.checked;
+							preparar();
+						}}
+					/>Importar sem associar parte</label
+				>
+				<p class="mt-2 text-xs text-muted-foreground">
+					Por padrão, usamos as partes sugeridas. Processos existentes mantêm suas partes.
+				</p>
+			</details>
+		{/if}
+
 		{#if preparando || importando}<p role="status" aria-live="polite">
 				{progresso || 'Preparando lote…'}
 			</p>{/if}
@@ -196,8 +240,9 @@
 					</li>{/each}
 			</ul>
 			<p class="text-sm text-muted-foreground">
-				{ignoradas} fora do lote: já importadas, sem sugestão única ou com partes divergentes no mesmo
-				processo. Revise essas publicações individualmente.
+				{ignoradas} fora do lote: {semParte
+					? 'já importadas.'
+					: 'já importadas ou precisam de revisão da parte.'}
 			</p>
 			{#if processadas}<p role="status">
 					{processadas} de {quantidade} importadas. Os lotes concluídos estão salvos.
@@ -209,7 +254,7 @@
 				>Fechar</Button
 			>
 			<Button disabled={preparando || importando || !pendentes} onclick={confirmar}>
-				{processadas ? 'Continuar importação' : 'Confirmar partes e importar'}
+				{processadas ? 'Continuar importação' : `Confirmar importação (${pendentes})`}
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

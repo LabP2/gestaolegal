@@ -115,6 +115,157 @@ def test_importar_salvo_sem_rede_classifica_so_selecionada(
     assert len(_linhas(eventos, origem="djen")) == 1
 
 
+@pytest.mark.parametrize("descartada", [False, True])
+def test_importacao_reutiliza_conteudo_sem_escrever_no_acervo(
+    client, auth_headers, lote, descartada, monkeypatch
+):
+    from sqlalchemy import event
+    from gestaolegal.database.session import get_session
+    from gestaolegal.repositories.djen_repository import DjenComunicacaoRepository
+
+    if descartada:
+        resposta = client.post(
+            "/api/djen/acervo/descartar",
+            json={"ids": [91001, 91002], "contexto_ids": []},
+            headers=auth_headers,
+        )
+        assert resposta.status_code == 200, resposta.json
+    anteriores = _linhas(djen_publicacoes)
+    escritas = []
+    consultas_lote = []
+    engine = get_session().get_bind()
+
+    def consulta_individual_proibida(*args, **kwargs):
+        raise AssertionError("A importação deve consultar comunicações em lote")
+
+    monkeypatch.setattr(
+        DjenComunicacaoRepository, "find_by_id_djen", consulta_individual_proibida
+    )
+
+    def conferir_sql(conn, cursor, statement, parameters, context, executemany):
+        comando = context.compiled.statement if context.compiled else None
+        if (
+            getattr(comando, "is_select", False)
+            and any(tabela is djen_comunicacoes for tabela in comando.get_final_froms())
+            and any(coluna is djen_comunicacoes.c.id_publicacao for coluna in comando.selected_columns)
+        ):
+            consultas_lote.append(statement)
+        tabela = getattr(comando, "table", None)
+        if getattr(tabela, "name", None) == "djen_publicacoes" and any(
+            getattr(comando, tipo, False) for tipo in ("is_insert", "is_update", "is_delete")
+        ):
+            escritas.append(statement)
+
+    event.listen(engine, "before_cursor_execute", conferir_sql)
+    try:
+        for tentativa in range(2):
+            resposta = client.post(
+                "/api/djen/busca-parte/importar",
+                json={"ids": [91001, 91002], "sem_parte": True, "contexto_ids": []},
+                headers=auth_headers,
+            )
+            assert resposta.status_code == 200, resposta.json
+            dados = get_success_data(resposta)
+            assert dados["novas"] == (2 if not descartada and tentativa == 0 else 0)
+            assert dados["vinculadas"] == (2 if tentativa == 0 else 0)
+    finally:
+        event.remove(engine, "before_cursor_execute", conferir_sql)
+
+    assert escritas == []
+    assert len(consultas_lote) == 2  # Uma consulta por requisição, inclusive na repetição.
+    assert _linhas(djen_publicacoes) == anteriores
+    assert rotulos() == {91001: "relevante", 91002: "relevante"}
+    assert len(_linhas(djen_comunicacoes)) == 2
+    assert all(x["situacao"] == "vinculada" for x in _linhas(djen_comunicacoes))
+    assert len(_linhas(eventos, origem="djen")) == 1
+
+
+def test_importacao_lote_rejeita_comunicacao_de_outra_unidade(client, auth_headers, lote):
+    from sqlalchemy import update
+    from gestaolegal.database.session import get_session
+    from gestaolegal.repositories.djen_repository import DjenComunicacaoRepository
+    from .conftest import UNIDADE_NL
+
+    resposta = client.post(
+        "/api/djen/busca-parte/importar",
+        json={"ids": [91002], "sem_parte": True, "contexto_ids": []},
+        headers=auth_headers,
+    )
+    assert resposta.status_code == 200, resposta.json
+    comunicacao = _linhas(djen_comunicacoes)[0]
+    with contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        session.execute(update(djen_comunicacoes).where(
+            djen_comunicacoes.c.id == comunicacao["id"],
+            djen_comunicacoes.c.tenant_id == TENANT_DAJ,
+        ).values(unidade_id=UNIDADE_NL))
+        session.commit()
+    with contexto_tenant(TENANT_OUTRO):
+        assert DjenComunicacaoRepository().por_publicacoes([comunicacao["id_publicacao"]]) == {}
+    anteriores = _linhas(djen_comunicacoes)
+    resposta = client.post(
+        "/api/djen/busca-parte/importar",
+        json={"ids": [91001, 91002], "sem_parte": True, "contexto_ids": []},
+        headers=auth_headers,
+    )
+    assert resposta.status_code == 400, resposta.json
+    assert _linhas(djen_comunicacoes) == anteriores
+    assert rotulos()[91001] == "nao_classificado"
+    assert _linhas(eventos, origem="djen") == []
+
+
+@pytest.mark.parametrize("lotes", [[[91001, 91002]], [[91001], [91002]]])
+def test_importacao_consultas_por_lote_e_bloqueio_por_processo(
+    client, auth_headers, lote, monkeypatch, lotes
+):
+    from sqlalchemy import event, update
+    from gestaolegal.database.session import get_session
+    from gestaolegal.repositories.processo_repository import ProcessoRepository
+    from gestaolegal.database.tables import djen_publicacao_contextos
+
+    # Duas publicações do mesmo processo devem compartilhar o bloqueio.
+    with contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        session.execute(update(djen_publicacoes).where(
+            djen_publicacoes.c.tenant_id == TENANT_DAJ,
+            djen_publicacoes.c.id_djen == 91002,
+        ).values(numero_processo=lote["numero_cnj"]))
+        session.commit()
+    bloqueios = []
+    bloquear = ProcessoRepository.bloquear
+
+    def contar_bloqueio(repo, pid):
+        bloqueios.append(pid)
+        return bloquear(repo, pid)
+
+    monkeypatch.setattr(ProcessoRepository, "bloquear", contar_bloqueio)
+    consultas = {"classificacoes": 0, "contextos": 0}
+    engine = get_session().get_bind()
+
+    def contar_consultas(conn, cursor, statement, parameters, context, executemany):
+        comando = context.compiled.statement if context.compiled else None
+        if not getattr(comando, "is_select", False):
+            return
+        for tabela in comando.get_final_froms():
+            if tabela is djen_classificacoes:
+                consultas["classificacoes"] += 1
+            if tabela is djen_publicacao_contextos:
+                consultas["contextos"] += 1
+
+    event.listen(engine, "before_cursor_execute", contar_consultas)
+    try:
+        # Requisições distintas precisam adquirir novamente o bloqueio.
+        for ids in lotes:
+            r = client.post("/api/djen/busca-parte/importar", headers=auth_headers,
+                json={"ids": ids, "contexto_ids": []})
+            assert r.status_code == 200, r.json
+    finally:
+        event.remove(engine, "before_cursor_execute", contar_consultas)
+    assert bloqueios == [lote["id"]] * len(lotes)
+    assert consultas == {"classificacoes": len(lotes), "contextos": 0}
+    assert len(_linhas(eventos, origem="djen")) == 2
+
+
 def test_importacao_falha_nao_classifica(client, auth_headers, lote):
     r = client.post(
         "/api/djen/busca-parte/importar",

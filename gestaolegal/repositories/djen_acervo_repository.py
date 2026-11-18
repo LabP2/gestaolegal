@@ -72,6 +72,35 @@ class DjenAcervoRepository(BaseRepository):
         return pid
 
     def classificar(self, pid, rotulo, origem, usuario, automatico=False):
+        return bool(self.classificar_lote([pid], rotulo, origem, usuario, automatico))
+
+    def classificar_lote(self, ids, rotulo, origem, usuario, automatico=False):
+        """Lê e bloqueia as classificações juntas; mantém um histórico por alteração."""
+        ids = sorted(set(ids))
+        if not ids:
+            return 0
+        atuais = list(
+            self.session.execute(
+                self.escopo(
+                    select(c)
+                    .where(c.c.id_publicacao.in_(ids))
+                    .order_by(c.c.id_publicacao)
+                    .with_for_update(),
+                    c,
+                )
+            ).mappings()
+        )
+        if len(atuais) != len(ids):
+            from gestaolegal.exceptions import ValidationException
+
+            raise ValidationException("Publicação não encontrada", field="ids")
+        return sum(
+            self._classificar_registro(atual, rotulo, origem, usuario, automatico)
+            for atual in atuais
+        )
+
+    def _classificar_registro(self, atual, rotulo, origem, usuario, automatico):
+        pid = atual["id_publicacao"]
         # Legado permanece para auditoria/compatibilidade, nunca treina novos modelos.
         if origem != "classificacao":
             from gestaolegal.services.djen_contexto_service import DjenContextoService
@@ -79,15 +108,6 @@ class DjenAcervoRepository(BaseRepository):
             DjenContextoService().propagar(
                 pid, rotulo, origem, usuario, getattr(self, "contextos_operacao", None)
             )
-        atual = (
-            self.session.execute(
-                self.escopo(
-                    select(c).where(c.c.id_publicacao == pid), c
-                ).with_for_update()
-            )
-            .mappings()
-            .one()
-        )
         # Uma consulta nunca constitui nova avaliação, nem remove decisão humana.
         if automatico and atual["origem"] != "captura":
             return False
@@ -204,6 +224,7 @@ class DjenAcervoRepository(BaseRepository):
             filtros.get("nome_parte"),
             filtros.get("numero_processo"),
             filtros.get("oab"),
+            filtros.get("polo"),
         )
         tribunais = filtros.get("tribunal")
         if tribunais:

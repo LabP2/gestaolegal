@@ -2,12 +2,12 @@
 
 import json
 import re
-from sqlalchemy import String, cast, exists, func, or_, select
+from sqlalchemy import String, cast, exists, func, literal_column, or_, select
 from gestaolegal.exceptions import ValidationException
 
 
 def filtrar_identificacao(
-    stmt, tabela, dialect, nome_parte=None, numero_processo=None, oab=None
+    stmt, tabela, dialect, nome_parte=None, numero_processo=None, oab=None, polo=None
 ):
     if numero_processo:
         numero = re.sub(r"[.\s/-]", "", numero_processo)
@@ -21,7 +21,35 @@ def filtrar_identificacao(
             if len(numero) == 20
             else tabela.c.numero_processo.contains(numero, autoescape=True)
         )
-    if nome_parte:
+    if polo:
+        if polo not in ("A", "P"):
+            raise ValidationException("Polo inválido: use A ou P", field="polo")
+        # Nome e polo devem pertencer ao mesmo destinatário, não a partes distintas.
+        if dialect == "mysql":
+            partes = func.json_table(
+                tabela.c.destinatarios,
+                literal_column("'$[*]' COLUMNS (nome VARCHAR(300) PATH '$.nome', "
+                               "polo VARCHAR(2) PATH '$.polo')"),
+            ).table_valued("nome", "polo").alias("partes_polo_djen")
+            nome_col, polo_col = partes.c.nome, partes.c.polo
+        else:
+            partes = func.json_each(tabela.c.destinatarios).table_valued("value").alias("partes_polo_djen")
+            nome_col = func.json_extract(partes.c.value, "$.nome")
+            polo_col = func.json_extract(partes.c.value, "$.polo")
+        # No MySQL, a agregação mantém JSON_TABLE correlacionado à publicação.
+        busca = (
+            select(func.count() if dialect == "mysql" else 1)
+            .select_from(partes)
+            .where(polo_col == polo)
+        )
+        if nome_parte:
+            busca = busca.where(
+                func.lower(nome_col).contains(nome_parte.strip().lower(), autoescape=True)
+            )
+        stmt = stmt.where(
+            busca.scalar_subquery() > 0 if dialect == "mysql" else exists(busca)
+        )
+    elif nome_parte:
         nome = nome_parte.strip().lower()
         if dialect == "mysql":
             # Escape LIKE metacharacters: the typed name is literal.

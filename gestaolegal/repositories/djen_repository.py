@@ -88,6 +88,26 @@ class DjenComunicacaoRepository(BaseRepository):
         row = self.session.execute(stmt).mappings().one_or_none()
         return from_dict(ComunicacaoDJEN, dict(row)) if row else None
 
+    def por_publicacoes(self, ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Estado operacional do lote, sem reler os textos do acervo.
+
+        Inclui outras unidades do tenant para o serviço rejeitar conflitos,
+        em vez de tratar uma comunicação inacessível como inexistente.
+        """
+        if not ids:
+            return {}
+        stmt = self.escopo(
+            select(_comunicacoes)
+            .where(_comunicacoes.c.id_publicacao.in_(ids))
+            .order_by(_comunicacoes.c.id_publicacao)
+            .with_for_update(),
+            _comunicacoes,
+        )
+        return {
+            row["id_publicacao"]: dict(row)
+            for row in self.session.execute(stmt).mappings()
+        }
+
     def criar(self, data: dict[str, Any]) -> int:
         result = self.session.execute(
             insert(_comunicacoes).values(**self.valores(data))
@@ -146,6 +166,7 @@ class DjenComunicacaoRepository(BaseRepository):
         caso_id: int | None = None,
         q: str | None = None,
         processo_id: int | None = None,
+        polo: str | None = None,
         nome_parte: str | None = None,
         numero_processo: str | None = None,
     ) -> PaginatedResult[ComunicacaoListItem]:
@@ -203,7 +224,7 @@ class DjenComunicacaoRepository(BaseRepository):
         if tipo:
             stmt = stmt.where(t.c.tipo_comunicacao == tipo)
         stmt = filtrar_identificacao(stmt, t, self.session.get_bind().dialect.name,
-            nome_parte, numero_processo, oab)
+            nome_parte, numero_processo, oab, polo)
         if situacao:
             stmt = stmt.where(t.c.situacao == situacao)
         if caso_id is not None:

@@ -3,7 +3,6 @@
 	import FiltroTribunais from './filtro-tribunais.svelte';
 	import PublicacoesTabela from './publicacoes-tabela.svelte';
 	import Paginacao from '$lib/components/paginacao.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { onDestroy, tick } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -22,6 +21,7 @@
 	let { dados, treino = false }: { dados: AcervoPagina; treino?: boolean } = $props();
 	let selecionados = $state<number[]>([]);
 	let tribunais = $state<string[]>([]);
+	let filtroPolo = $state('todos');
 	let filtroSituacao = $state('todos');
 	let filtroFonte = $state('todos');
 	let filtroSugestao = $state('todos');
@@ -36,6 +36,7 @@
 			.getAll('tribunal')
 			.flatMap((t) => t.split(','))
 			.filter(Boolean);
+		filtroPolo = page.url.searchParams.get('polo') || 'todos';
 		filtroSituacao = page.url.searchParams.get('situacao') || 'todos';
 		filtroFonte = page.url.searchParams.get('fonte') || 'todos';
 		filtroSugestao = page.url.searchParams.get('sugestao') || 'todos';
@@ -182,6 +183,29 @@
 						value={page.url.searchParams.get('nome_parte') ?? ''}
 						placeholder="Nome completo ou parte do nome"
 					/>
+				</div>
+				<div class="w-full sm:w-40">
+					<span class="mb-1 block text-sm font-medium">Polo da parte</span>
+					<input type="hidden" name="polo" value={filtroPolo === 'todos' ? '' : filtroPolo} />
+					<Select.Root
+						type="single"
+						bind:value={filtroPolo}
+						disabled={ocupado}
+						onValueChange={() => agendarFiltro(0)}
+					>
+						<Select.Trigger class="w-full" aria-label="Polo da parte"
+							>{filtroPolo === 'A'
+								? 'Ativo'
+								: filtroPolo === 'P'
+									? 'Passivo'
+									: 'Todos'}</Select.Trigger
+						>
+						<Select.Content
+							><Select.Item value="todos">Todos</Select.Item><Select.Item value="A"
+								>Ativo</Select.Item
+							><Select.Item value="P">Passivo</Select.Item></Select.Content
+						>
+					</Select.Root>
 				</div>
 				<div class="w-full sm:w-64">
 					<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
@@ -372,9 +396,11 @@
 		</p>
 	{:else}
 		<div
-			class={`flex flex-wrap items-end gap-3 ${treino ? 'py-2' : 'rounded-lg border bg-card p-6'}`}
+			class={`flex flex-wrap items-end gap-3 ${treino ? 'py-2' : 'rounded-lg border bg-card p-3'}`}
 		>
-			<span>{selecionados.length} selecionada(s)</span>
+			<span class="text-sm text-muted-foreground"
+				>{selecionados.length ? `${selecionados.length} selecionadas` : 'Nenhuma selecionada'}</span
+			>
 			{#if treino}
 				{#each Object.entries(rotulos) as [rotulo, nome]}<Button
 						variant="outline"
@@ -382,6 +408,18 @@
 						onclick={() => agir('classificar', rotulo as RotuloExemplo)}>{nome}</Button
 					>{/each}
 			{:else}
+				<ImportarLote
+					itens={dados.items}
+					{selecionados}
+					total={dados.total}
+					contextoIds={contextoId ? [Number(contextoId)] : contextosAvaliados}
+					bind:ocupado
+				/>
+				<Button
+					variant="outline"
+					disabled={ocupado || !selecionados.length}
+					onclick={() => agir('descartar')}>Descartar</Button
+				>
 				{#if !contextoId && dados.contextos?.length}
 					<details class="w-full text-sm">
 						<summary class="cursor-pointer text-muted-foreground"
@@ -406,33 +444,10 @@
 						</fieldset>
 					</details>
 				{/if}
-				<ImportarLote
-					itens={dados.items}
-					{selecionados}
-					total={dados.total}
-					contextoIds={contextoId ? [Number(contextoId)] : contextosAvaliados}
-					bind:ocupado
-				/>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						class="h-9 rounded-md border px-3 text-sm"
-						disabled={ocupado || !selecionados.length}>Mais ações</DropdownMenu.Trigger
-					>
-					<DropdownMenu.Content>
-						<DropdownMenu.Item onclick={() => agir('importar')}
-							>Importar selecionadas sem parte</DropdownMenu.Item
-						>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-				<Button
-					variant="outline"
-					disabled={ocupado || !selecionados.length}
-					onclick={() => agir('descartar')}>Descartar selecionadas</Button
-				>
 			{/if}
 		</div>
 		<p class="text-sm text-muted-foreground">
-			{dados.total} publicação(ões). Não selecionar mantém o estado atual.
+			{dados.total} publicações encontradas.
 		</p>
 		<label class="flex items-center gap-2 text-sm"
 			><Checkbox

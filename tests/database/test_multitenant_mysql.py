@@ -599,3 +599,24 @@ def test_contextos_funcional_e_concorrencia_mysql(mysql_descartavel, monkeypatch
     listado = client.get('/api/djen/contextos',headers=h).json['data'][0]
     assert listado['treino_status'] == 'concluido'
     assert listado['modelo']['id'] == modelo['id']
+
+
+def test_filtro_polo_mysql_mesmo_destinatario(mysql_descartavel):
+    from sqlalchemy import Column, Integer, JSON
+    from gestaolegal.repositories.djen_filtros import filtrar_identificacao
+
+    engine, _ = mysql_descartavel
+    tabela = Table('publicacoes_polo_teste', MetaData(), Column('id', Integer, primary_key=True), Column('destinatarios', JSON))
+    tabela.create(engine)
+    with engine.begin() as conn:
+        conn.execute(tabela.insert(), [
+            {'id': 1, 'destinatarios': [{'nome': 'UFMG', 'polo': 'A'}, {'nome': 'Outra', 'polo': 'P'}]},
+            {'id': 2, 'destinatarios': [{'nome': 'UFMG', 'polo': 'P'}, {'nome': 'Outra', 'polo': 'A'}]},
+            {'id': 3, 'destinatarios': [{'nome': 'UFMG'}]},
+            {'id': 4, 'destinatarios': [{'nome': 'UFMG_100%', 'polo': 'A'}]},
+        ])
+        for nome, polo, ids in [('ufmg', 'A', {1, 4}), ('UFMG', 'P', {2}),
+                                ('Outra', 'P', {1}), ('UFMG_100%', 'A', {4}),
+                                (None, 'P', {1, 2})]:
+            stmt = filtrar_identificacao(select(tabela.c.id), tabela, 'mysql', nome_parte=nome, polo=polo)
+            assert set(conn.execute(stmt).scalars()) == ids

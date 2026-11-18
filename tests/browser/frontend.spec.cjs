@@ -513,12 +513,21 @@ test('DJEN: treino altera apenas rótulo e mantém decisão ao reabrir', async (
   expect(state.errors).toEqual([]);
 });
 
+async function importarSemParte(page) {
+ await page.getByRole('button',{name:'Importar',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await dialog.getByText('Opções de importação',{exact:true}).click();
+ await dialog.getByRole('checkbox',{name:'Importar sem associar parte',exact:true}).check();
+ await dialog.getByRole('button',{name:/^Confirmar importação/}).click();
+ await expect(dialog).toContainText('Os lotes concluídos estão salvos.');
+ await dialog.getByRole('button',{name:'Fechar',exact:true}).click();
+}
+
 test('DJEN: importar parte do acervo preserva o restante para depois', async ({ page }) => {
   const state = await acervoSetup(page);
   await page.goto('/djen');
   await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
-  await page.getByRole('button',{name:'Mais ações',exact:true}).click();
- await page.getByRole('menuitem',{name:'Importar selecionadas sem parte'}).click();
+  await importarSemParte(page);
   await expect(page.getByRole('link', { name: 'Processo #71' })).toBeVisible();
   expect(state.items[0].rotulo).toBe('relevante');
   expect(state.items[1].rotulo).toBe('nao_classificado');
@@ -532,7 +541,7 @@ test('DJEN: descarte operacional marca irrelevante', async ({ page }) => {
   const state = await acervoSetup(page);
   await page.goto('/djen');
   await page.getByRole('checkbox', { name: 'Selecionar publicação 98002' }).check();
-  await page.getByRole('button', { name: 'Descartar selecionadas' }).click();
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click();
   await expect(page.getByRole('table',{name:'Publicações'}).getByText('Descartado',{exact:true})).toBeVisible();
   expect(state.items[1].rotulo).toBe('irrelevante');
   expect(state.errors).toEqual([]);
@@ -748,12 +757,11 @@ test('DJEN: sugestões por contexto divergem e operação recebe escolha explíc
  await page.getByRole('checkbox',{name:'Selecionar publicação 98001'}).check();
  await page.getByText('Avaliar contextos ao importar ou descartar',{exact:true}).click();
  await page.getByRole('checkbox',{name:'UFMG — TRF6',exact:true}).check();
- await page.getByRole('button',{name:'Mais ações',exact:true}).click();
- await page.getByRole('menuitem',{name:'Importar selecionadas sem parte'}).click();
+ await importarSemParte(page);
  await expect.poll(()=>state.actions.length).toBe(1);
  expect(state.actions[0].body.contexto_ids).toEqual([1]);
- await expect(page.getByRole('button',{name:'Mais ações',exact:true})).toBeDisabled();
- await expect(page.getByText('Alterações salvas.',{exact:true})).toBeVisible();
+ await expect(page.getByText('Nenhuma selecionada',{exact:true})).toBeVisible();
+ await expect(page.getByText(/publicações importadas\./)).toBeVisible();
  await expect(page.getByRole('button',{name:'Contexto de classificação',exact:true})).not.toBeVisible();
  await page.getByText('Filtros avançados',{exact:true}).click();
  await page.getByRole('button',{name:'Contexto de classificação',exact:true}).click();
@@ -833,8 +841,7 @@ test('DJEN: card mostra partes, confirma sugestão e lote permite sem parte', as
   await expect(page.getByRole('link',{name:'Processo #71'})).toBeVisible();
   expect(state.actions[0].body).toMatchObject({ids:[98001],id_atendido:42,sem_parte:false});
   await page.getByRole('checkbox',{name:'Selecionar publicação 98002'}).check();
-  await page.getByRole('button',{name:'Mais ações',exact:true}).click();
- await page.getByRole('menuitem',{name:'Importar selecionadas sem parte'}).click();
+  await importarSemParte(page);
   await expect(page.getByRole('link',{name:'Processo #71'})).toHaveCount(2);
   expect(state.actions[1].body).toMatchObject({ids:[98002],id_atendido:null,sem_parte:true});
   expect(state.errors).toEqual([]);
@@ -869,7 +876,7 @@ test('DJEN lote sugerido: revisa seleção e exclui ambiguidades', async ({page}
   state.items[1].atendidos_sugeridos = [{id:43,nome:'Homônimo'}, {id:44,nome:'Homônimo'}];
   await page.goto('/djen?nome_parte=UFMG');
   await page.getByRole('checkbox',{name:'Selecionar esta página'}).check();
-  await page.getByRole('button',{name:'Importar selecionadas com partes sugeridas',exact:true}).click();
+  await page.getByRole('button',{name:'Importar',exact:true}).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('1 publicações aptas');
   await expect(dialog).toContainText('1 fora do lote');
@@ -878,7 +885,7 @@ test('DJEN lote sugerido: revisa seleção e exclui ambiguidades', async ({page}
   await expect(dialog).toHaveCSS('opacity','1');
   await page.screenshot({path:'/tmp/djen-importar-lote.png',animations:'disabled'});
   expect(state.actions).toHaveLength(0);
-  await dialog.getByRole('button',{name:'Confirmar partes e importar',exact:true}).click();
+  await dialog.getByRole('button',{name:/^Confirmar importação/}).click();
   await expect(dialog).toContainText('1 de 1 importadas');
   expect(state.actions).toHaveLength(1);
   expect(state.actions[0].body).toMatchObject({ids:[98001],id_atendido:42,sem_parte:false});
@@ -906,13 +913,13 @@ test('DJEN lote sugerido: todo filtro pagina, divide lotes e retoma falha', asyn
     return route.fulfill({json:{success:true,data:{}}});
   });
   await page.goto('/djen?nome_parte=UFMG&tribunal=TRT3&situacao=nao_importada');
-  await page.getByRole('button',{name:'Importar todas do filtro com partes sugeridas'}).click();
+  await page.getByRole('button',{name:'Importar',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await expect(dialog).toContainText('205 publicações aptas');
   expect(chamadas).toHaveLength(0);
   expect(leituras.filter(p=>p.per_page==='100').map(p=>p.page)).toEqual(['1','2','3']);
   for(const p of leituras) expect(p).toMatchObject({nome_parte:'UFMG',tribunal:'TRT3',situacao:'nao_importada'});
-  await dialog.getByRole('button',{name:'Confirmar partes e importar',exact:true}).click();
+  await dialog.getByRole('button',{name:/^Confirmar importação/}).click();
   await expect(dialog.getByRole('alert')).toContainText('Falha simulada');
   await expect(dialog).toContainText('100 de 205 importadas');
   await dialog.getByRole('button',{name:'Continuar importação'}).click();
@@ -929,11 +936,11 @@ test('DJEN lote sugerido: não associa partes divergentes ao mesmo processo', as
   state.items[0].atendidos_sugeridos=[{id:42,nome:'Parte A'}];
   state.items[1].atendidos_sugeridos=[{id:43,nome:'Parte B'}];
   await page.goto('/djen');
-  await page.getByRole('button',{name:'Importar todas do filtro com partes sugeridas'}).click();
+  await page.getByRole('button',{name:'Importar',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await expect(dialog).toContainText('0 publicações aptas');
   await expect(dialog).toContainText('2 fora do lote');
-  await expect(dialog.getByRole('button',{name:'Confirmar partes e importar',exact:true})).toBeDisabled();
+  await expect(dialog.getByRole('button',{name:/^Confirmar importação/})).toBeDisabled();
   expect(state.actions).toHaveLength(0);
 });
 
@@ -1027,12 +1034,65 @@ test('DJEN: filtro múltiplo de tribunais persiste na paginação e no lote',asy
  await expect(trigger).toContainText('TJMG, TRT3');
  await page.reload();
  await expect(trigger).toContainText('TJMG, TRT3');
- await page.getByRole('button',{name:'Importar todas do filtro com partes sugeridas'}).click();
+ await page.getByRole('button',{name:'Importar',exact:true}).click();
  await expect(page.getByRole('dialog')).toContainText('1 publicações aptas');
  expect(consultas.find(p=>p.per_page==='100')).toMatchObject({tribunal:'TJMG,TRT3'});
  await page.getByRole('button',{name:'Fechar',exact:true}).click();
  await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
  await expect(trigger).toHaveText('Todos os tribunais');
+ expect(state.actions).toHaveLength(0);
+ expect(state.errors).toEqual([]);
+});
+
+test('DJEN: importação simples escolhe alcance antes de confirmar',async({page})=>{
+ const state=await acervoSetup(page);
+ for(const item of state.items)item.atendidos_sugeridos=[{id:42,nome:'UFMG'}];
+ await page.goto('/djen');
+ await expect(page.getByRole('button',{name:'Importar',exact:true})).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'Mais ações',exact:true})).toHaveCount(0);
+ await page.getByRole('checkbox',{name:'Selecionar publicação 98001'}).check();
+ await page.getByRole('button',{name:'Importar',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog.getByRole('radio',{name:'Selecionadas (1)',exact:true})).toBeChecked();
+ await expect(dialog).toContainText('1 publicações aptas');
+ await dialog.getByRole('radio',{name:'Todas do filtro (2)',exact:true}).check();
+ await expect(dialog).toContainText('2 publicações aptas');
+ expect(state.actions).toHaveLength(0);
+ await dialog.getByRole('radio',{name:'Selecionadas (1)',exact:true}).check();
+ await expect(dialog.getByRole('button',{name:'Confirmar importação (1)',exact:true})).toBeEnabled();
+ await dialog.getByRole('button',{name:'Confirmar importação (1)',exact:true}).click();
+ await expect(dialog).toContainText('1 de 1 importadas');
+ expect(state.actions).toHaveLength(1);
+ expect(state.actions[0].body).toMatchObject({ids:[98001],id_atendido:42,sem_parte:false});
+ expect(state.errors).toEqual([]);
+});
+
+test('DJEN: polo da parte acompanha nome, paginação e importação',async({page})=>{
+ const state=await acervoSetup(page);
+ state.items[0].atendidos_sugeridos=[{id:42,nome:'UFMG'}];
+ const consultas=[];
+ await page.route('**/api/djen/acervo?**',route=>{
+  const p=new URL(route.request().url()).searchParams;
+  consultas.push(Object.fromEntries(p));
+  return route.fulfill({json:{success:true,data:{items:state.items,total:40,page:Number(p.get('page')||1),per_page:Number(p.get('per_page')||20),contextos:[]}}});
+ });
+ await page.goto('/djen?nome_parte=UFMG');
+ const polo=page.getByRole('button',{name:'Polo da parte',exact:true});
+ await polo.click();
+ await page.getByRole('option',{name:'Passivo',exact:true}).click();
+ await expect.poll(()=>new URL(page.url()).searchParams.get('polo')).toBe('P');
+ expect(new URL(page.url()).searchParams.get('nome_parte')).toBe('UFMG');
+ await page.getByRole('button',{name:'Próxima página',exact:true}).click();
+ await expect.poll(()=>new URL(page.url()).searchParams.get('page')).toBe('2');
+ await expect(polo).toContainText('Passivo');
+ await page.reload();
+ await expect(polo).toContainText('Passivo');
+ await page.getByRole('button',{name:'Importar',exact:true}).click();
+ await expect(page.getByRole('dialog')).toContainText('1 publicações aptas');
+ expect(consultas.find(p=>p.per_page==='100')).toMatchObject({polo:'P',nome_parte:'UFMG'});
+ await page.getByRole('button',{name:'Fechar',exact:true}).click();
+ await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+ await expect(polo).toHaveText('Todos');
  expect(state.actions).toHaveLength(0);
  expect(state.errors).toEqual([]);
 });

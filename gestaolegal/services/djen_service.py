@@ -388,6 +388,8 @@ class DJENService:
         executor_id: int | None,
         manual: bool,
         exemplo: bool = True,
+        *,
+        processos_bloqueados: dict[int, tuple[Processo, Caso | None]] | None = None,
     ) -> Evento | None:
         """Grava o vínculo e cria o evento no caso, na transação em curso.
 
@@ -401,11 +403,18 @@ class DJENService:
         """
         # A captura pode ter lido o processo antes de ele ganhar um caso.
         # Usa o mesmo bloqueio da associação para não perder eventos nessa corrida.
-        atual = self.processos.bloquear(processo.id)
-        if atual is None:
-            raise ValidationException("Processo não encontrado", field="processo_id")
-        processo = atual
-        caso = self._caso_do_processo(processo)
+        # O mapa pertence apenas à transação de um lote de importação.
+        # O bloqueio permanece no banco até commit/rollback.
+        if processos_bloqueados is not None and processo.id in processos_bloqueados:
+            processo, caso = processos_bloqueados[processo.id]
+        else:
+            atual = self.processos.bloquear(processo.id)
+            if atual is None:
+                raise ValidationException("Processo não encontrado", field="processo_id")
+            processo = atual
+            caso = self._caso_do_processo(processo)
+            if processos_bloqueados is not None:
+                processos_bloqueados[processo.id] = (processo, caso)
         self.repo.atualizar(
             comunicacao_id,
             {
@@ -1068,8 +1077,8 @@ class DJENService:
         from gestaolegal.services.djen_contexto_service import DjenContextoService
         self.acervo.contextos_operacao = DjenContextoService().preparar_operacao(registros, corpo, unidade_id)
         itens = [self._comunicacao_salva(r) for r in registros]
+        publicacoes_salvas = {r["id_djen"]: r["id"] for r in registros}
         escolhidos = itens
-        termos = {}
         nao_encontradas = sorted(set(ids) - {i.id_djen for i in escolhidos})
         if nao_encontradas:
             raise ValidationException(
@@ -1089,6 +1098,11 @@ class DJENService:
         resultado = ResultadoCaptura()
         criados: list[int] = []
         try:
+            comunicacoes = self.repo.por_publicacoes(list(publicacoes_salvas.values()))
+            if any(c["unidade_id"] != unidade_id for c in comunicacoes.values()):
+                raise ValidationException(
+                    "Publicação vinculada a outra unidade", field="ids"
+                )
             servico = ProcessoService()
             for numero in sem_processo:
                 if len(numero) != 20:
@@ -1116,31 +1130,34 @@ class DJENService:
                 novo = servico.criar_sem_caso(dados, user, unidade_id)
                 processos[numero] = self.processos.find_by_id(novo["id"])
                 criados.append(novo["id"])
+            processos_bloqueados = {}
             for item in escolhidos:
-                self.registrar(
-                    item,
-                    resultado,
-                    processo=processos[item.numero_processo],
-                    unidade_padrao=unidade_id,
-                    executor_id=user.id,
-                    exemplo=False,
-                )
-                gravada = self.repo.find_by_id_djen(item.id_djen)
-                if gravada is None or gravada.unidade_id != unidade_id:
-                    raise ValidationException(
-                        "Publicação vinculada a outra unidade", field="ids"
+                pid = publicacoes_salvas[item.id_djen]
+                gravada = comunicacoes.get(pid)
+                if gravada is None:
+                    cid = self.repo.criar(
+                        dict(id_publicacao=pid, situacao="pendente", unidade_id=unidade_id)
                     )
-                if gravada.situacao != "vinculada":
+                    gravada = dict(id=cid, situacao="pendente")
+                    comunicacoes[pid] = gravada
+                    resultado.novas += 1
+                if gravada["situacao"] != "vinculada":
                     alvo = processos[item.numero_processo]
+                    manual = gravada["situacao"] == "descartada"
                     self._vincular(
-                        gravada.id,
+                        gravada["id"],
                         alvo,
-                        self._caso_do_processo(alvo),
+                        None,
                         user.id,
-                        manual=True,
+                        manual=manual,
+                        exemplo=manual,
+                        processos_bloqueados=processos_bloqueados,
                     )
+                    gravada["situacao"] = "vinculada"
                     resultado.vinculadas += 1
-            self._rotular_busca(itens, escolhidos, termos, "relevante", user.id)
+            self.acervo.classificar_lote(
+                list(publicacoes_salvas.values()), "relevante", "busca_parte", user.id
+            )
             self._depois_da_fonte()
             self.session.commit()
         except Exception:
