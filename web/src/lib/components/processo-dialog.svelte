@@ -28,6 +28,8 @@
 		processo
 			? {
 					...formData,
+					// Não reutilizar o ID do formulário vazio retornado pelo layout.
+					id: `processo-modal-editar-${processo.id}`,
 					data: {
 						...formData.data,
 						especie: processo.especie,

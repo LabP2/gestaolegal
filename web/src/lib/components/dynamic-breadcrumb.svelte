@@ -16,7 +16,7 @@
 		},
 		'/casos/gestao-casos': { label: 'Gestão de Casos', href: '/casos/gestao-casos' },
 		'/casos/gerenciar-roteiros': { label: 'Gerenciar Roteiros', href: '/casos/gerenciar-roteiros' },
-		'/plantao': { label: 'Plantão', href: '/plantao' },
+		'/plantao': { label: 'Plantão', href: '/plantao/escalas' },
 		'/plantao/atendidos-assistidos': {
 			label: 'Atendidos/Assistidos',
 			href: '/plantao/atendidos-assistidos'

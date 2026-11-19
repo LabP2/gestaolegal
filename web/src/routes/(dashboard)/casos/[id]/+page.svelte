@@ -195,7 +195,7 @@
 	}
 
 	// --- Processos (CRUD via modal) ---
-	const processos = $derived(data.caso.processos ?? []);
+	const processos = $derived((data.caso.processos ?? []).filter((processo) => processo.status));
 	let processoDialogOpen = $state(false);
 	let editingProcesso = $state<Processo | undefined>(undefined);
 

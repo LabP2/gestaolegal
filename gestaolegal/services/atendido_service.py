@@ -275,6 +275,14 @@ class AtendidoService:
         self.repository.delete(atendido_id)
         logger.info(f"Atendido soft deleted successfully with id: {atendido_id}")
 
+    def reactivate(self, atendido_id: int):
+        existing = self.repository.find_by_id(
+            atendido_id, unidade_id=RequestContext.get_unidade_ativa()
+        )
+        if not existing:
+            raise NotFoundException(resource="Atendido", resource_id=atendido_id)
+        self.repository.update(atendido_id, {"status": 1})
+
     def __extract_endereco_data(self, atendido_data: dict[str, Any]):
         return {
             "logradouro": atendido_data.pop("logradouro"),
