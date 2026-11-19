@@ -4,7 +4,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const base = process.env.GL_BASE_URL || 'http://localhost:5401';
 const paginated = (items = [], total = items.length, page = 1, perPage = 2) => ({
   items,
-  pagination: { total, page, per_page: perPage, total_pages: Math.ceil(total / perPage), has_next_page: page * perPage < total, has_previous_page: page > 1 }
+  total, page, per_page: perPage, total_pages: Math.ceil(total / perPage), has_next_page: page * perPage < total, has_previous_page: page > 1
 });
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] });

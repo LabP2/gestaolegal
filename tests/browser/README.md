@@ -43,7 +43,7 @@ GL_BASE_URL=http://localhost:5401 node tests/browser/front-check.cjs
 ```
 
 Intercepta toda a API com dados sintéticos. Verifica login recusado e aceito,
-paginação no contrato `items` + `pagination`, navegação de volta, edição de
+paginação no contrato `PaginatedResult.to_dict()` (`items`, `total`, `page` e `per_page` no mesmo nível), navegação de volta, edição de
 atendido/caso/orientação/assistência judiciária, upload multipart e download.
 Não acessa banco real. Também pode ser executado contra a imagem Nginx de produção
 alterando `GL_BASE_URL` para a porta onde o contêiner está publicado.
