@@ -75,15 +75,12 @@
 	);
 
 	let isLoadingCep = $state(false);
-	// When editing an existing atendido the address is already filled, so keep the
-	// fields enabled and seed the last-looked-up CEP to avoid a spurious refetch.
-	let addressFieldsDisabled = $state(!$formData.logradouro);
+	// Seed the last-looked-up CEP to avoid refetching when editing an existing atendido.
 	let lastCepLookup = $state(($formData.cep ?? '').replace(/\D/g, ''));
 
 	$effect(() => {
 		const cep = $formData.cep;
 		if (!cep) {
-			addressFieldsDisabled = true;
 			return;
 		}
 
@@ -100,7 +97,6 @@
 
 		lastCepLookup = cleanCep;
 		isLoadingCep = true;
-		addressFieldsDisabled = true;
 
 		const result = await fetchCepData(cleanCep);
 
@@ -112,12 +108,8 @@
 			$formData.cidade = result.data.cidade;
 			$formData.estado = result.data.estado;
 
-			// Keep fields disabled when successfully filled
-			addressFieldsDisabled = true;
 			toast.success('Endereço preenchido automaticamente!');
 		} else {
-			// Enable fields for manual editing on error
-			addressFieldsDisabled = false;
 			toast.error(result.error || 'Erro ao buscar CEP. Preencha manualmente.');
 		}
 	}
@@ -232,8 +224,8 @@
 					name="logradouro"
 					{form}
 					bind:value={$formData.logradouro}
-					placeholder={isLoadingCep ? 'Buscando...' : 'Preencha o CEP'}
-					disabled={addressFieldsDisabled || isLoadingCep}
+					placeholder={isLoadingCep ? 'Buscando...' : 'Digite o logradouro'}
+					disabled={isLoadingCep}
 				/>
 			</div>
 
@@ -258,8 +250,8 @@
 				name="bairro"
 				{form}
 				bind:value={$formData.bairro}
-				placeholder={isLoadingCep ? 'Buscando...' : 'Preencha o CEP'}
-				disabled={addressFieldsDisabled || isLoadingCep}
+				placeholder={isLoadingCep ? 'Buscando...' : 'Digite o bairro'}
+				disabled={isLoadingCep}
 			/>
 
 			<SimpleInput
@@ -267,8 +259,8 @@
 				name="cidade"
 				{form}
 				bind:value={$formData.cidade}
-				placeholder={isLoadingCep ? 'Buscando...' : 'Preencha o CEP'}
-				disabled={addressFieldsDisabled || isLoadingCep}
+				placeholder={isLoadingCep ? 'Buscando...' : 'Digite a cidade'}
+				disabled={isLoadingCep}
 			/>
 
 			<SimpleInput
@@ -277,7 +269,7 @@
 				{form}
 				bind:value={$formData.estado}
 				placeholder={isLoadingCep ? 'Buscando...' : 'UF'}
-				disabled={addressFieldsDisabled || isLoadingCep}
+				disabled={isLoadingCep}
 			/>
 		</Card.Content>
 	</Card.Root>
