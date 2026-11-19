@@ -1,8 +1,8 @@
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { loginSchema } from '$lib/forms/schemas/login-schema';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
+import { loginSchema } from '#lib/forms/schemas/login-schema.ts';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ fetch }) => {
 	const form = await superValidate(zod4(loginSchema));

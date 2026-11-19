@@ -1,8 +1,8 @@
 <script lang="ts">
-	import ProcessoForm from '$lib/forms/processo-form.svelte';
+	import ProcessoForm from '#lib/forms/processo-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const { processo } = data;
@@ -30,9 +30,9 @@
 					</h1>
 					<p class="mt-2 text-muted-foreground">Atualize as informações do processo no sistema</p>
 				</div>
-				<Button variant="outline" href="/casos/{processo.id_caso}/processos/{processo.id}"
-					>Voltar</Button
-				>
+				<Button variant="outline" href="/casos/{processo.id_caso}/processos/{processo.id}">
+					Voltar
+				</Button>
 			</div>
 		</div>
 	</div>

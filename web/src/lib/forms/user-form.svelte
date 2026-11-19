@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Form from '$lib/components/ui/form/index.js';
-	import { Button } from '$lib/components/ui/button';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Form from '#lib/components/ui/form/index.js';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		FormSection,
 		SimpleInput,
@@ -9,7 +9,7 @@
 		SimpleSelect,
 		SimpleTextArea,
 		SimpleDatePicker
-	} from '$lib/components/forms';
+	} from '#lib/components/forms/index.ts';
 	import { userCreateFormSchema, type UserCreateFormSchema } from './schemas/user-schema';
 	import { booleanProxy, superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
@@ -20,14 +20,14 @@
 		YES_NO_OPTIONS,
 		BOOLEAN_OPTIONS,
 		SCHOLARSHIP_TYPE_OPTIONS
-	} from '$lib/constants';
-	import MultipleSelect from '$lib/components/forms/multiple-select.svelte';
-	import { fetchCepData } from '$lib/utils/cep';
+	} from '#lib/constants/index.ts';
+	import MultipleSelect from '#lib/components/forms/multiple-select.svelte';
+	import { fetchCepData } from '#lib/utils/cep.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import type { Unidade, User } from '$lib/types';
+	import type { Unidade, User } from '#lib/types/index.ts';
 
 	let {
 		data,
@@ -67,9 +67,9 @@
 					isCreateMode ? 'Usuário criado com sucesso!' : 'Usuário atualizado com sucesso!'
 				);
 
-				// invalidateAll so the destination view reloads fresh data instead of
+				// refreshAll so the destination view reloads fresh data instead of
 				// showing the pre-edit values from SvelteKit's cached load.
-				await goto(`/usuarios/${response.id}`, { invalidateAll: true });
+				await goto(`/usuarios/${response.id}`, { refreshAll: true });
 			} catch (error) {
 				console.error('User form error:', error);
 				toast.error(mensagemDeErro(error, 'Erro ao salvar usuário. Por favor, tente novamente.'));

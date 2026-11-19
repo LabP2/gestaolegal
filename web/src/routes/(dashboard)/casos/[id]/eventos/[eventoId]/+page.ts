@@ -1,8 +1,8 @@
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
-import type { Evento } from '$lib/types/evento';
+import { ApiException } from '#lib/types/index.ts';
+import type { Evento } from '#lib/types/evento.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {

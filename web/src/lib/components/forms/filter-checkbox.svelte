@@ -1,9 +1,9 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 
 	let {
 		form,

@@ -2,9 +2,9 @@
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Bell from '@lucide/svelte/icons/bell';
-	import { api } from '$lib/api-client';
-	import { Button } from '$lib/components/ui/button';
-	import { naoLidas } from '$lib/stores/notificacoes';
+	import { api } from '#lib/api-client.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { naoLidas } from '#lib/stores/notificacoes.ts';
 
 	const INTERVALO_MS = 60_000;
 
@@ -23,7 +23,9 @@
 		return () => clearInterval(timer);
 	});
 
-	afterNavigate(() => {
+	afterNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		atualizar();
 	});
 </script>

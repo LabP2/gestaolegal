@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Button } from '$lib/components/ui/button';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Label } from '$lib/components/ui/label';
-	import { Input } from '$lib/components/ui/input';
-	import * as Select from '$lib/components/ui/select';
-	import { api } from '$lib/api-client';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
-	import type { Lembrete } from '$lib/types';
-	import type { UserOption } from '$lib/types';
+	import type { Lembrete } from '#lib/types/index.ts';
+	import type { UserOption } from '#lib/types/index.ts';
 
 	let {
 		casoId,

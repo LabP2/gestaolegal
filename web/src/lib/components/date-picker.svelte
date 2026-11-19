@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import Calendar from '#lib/components/ui/calendar/calendar.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import {
 		CalendarDate,

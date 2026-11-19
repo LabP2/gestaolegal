@@ -1,8 +1,8 @@
 <script lang="ts">
-	import CasoForm from '$lib/forms/caso-form.svelte';
+	import CasoForm from '#lib/forms/caso-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 

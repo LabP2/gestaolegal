@@ -1,11 +1,11 @@
 <script lang="ts">
 	import NavMain from './nav-main.svelte';
 	import NavUser from './nav-user.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import type { ComponentProps } from 'svelte';
 	import CompanyLogo from './company-logo.svelte';
-	import type { User } from '$lib/types';
-	import { podeVer, type ItemComPapeis } from '$lib/utils/permissoes';
+	import type { User } from '#lib/types/index.ts';
+	import { podeVer, type ItemComPapeis } from '#lib/utils/permissoes.ts';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';

@@ -1,16 +1,16 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Input } from '$lib/components/ui/input';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
 	import { untrack } from 'svelte';
-	import type { Atendido } from '$lib/types';
+	import type { Atendido } from '#lib/types/index.ts';
 	import type { Snippet } from 'svelte';
 	import Search from '@lucide/svelte/icons/search';
-	import * as Form from '$lib/components/ui/form';
+	import * as Form from '#lib/components/ui/form/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 
 	let {
 		selectedIds = $bindable([]),
@@ -205,8 +205,9 @@
 				{:else if failure}
 					<div role="alert" class="space-y-2 py-8 text-center">
 						<p>{failure}</p>
-						<Button type="button" variant="outline" onclick={() => retry++}>Tentar novamente</Button
-						>
+						<Button type="button" variant="outline" onclick={() => retry++}>
+							Tentar novamente
+						</Button>
 					</div>
 				{:else if items.length === 0}
 					<div class="py-8 text-center text-muted-foreground">{emptyStateText}</div>
@@ -273,23 +274,27 @@
 						type="button"
 						variant="outline"
 						disabled={loading || !!failure || page <= 1}
-						onclick={() => page--}>Anterior</Button
+						onclick={() => page--}
 					>
+						Anterior
+					</Button>
 					<Button
 						type="button"
 						variant="outline"
 						disabled={loading || !!failure || page >= totalPages}
-						onclick={() => page++}>Próxima</Button
+						onclick={() => page++}
 					>
+						Próxima
+					</Button>
 				</div>
 			</div>
 		</div>
 
 		<Dialog.Footer class="flex-shrink-0">
 			<Button type="button" variant="outline" onclick={() => (open = false)}>Cancelar</Button>
-			<Button type="button" disabled={loading || !!failure} onclick={confirmSelection}
-				>Confirmar Seleção</Button
-			>
+			<Button type="button" disabled={loading || !!failure} onclick={confirmSelection}>
+				Confirmar Seleção
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

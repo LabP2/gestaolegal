@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ArquivoForm from '$lib/forms/arquivo-form.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import ArquivoForm from '#lib/forms/arquivo-form.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

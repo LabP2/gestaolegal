@@ -6,14 +6,18 @@
 	import Edit from '@lucide/svelte/icons/edit';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { usePaginatedFilters } from '$lib';
-	import { api } from '$lib/api-client';
-	import DataTable from '$lib/components/data-table.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { ARQUIVO_PAPEIS_EDITAM, ARQUIVO_PAPEIS_EXCLUEM, type ListArquivo } from '$lib/types';
-	import { baixarArquivoDaApi } from '$lib/utils/download';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { usePaginatedFilters } from '#lib';
+	import { api } from '#lib/api-client.ts';
+	import DataTable from '#lib/components/data-table.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import {
+		ARQUIVO_PAPEIS_EDITAM,
+		ARQUIVO_PAPEIS_EXCLUEM,
+		type ListArquivo
+	} from '#lib/types/index.ts';
+	import { baixarArquivoDaApi } from '#lib/utils/download.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

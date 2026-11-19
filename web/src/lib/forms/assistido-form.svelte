@@ -1,19 +1,19 @@
 <script lang="ts">
 	import DadosJuridicosForm from './dados-juridicos-form.svelte';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import {
 		assistidoCreateFormSchema,
 		type AssistidoCreateFormData
 	} from './schemas/assistido-schema';
-	import { SimpleInput, SimpleSelect, SimpleTextArea } from '$lib/components/forms';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { api } from '$lib/api-client';
+	import { SimpleInput, SimpleSelect, SimpleTextArea } from '#lib/components/forms/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
-	import type { Atendido } from '$lib/types';
+	import type { Atendido } from '#lib/types/index.ts';
 
 	let {
 		data,

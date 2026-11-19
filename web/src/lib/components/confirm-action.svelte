@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { Snippet } from 'svelte';
 	import { buttonVariants, type ButtonSize, type ButtonVariant } from './ui/button';
 

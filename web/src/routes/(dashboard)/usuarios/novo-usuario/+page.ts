@@ -1,4 +1,4 @@
-import { userCreateFormSchema } from '$lib/forms/schemas/user-schema';
+import { userCreateFormSchema } from '#lib/forms/schemas/user-schema.ts';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 

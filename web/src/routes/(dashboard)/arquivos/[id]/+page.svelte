@@ -4,14 +4,14 @@
 	import Download from '@lucide/svelte/icons/download';
 	import Edit from '@lucide/svelte/icons/edit';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { api } from '$lib/api-client';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { ARQUIVO_PAPEIS_EDITAM, ARQUIVO_PAPEIS_EXCLUEM } from '$lib/types';
-	import { formatDateTime } from '$lib/utils/date';
-	import { baixarArquivoDaApi } from '$lib/utils/download';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { api } from '#lib/api-client.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { ARQUIVO_PAPEIS_EDITAM, ARQUIVO_PAPEIS_EXCLUEM } from '#lib/types/index.ts';
+	import { formatDateTime } from '#lib/utils/date.ts';
+	import { baixarArquivoDaApi } from '#lib/utils/download.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

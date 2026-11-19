@@ -1,5 +1,5 @@
-import { api } from '$lib/api-client';
-import { ApiException, type ListArquivo, type Paginated } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException, type ListArquivo, type Paginated } from '#lib/types/index.ts';
 import { error } from '@sveltejs/kit';
 
 export const load = async ({ depends, url, fetch }) => {

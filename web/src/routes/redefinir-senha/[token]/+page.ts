@@ -1,7 +1,7 @@
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { resetPasswordSchema } from '$lib/forms/schemas/reset-password-schema';
-import { api } from '$lib/api-client';
+import { resetPasswordSchema } from '#lib/forms/schemas/reset-password-schema.ts';
+import { api } from '#lib/api-client.ts';
 
 export const load = async ({ params, fetch }) => {
 	const form = await superValidate(zod4(resetPasswordSchema));

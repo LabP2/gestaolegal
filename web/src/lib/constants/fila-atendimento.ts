@@ -1,4 +1,4 @@
-import { FilaPrioridade } from '$lib/types/fila-atendimento';
+import { FilaPrioridade } from '#lib/types/fila-atendimento.ts';
 
 export interface PrioridadeOption {
 	value: number;

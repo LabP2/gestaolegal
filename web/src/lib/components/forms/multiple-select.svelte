@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import * as Select from '$lib/components/ui/select';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';
 

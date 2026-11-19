@@ -1,8 +1,8 @@
 <script lang="ts">
-	import OrientacaoJuridicaForm from '$lib/forms/orientacao-juridica-form.svelte';
+	import OrientacaoJuridicaForm from '#lib/forms/orientacao-juridica-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 

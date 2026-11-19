@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { unidadeAtiva } from '$lib/stores/unidade';
-	import { Button } from '$lib/components/ui/button';
+	import { unidadeAtiva } from '#lib/stores/unidade.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { PageData } from './$types';
-	import { api } from '$lib/api-client';
-	import { ApiException, type ConfiguracaoPlantao } from '$lib/types';
-	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Card from '$lib/components/ui/card';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException, type ConfiguracaoPlantao } from '#lib/types/index.ts';
+	import Calendar from '#lib/components/ui/calendar/calendar.svelte';
+	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
 	import { CalendarDate, type DateValue } from '@internationalized/date';
 	import { toast } from 'svelte-sonner';
 
@@ -82,7 +82,7 @@
 						payload
 					)
 				: await api.post<ConfiguracaoPlantao>('plantao/escalas', payload);
-			await goto(`/plantao/escala?escala_id=${resultado.id}`, { invalidateAll: true });
+			await goto(`/plantao/escala?escala_id=${resultado.id}`, { refreshAll: true });
 			toast.success('Configuração do plantão salva com sucesso');
 		} catch (err) {
 			if (err instanceof ApiException) toast.error(err.message);
@@ -141,9 +141,9 @@
 				</Card.Header>
 				<Card.Content class="space-y-4">
 					<div class="flex items-center justify-between gap-4">
-						<Label for="data-abertura"
-							>Data de abertura <span class="text-destructive">*</span></Label
-						>
+						<Label for="data-abertura">
+							Data de abertura <span class="text-destructive">*</span>
+						</Label>
 						<Input id="data-abertura" type="date" bind:value={dataAbertura} class="w-44" />
 					</div>
 					<div class="flex items-center justify-between gap-4">

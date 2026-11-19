@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { validateCPF } from '$lib/utils/cpf-validator';
+import { validateCPF } from '#lib/utils/cpf-validator.ts';
 
 const baseAtendidoFormSchema = z
 	.object({

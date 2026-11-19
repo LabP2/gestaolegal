@@ -1,11 +1,11 @@
 <script lang="ts">
 	import '../app.css';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { Toaster } from 'svelte-sonner';
-	import { ehRotaPublica } from '$lib/utils/rotas';
+	import { ehRotaPublica } from '#lib/utils/rotas.ts';
 
 	let { children } = $props();
 

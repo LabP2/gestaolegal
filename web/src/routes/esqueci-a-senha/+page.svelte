@@ -1,12 +1,12 @@
 <script lang="ts">
-	import AppFooter from '$lib/components/app-footer.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
+	import AppFooter from '#lib/components/app-footer.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
 	import {
 		forgotPasswordSchema,
 		type ForgotPasswordData
-	} from '$lib/forms/schemas/forgot-password-schema';
-	import { api } from '$lib/api-client';
+	} from '#lib/forms/schemas/forgot-password-schema.ts';
+	import { api } from '#lib/api-client.ts';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import MailCheck from '@lucide/svelte/icons/mail-check';
 	import { superForm } from 'sveltekit-superforms';

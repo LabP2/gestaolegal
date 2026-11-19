@@ -1,4 +1,4 @@
-import { atendidoCreateFormSchema } from '$lib/forms/schemas/atendido-schema';
+import { atendidoCreateFormSchema } from '#lib/forms/schemas/atendido-schema.ts';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 

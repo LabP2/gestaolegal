@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { page } from '$app/state';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import { AlertTriangle, Home, RefreshCw } from '@lucide/svelte';
 
 	let { error }: { error: App.Error } = $props();
 
 	const errorMessage = $derived(error?.message || 'Ocorreu um erro inesperado');
-	const status = $derived($page.status);
+	const status = $derived(page.status);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
@@ -48,8 +48,7 @@
 				{/if}
 
 				<Button onclick={() => (window.location.href = '/')} variant="ghost" class="w-full">
-					<Home class="mr-2 h-4 w-4" />
-					Página Inicial
+					<Home class="mr-2 h-4 w-4" /> Página Inicial
 				</Button>
 			</div>
 		</CardContent>

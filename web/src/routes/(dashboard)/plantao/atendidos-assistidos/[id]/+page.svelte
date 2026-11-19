@@ -1,16 +1,16 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Edit from '@lucide/svelte/icons/edit';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Scale from '@lucide/svelte/icons/scale';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
-	import SenhaModal from '$lib/components/senha-modal.svelte';
-	import { formatDateOnly } from '$lib/utils/date';
+	import SenhaModal from '#lib/components/senha-modal.svelte';
+	import { formatDateOnly } from '#lib/utils/date.ts';
 
 	let { data }: { data: PageData } = $props();
 	let { atendido } = data;

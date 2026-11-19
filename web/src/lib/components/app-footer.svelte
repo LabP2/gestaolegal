@@ -17,8 +17,10 @@
 				href="https://labp2.direito.ufmg.br/"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="font-semibold text-white underline-offset-2 hover:underline">LabP²</a
+				class="font-semibold text-white underline-offset-2 hover:underline"
 			>
+				LabP²
+			</a>
 			· Laboratório de Tecnologias Públicas para o Setor Público · Faculdade de Direito da UFMG
 		</p>
 		<div class="flex items-center gap-5 opacity-70 transition-opacity hover:opacity-100">

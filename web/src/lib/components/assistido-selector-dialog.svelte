@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
 	import BaseSelectorDialog from './base-selector-dialog.svelte';
-	import type { Atendido } from '$lib/types';
+	import type { Atendido } from '#lib/types/index.ts';
 	import type { Snippet } from 'svelte';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';

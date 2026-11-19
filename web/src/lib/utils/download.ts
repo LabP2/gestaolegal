@@ -1,5 +1,5 @@
-import { apiFetch } from '$lib/api-client';
-import { ApiException } from '$lib/types';
+import { apiFetch } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
 
 /** Baixa um arquivo autenticado da API e dispara o download no navegador. */
 export async function baixarArquivoDaApi(endpoint: string, nomeSugerido: string): Promise<void> {

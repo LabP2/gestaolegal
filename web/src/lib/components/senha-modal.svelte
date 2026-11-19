@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import { Label } from '$lib/components/ui/label';
-	import { api } from '$lib/api-client';
-	import { ApiException, type FilaItem, type SenhaPreview } from '$lib/types';
-	import { PRIORIDADE_OPTIONS } from '$lib/constants/fila-atendimento';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException, type FilaItem, type SenhaPreview } from '#lib/types/index.ts';
+	import { PRIORIDADE_OPTIONS } from '#lib/constants/fila-atendimento.ts';
 	import { toast } from 'svelte-sonner';
 
 	let {

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import UserForm from '$lib/forms/user-form.svelte';
+	import UserForm from '#lib/forms/user-form.svelte';
 	import type { PageData } from './$types';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>

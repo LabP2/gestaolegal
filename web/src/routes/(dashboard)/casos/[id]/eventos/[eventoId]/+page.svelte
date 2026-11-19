@@ -1,16 +1,16 @@
 <script lang="ts">
-	import AnexosEvento from '$lib/components/anexos-evento.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import InfoCard from '$lib/components/ui/info-card.svelte';
+	import AnexosEvento from '#lib/components/anexos-evento.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import InfoCard from '#lib/components/ui/info-card.svelte';
 	import type { PageProps } from './$types';
 	import Edit from '@lucide/svelte/icons/edit';
-	import { TIPO_EVENTO } from '$lib/constants/tipo_evento';
+	import { TIPO_EVENTO } from '#lib/constants/tipo_evento.ts';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
 	import { goto } from '$app/navigation';
 
 	let { data }: PageProps = $props();

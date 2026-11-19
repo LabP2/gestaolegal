@@ -1,11 +1,11 @@
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import type { Atendido } from '$lib/types';
-import type { Paginated } from '$lib/types/paginated';
-import type { ListCaso } from '$lib/types/caso';
-import type { OrientacaoJuridica } from '$lib/types/orientacao-juridica';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import type { Atendido } from '#lib/types/index.ts';
+import type { Paginated } from '#lib/types/paginated.ts';
+import type { ListCaso } from '#lib/types/caso.ts';
+import type { OrientacaoJuridica } from '#lib/types/orientacao-juridica.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {

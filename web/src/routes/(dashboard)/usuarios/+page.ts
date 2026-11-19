@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
-import type { Paginated, User } from '$lib/types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
+import type { Paginated, User } from '#lib/types/index.ts';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ url, fetch }) => {
 	const urlParams = url.searchParams;

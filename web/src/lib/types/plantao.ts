@@ -3,7 +3,7 @@
  *
  * Datas puras (`data`, `data_marcada`, `dias`) chegam da API como "YYYY-MM-DD".
  * Já os timestamps (`data_abertura`, `data_entrada`, ...) vêm em RFC-1123 GMT,
- * como no resto da API — formate-os com `formatDateTime` de `$lib/utils/date`.
+ * como no resto da API — formate-os com `formatDateTime` de `#lib/utils/date.ts`.
  */
 
 export const CONFIRMACAO = {

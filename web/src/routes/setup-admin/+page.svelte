@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
-	import { setupAdminSchema, type SetupAdminData } from '$lib/forms/schemas/setup-admin-schema';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
+	import { setupAdminSchema, type SetupAdminData } from '#lib/forms/schemas/setup-admin-schema.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';

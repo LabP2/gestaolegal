@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { BadgeVariant } from '$lib/components/ui/badge';
+	import type { BadgeVariant } from '#lib/components/ui/badge/index.ts';
 
 	export type Column = {
 		header: string;
@@ -13,13 +13,13 @@
 </script>
 
 <script lang="ts" generics="T extends { id:  number }">
-	import * as Table from '$lib/components/ui/table';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import type { Paginated } from '$lib/types';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import type { Paginated } from '#lib/types/index.ts';
 	import type { Component } from 'svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 	import { goto } from '$app/navigation';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -75,7 +75,7 @@
 		} else {
 			const url = new URL(window.location.href);
 			url.searchParams.set('page', String(newPage));
-			await goto(url.toString(), { keepFocus: true, noScroll: true });
+			await goto(url.toString(), { reset: false });
 		}
 	}
 
@@ -191,8 +191,10 @@
 							'sticky right-0 bg-background transition-[filter]',
 							isScrolled && 'drop-shadow-lg',
 							actions.class || 'w-[120px] text-right'
-						)}>Ações</Table.Head
+						)}
 					>
+						Ações
+					</Table.Head>
 				{/if}
 			</Table.Row>
 		</Table.Header>
@@ -201,21 +203,19 @@
 				<Table.Row>
 					{#each columns as column}
 						{#if column.type === 'mono'}
-							<Table.Cell class={column.class}
-								><span class="font-mono text-sm"
-									>{String(getNestedValue(item, column.key) ?? '')}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="font-mono text-sm">
+									{String(getNestedValue(item, column.key) ?? '')}
+								</span>
+							</Table.Cell>
 						{:else if column.type === 'date'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatDate(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatDate(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'datetime'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatDateTime(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatDateTime(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'badge'}
 							<Table.Cell class={column.class}>
 								{@const value = getNestedValue(item, column.key)}
@@ -242,15 +242,13 @@
 							</Table.Cell>
 						{:else if column.type === 'array'}
 							{@const value = getNestedValue(item, column.key)}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{Array.isArray(value) ? formatArray(value) : '--'}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{Array.isArray(value) ? formatArray(value) : '--'}</span>
+							</Table.Cell>
 						{:else if column.type === 'tel'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatTel(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatTel(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'preview'}
 							{@const raw = getNestedValue(item, column.key)}
 							<Table.Cell class={column.class}>
@@ -259,14 +257,15 @@
 										'block truncate text-sm text-muted-foreground',
 										column.previewClass ?? 'max-w-[280px]'
 									)}
-									title={raw ? String(raw) : ''}>{raw ? String(raw) : '--'}</span
+									title={raw ? String(raw) : ''}
 								>
+									{raw ? String(raw) : '--'}
+								</span>
 							</Table.Cell>
 						{:else}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{String(getNestedValue(item, column.key) ?? '')}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{String(getNestedValue(item, column.key) ?? '')}</span>
+							</Table.Cell>
 						{/if}
 					{/each}
 					{#if actions?.buttons?.length}

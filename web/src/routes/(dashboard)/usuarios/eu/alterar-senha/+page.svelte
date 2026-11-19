@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
 		CardContent,
 		CardDescription,
 		CardHeader,
 		CardTitle
-	} from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
+	} from '#lib/components/ui/card/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import { passwordChangeSchema } from '$lib/forms/schemas/password-schema';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { passwordChangeSchema } from '#lib/forms/schemas/password-schema.ts';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 	import { toast } from 'svelte-sonner';
 
 	let { data }: PageProps = $props();

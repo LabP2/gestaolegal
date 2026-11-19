@@ -11,16 +11,13 @@ dist
 
 # Git
 .git
-.gitignore
 .github
 
 # Documentation
 README.md
 *.md
 
-# Configuration (not needed in container)
-.prettierrc
-.prettierignore
+# Configuration not used by the build checks
 .eslintrc.cjs
 .npmrc
 .dockerignore

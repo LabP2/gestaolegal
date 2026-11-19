@@ -1,4 +1,4 @@
-import { ApiException } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
 
 /**
  * Mensagem para exibir ao usuário a partir de um erro de chamada à API.

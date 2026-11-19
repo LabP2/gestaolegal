@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { podeVer, type ItemComPapeis } from '$lib/utils/permissoes';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { podeVer, type ItemComPapeis } from '#lib/utils/permissoes.ts';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
@@ -56,9 +56,9 @@
 					class="relative h-16 flex-col gap-2 p-3 transition-colors hover:bg-primary hover:text-primary-foreground"
 				>
 					<atalho.icon class="h-6 w-6" />
-					<span class="text-center text-xs font-medium break-words whitespace-normal"
-						>{atalho.label}</span
-					>
+					<span class="text-center text-xs font-medium break-words whitespace-normal">
+						{atalho.label}
+					</span>
 					{#if atalho.href === '/notificacoes' && data.naoLidas > 0}
 						<span
 							class="absolute top-1 right-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] leading-none font-semibold text-primary-foreground"

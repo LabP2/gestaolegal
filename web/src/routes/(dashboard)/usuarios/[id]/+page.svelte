@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/button/button.svelte';
-	import InfoCard from '$lib/components/ui/info-card.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import InfoCard from '#lib/components/ui/info-card.svelte';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import KeyIcon from '@lucide/svelte/icons/key';
 	import type { PageProps } from './$types';

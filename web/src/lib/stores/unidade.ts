@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
-import { browser } from '$app/environment';
-import type { Unidade } from '$lib/types';
+import { browser } from '$app/env';
+import type { Unidade } from '#lib/types/index.ts';
 
 /** Chave do localStorage onde a unidade ativa sobrevive ao reload. */
 const CHAVE = 'unidade_ativa';

@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { api } from '$lib/api-client';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Table from '$lib/components/ui/table';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { invalidateAll } from '$app/navigation';
+	import { api } from '#lib/api-client.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { refreshAll } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { formatDateTime } from '$lib/utils/date';
-	import type { Unidade } from '$lib/types';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { formatDateTime } from '#lib/utils/date.ts';
+	import type { Unidade } from '#lib/types/index.ts';
 	import type { PageProps } from './$types';
 	import Edit from '@lucide/svelte/icons/edit';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
@@ -53,7 +53,7 @@
 			});
 			toast.success(`Unidade ${unidade.sigla} reativada`);
 			// Recarrega o layout junto: é ele que devolve a unidade ao seletor.
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Erro ao reativar unidade'));
 		} finally {
@@ -80,7 +80,7 @@
 			open = false;
 			// Recarrega o layout do dashboard também: é ele que ressincroniza a
 			// unidade ativa do seletor com a lista atual.
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Erro ao salvar unidade'));
 		} finally {

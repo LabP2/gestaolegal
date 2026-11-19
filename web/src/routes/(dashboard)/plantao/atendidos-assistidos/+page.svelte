@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import DataTable from '$lib/components/data-table.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import DataTable from '#lib/components/data-table.svelte';
 	import type { PageProps } from './$types';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Edit from '@lucide/svelte/icons/edit';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
-	import { api } from '$lib/api-client';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { api } from '#lib/api-client.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
 	import { page } from '$app/state';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { usePaginatedFilters } from '$lib';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { usePaginatedFilters } from '#lib';
 
 	let { data }: PageProps = $props();
 	const { atendidos, me } = $derived(data);

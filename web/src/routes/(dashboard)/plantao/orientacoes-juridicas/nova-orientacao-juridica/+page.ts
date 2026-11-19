@@ -1,5 +1,5 @@
 import { superValidate } from 'sveltekit-superforms';
-import { orientacaoJuridicaCreateFormSchema } from '$lib/forms/schemas/orientacao-juridica-schema';
+import { orientacaoJuridicaCreateFormSchema } from '#lib/forms/schemas/orientacao-juridica-schema.ts';
 import { zod4 } from 'sveltekit-superforms/adapters';
 
 export const load = async () => {

@@ -1,11 +1,11 @@
 import { superValidate, type Infer } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { orientacaoJuridicaUpdateFormSchema } from '$lib/forms/schemas/orientacao-juridica-schema';
+import { orientacaoJuridicaUpdateFormSchema } from '#lib/forms/schemas/orientacao-juridica-schema.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
-import type { OrientacaoJuridica } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
+import type { OrientacaoJuridica } from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {
