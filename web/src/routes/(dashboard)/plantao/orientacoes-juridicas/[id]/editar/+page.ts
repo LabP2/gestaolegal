@@ -1,4 +1,4 @@
-import { superValidate } from 'sveltekit-superforms';
+import { superValidate, type Infer } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { orientacaoJuridicaUpdateFormSchema } from '$lib/forms/schemas/orientacao-juridica-schema';
 import type { PageLoad } from './$types';
@@ -22,7 +22,11 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			atendidos_ids: orientacao.atendidos?.map((a: { id: number }) => a.id) ?? []
 		};
 
-		const form = await superValidate(formData, zod4(orientacaoJuridicaUpdateFormSchema));
+		const form = await superValidate<
+			Infer<typeof orientacaoJuridicaUpdateFormSchema>,
+			unknown,
+			typeof formData
+		>(formData, zod4(orientacaoJuridicaUpdateFormSchema));
 
 		return { form, orientacao };
 	} catch (err) {

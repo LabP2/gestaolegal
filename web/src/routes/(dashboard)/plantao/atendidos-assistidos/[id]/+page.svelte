@@ -24,7 +24,7 @@
 
 	let senhaModalOpen = $state(false);
 
-	function formatDate(dateString: string | null): string {
+	function formatDate(dateString: string | null | undefined): string {
 		if (!dateString) return 'Não informado';
 		const date = new Date(dateString);
 		// Birth dates are calendar dates — format in UTC to avoid a timezone day-shift.
@@ -192,7 +192,9 @@
 					<div>
 						<p class="text-sm text-muted-foreground">Estado Civil</p>
 						<p class="font-medium">
-							{estadoCivilLabels[atendido.estado_civil] || atendido.estado_civil}
+							{estadoCivilLabels[atendido.estado_civil ?? ''] ||
+								atendido.estado_civil ||
+								'Não informado'}
 						</p>
 					</div>
 
@@ -262,7 +264,9 @@
 					<div>
 						<p class="text-sm text-muted-foreground">Como conheceu</p>
 						<p class="font-medium">
-							{comoConheceuLabels[atendido.como_conheceu] || atendido.como_conheceu}
+							{comoConheceuLabels[atendido.como_conheceu ?? ''] ||
+								atendido.como_conheceu ||
+								'Não informado'}
 						</p>
 					</div>
 

@@ -34,3 +34,14 @@ edição, campos de nomes conforme a quantidade, “Outros”, mudança para MEI
 conteúdo enviado à API, visualização e ausência da seção em pessoa física.
 Os testes de API em `tests/api/test_dados_juridicos_pj_api.py` cobrem também
 validação, persistência, leitura de texto legado e isolamento entre unidades.
+
+## Login, paginação e edição de atendido
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/gestaolegal-browser/node_modules/playwright \
+GL_BASE_URL=http://localhost:5401 node tests/browser/front-check.cjs
+```
+
+Intercepta toda a API com dados sintéticos. Verifica login recusado e aceito,
+paginação no contrato `items` + `pagination`, navegação de volta e gravação
+do endereço no formulário de edição, sem acessar banco real.

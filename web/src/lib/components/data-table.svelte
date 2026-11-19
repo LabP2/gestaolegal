@@ -3,7 +3,7 @@
 
 	export type Column = {
 		header: string;
-		key?: string;
+		key: string;
 		class?: string;
 		type?: 'text' | 'mono' | 'date' | 'datetime' | 'badge' | 'status' | 'array' | 'tel' | 'preview';
 		badgeMap?: Record<string | number, { text: string; variant: BadgeVariant; class?: string }>;
@@ -51,21 +51,23 @@
 		emptyText = 'Nenhum registro encontrado.',
 		actions,
 		onPageChange
-	} = $props<{
+	}: {
 		columns: Column[];
 		data: Paginated<T>;
 		tableClass?: string;
 		emptyText?: string;
 		actions?: { class?: string; buttons: ActionButton[] };
 		onPageChange?: (page: number) => void | Promise<void>;
-	}>();
+	} = $props();
 
 	let isScrolled = $state(false);
 	let scrollContainer: HTMLDivElement;
 
-	let totalPages = $derived(Math.ceil(data.total / data.per_page));
-	let startItem = $derived((data.page - 1) * data.per_page + 1);
-	let endItem = $derived(Math.min(data.page * data.per_page, data.total));
+	let totalPages = $derived(Math.ceil(data.pagination.total / data.pagination.per_page));
+	let startItem = $derived((data.pagination.page - 1) * data.pagination.per_page + 1);
+	let endItem = $derived(
+		Math.min(data.pagination.page * data.pagination.per_page, data.pagination.total)
+	);
 
 	async function handlePageChange(newPage: number) {
 		if (onPageChange) {
@@ -331,24 +333,24 @@
 	{/if}
 </div>
 
-{#if data.total > 0}
+{#if data.pagination.total > 0}
 	<div
 		class="flex items-center justify-between rounded-b-md border-x border-b bg-muted/50 px-4 py-3"
 	>
 		<div class="text-sm text-muted-foreground">
 			Mostrando <span class="font-medium">{startItem}</span> a
 			<span class="font-medium">{endItem}</span>
-			de <span class="font-medium">{data.total}</span> resultados
+			de <span class="font-medium">{data.pagination.total}</span> resultados
 		</div>
 		<div class="flex items-center space-x-2">
 			<div class="mr-4 text-sm text-muted-foreground">
-				Página {data.page} de {totalPages}
+				Página {data.pagination.page} de {totalPages}
 			</div>
 			<Button
 				variant="ghost"
 				size="sm"
 				onclick={() => handlePageChange(1)}
-				disabled={data.page === 1}
+				disabled={data.pagination.page === 1}
 				title="Primeira página"
 			>
 				<ChevronsLeft class="h-4 w-4" />
@@ -356,8 +358,8 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				onclick={() => handlePageChange(data.page - 1)}
-				disabled={data.page === 1}
+				onclick={() => handlePageChange(data.pagination.page - 1)}
+				disabled={data.pagination.page === 1}
 				title="Página anterior"
 			>
 				<ChevronLeft class="h-4 w-4" />
@@ -365,8 +367,8 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				onclick={() => handlePageChange(data.page + 1)}
-				disabled={data.page >= totalPages}
+				onclick={() => handlePageChange(data.pagination.page + 1)}
+				disabled={data.pagination.page >= totalPages}
 				title="Próxima página"
 			>
 				<ChevronRight class="h-4 w-4" />
@@ -375,7 +377,7 @@
 				variant="ghost"
 				size="sm"
 				onclick={() => handlePageChange(totalPages)}
-				disabled={data.page >= totalPages}
+				disabled={data.pagination.page >= totalPages}
 				title="Última página"
 			>
 				<ChevronsRight class="h-4 w-4" />

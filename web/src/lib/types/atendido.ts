@@ -36,7 +36,13 @@ export interface Atendido {
 	procurou_qual_local?: string;
 	obs?: string;
 	pj_constituida?: string;
-	repres_legal?: boolean;
+	repres_legal?: boolean | null;
+	nome_repres_legal?: string | null;
+	cpf_repres_legal?: string | null;
+	contato_repres_legal?: string | null;
+	rg_repres_legal?: string | null;
+	nascimento_repres_legal?: string | null;
+	pretende_constituir_pj?: string | null;
 	status?: number;
 	created_at?: string;
 	updated_at?: string;
