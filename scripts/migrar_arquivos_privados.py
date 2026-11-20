@@ -11,6 +11,11 @@ O procedimento inteiro, na ordem, é:
        uma resolve dentro da raiz privada e tem o conteúdo do manifesto. Não
        escreve nada; sai com a contagem de erros.
 
+Depois da multitenancy (PR 8), os anexos ficam em `<raiz>/<tenant_id>/<categoria>`.
+Este script não conhece tenant: para gravar no layout novo, passe a pasta do
+tenant como raiz (`--raiz-privada /data/gestaolegal/uploads/1`). Anexos já
+migrados para o layout antigo vão para `1/` com `scripts/mover_arquivos_tenant.py`.
+
 **Rodar qualquer fase contra o banco de QA ou de produção é decisão humana.**
 Nenhuma delas é acionada pela esteira automatizada: ela só escreve e testa o
 script. A aplicação ainda exige `--backup-conferido`, que é a afirmação de

@@ -18,7 +18,7 @@ class ArquivoCasoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int) -> ArquivoCaso | None:
-        stmt = select(arquivos_caso).where(arquivos_caso.c.id == id)
+        stmt = self.escopo(select(arquivos_caso).where(arquivos_caso.c.id == id), arquivos_caso)
         result = self.session.execute(stmt).one_or_none()
 
         if not result:
@@ -27,22 +27,28 @@ class ArquivoCasoRepository(BaseRepository):
         return from_dict(ArquivoCaso, dict(result._mapping))
 
     def find_by_caso_id(self, caso_id: int) -> list[ArquivoCaso]:
-        stmt = select(arquivos_caso).where(arquivos_caso.c.id_caso == caso_id)
+        stmt = self.escopo(
+            select(arquivos_caso).where(arquivos_caso.c.id_caso == caso_id), arquivos_caso
+        )
         results = self.session.execute(stmt).all()
 
         return [from_dict(ArquivoCaso, dict(row._mapping)) for row in results]
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(arquivos_caso).values(**data)
+        stmt = insert(arquivos_caso).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(arquivos_caso).where(arquivos_caso.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(arquivos_caso).where(arquivos_caso.c.id == id), arquivos_caso
+        ).values(**data)
         self.session.execute(stmt)
 
     def delete(self, id: int) -> bool:
-        stmt = sql_delete(arquivos_caso).where(arquivos_caso.c.id == id)
+        stmt = self.escopo(
+            sql_delete(arquivos_caso).where(arquivos_caso.c.id == id), arquivos_caso
+        )
         result = self.session.execute(stmt)
         return result.rowcount > 0

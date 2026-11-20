@@ -1,9 +1,9 @@
 <script lang="ts" module>
-	import type { BadgeVariant } from '$lib/components/ui/badge';
+	import type { BadgeVariant } from '#lib/components/ui/badge/index.ts';
 
 	export type Column = {
 		header: string;
-		key?: string;
+		key: string;
 		class?: string;
 		type?: 'text' | 'mono' | 'date' | 'datetime' | 'badge' | 'status' | 'array' | 'tel' | 'preview';
 		badgeMap?: Record<string | number, { text: string; variant: BadgeVariant; class?: string }>;
@@ -13,18 +13,15 @@
 </script>
 
 <script lang="ts" generics="T extends { id:  number }">
-	import * as Table from '$lib/components/ui/table';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import type { Paginated } from '$lib/types';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import type { Paginated } from '#lib/types/index.ts';
 	import type { Component } from 'svelte';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 	import { goto } from '$app/navigation';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import ChevronsLeft from '@lucide/svelte/icons/chevrons-left';
-	import ChevronsRight from '@lucide/svelte/icons/chevrons-right';
+	import Paginacao from './paginacao.svelte';
 
 	type ActionButton = {
 		title: string;
@@ -50,22 +47,22 @@
 		tableClass,
 		emptyText = 'Nenhum registro encontrado.',
 		actions,
-		onPageChange
-	} = $props<{
+		onPageChange,
+		tamanhosPagina = false,
+		onPageSizeChange
+	}: {
 		columns: Column[];
 		data: Paginated<T>;
 		tableClass?: string;
 		emptyText?: string;
 		actions?: { class?: string; buttons: ActionButton[] };
 		onPageChange?: (page: number) => void | Promise<void>;
-	}>();
+		tamanhosPagina?: boolean;
+		onPageSizeChange?: (n: number) => void | Promise<void>;
+	} = $props();
 
 	let isScrolled = $state(false);
 	let scrollContainer: HTMLDivElement;
-
-	let totalPages = $derived(Math.ceil(data.total / data.per_page));
-	let startItem = $derived((data.page - 1) * data.per_page + 1);
-	let endItem = $derived(Math.min(data.page * data.per_page, data.total));
 
 	async function handlePageChange(newPage: number) {
 		if (onPageChange) {
@@ -73,7 +70,7 @@
 		} else {
 			const url = new URL(window.location.href);
 			url.searchParams.set('page', String(newPage));
-			await goto(url.toString(), { keepFocus: true, noScroll: true });
+			await goto(url.toString(), { reset: false });
 		}
 	}
 
@@ -189,8 +186,10 @@
 							'sticky right-0 bg-background transition-[filter]',
 							isScrolled && 'drop-shadow-lg',
 							actions.class || 'w-[120px] text-right'
-						)}>Ações</Table.Head
+						)}
 					>
+						Ações
+					</Table.Head>
 				{/if}
 			</Table.Row>
 		</Table.Header>
@@ -199,21 +198,19 @@
 				<Table.Row>
 					{#each columns as column}
 						{#if column.type === 'mono'}
-							<Table.Cell class={column.class}
-								><span class="font-mono text-sm"
-									>{String(getNestedValue(item, column.key) ?? '')}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="font-mono text-sm">
+									{String(getNestedValue(item, column.key) ?? '')}
+								</span>
+							</Table.Cell>
 						{:else if column.type === 'date'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatDate(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatDate(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'datetime'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatDateTime(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatDateTime(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'badge'}
 							<Table.Cell class={column.class}>
 								{@const value = getNestedValue(item, column.key)}
@@ -240,15 +237,13 @@
 							</Table.Cell>
 						{:else if column.type === 'array'}
 							{@const value = getNestedValue(item, column.key)}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{Array.isArray(value) ? formatArray(value) : '--'}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{Array.isArray(value) ? formatArray(value) : '--'}</span>
+							</Table.Cell>
 						{:else if column.type === 'tel'}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{formatTel(getNestedValue(item, column.key))}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{formatTel(getNestedValue(item, column.key))}</span>
+							</Table.Cell>
 						{:else if column.type === 'preview'}
 							{@const raw = getNestedValue(item, column.key)}
 							<Table.Cell class={column.class}>
@@ -257,14 +252,15 @@
 										'block truncate text-sm text-muted-foreground',
 										column.previewClass ?? 'max-w-[280px]'
 									)}
-									title={raw ? String(raw) : ''}>{raw ? String(raw) : '--'}</span
+									title={raw ? String(raw) : ''}
 								>
+									{raw ? String(raw) : '--'}
+								</span>
 							</Table.Cell>
 						{:else}
-							<Table.Cell class={column.class}
-								><span class="text-sm">{String(getNestedValue(item, column.key) ?? '')}</span
-								></Table.Cell
-							>
+							<Table.Cell class={column.class}>
+								<span class="text-sm">{String(getNestedValue(item, column.key) ?? '')}</span>
+							</Table.Cell>
 						{/if}
 					{/each}
 					{#if actions?.buttons?.length}
@@ -331,57 +327,15 @@
 	{/if}
 </div>
 
-{#if data.total > 0}
-	<div
-		class="flex items-center justify-between rounded-b-md border-x border-b bg-muted/50 px-4 py-3"
-	>
-		<div class="text-sm text-muted-foreground">
-			Mostrando <span class="font-medium">{startItem}</span> a
-			<span class="font-medium">{endItem}</span>
-			de <span class="font-medium">{data.total}</span> resultados
-		</div>
-		<div class="flex items-center space-x-2">
-			<div class="mr-4 text-sm text-muted-foreground">
-				Página {data.page} de {totalPages}
-			</div>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(1)}
-				disabled={data.page === 1}
-				title="Primeira página"
-			>
-				<ChevronsLeft class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(data.page - 1)}
-				disabled={data.page === 1}
-				title="Página anterior"
-			>
-				<ChevronLeft class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(data.page + 1)}
-				disabled={data.page >= totalPages}
-				title="Próxima página"
-			>
-				<ChevronRight class="h-4 w-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onclick={() => handlePageChange(totalPages)}
-				disabled={data.page >= totalPages}
-				title="Última página"
-			>
-				<ChevronsRight class="h-4 w-4" />
-			</Button>
-		</div>
-	</div>
+{#if data.total > 0 || tamanhosPagina}
+	<Paginacao
+		total={data.total}
+		page={data.page}
+		per_page={data.per_page}
+		tamanhos={tamanhosPagina}
+		onPageChange={handlePageChange}
+		{onPageSizeChange}
+	/>
 {/if}
 
 <style>

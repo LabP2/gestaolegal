@@ -1,11 +1,11 @@
 <script lang="ts">
 	import '../app.css';
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { Toaster } from 'svelte-sonner';
-	import { ehRotaPublica } from '$lib/utils/rotas';
+	import { ehRotaPublica } from '#lib/utils/rotas.ts';
 
 	let { children } = $props();
 
@@ -25,7 +25,7 @@
 	<link rel="apple-touch-icon" href="/favicon-512.png" />
 </svelte:head>
 
-<!-- No layout raiz para que as telas públicas (login, setup-admin) também
+<!-- No layout raiz para que as telas públicas (login, recuperação de senha) também
 	 exibam toasts: antes ele ficava só no layout do dashboard e os erros
 	 dessas telas eram emitidos sem nada que os renderizasse. -->
 <Toaster position="top-center" richColors />

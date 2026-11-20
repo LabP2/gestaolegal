@@ -115,7 +115,10 @@ class PlantaoService:
         ids = {item["usuario_id"] for item in historico if item.get("usuario_id")}
         nomes = dict(
             self.repository.session.execute(
-                select(usuarios.c.id, usuarios.c.nome).where(usuarios.c.id.in_(ids))
+                self.repository.escopo(
+                    select(usuarios.c.id, usuarios.c.nome).where(usuarios.c.id.in_(ids)),
+                    usuarios,
+                )
             ).all()
         )
         return [
@@ -387,7 +390,9 @@ class PlantaoService:
         from gestaolegal.database.tables import unidades
 
         self.repository.session.execute(
-            select(unidades.c.id).where(unidades.c.id == unidade_id).with_for_update()
+            self.repository.escopo(
+                select(unidades.c.id).where(unidades.c.id == unidade_id), unidades
+            ).with_for_update()
         )
         registro = None if criar else self._selecionar(lock=True)
         if registro and (registro.legado or registro.cancelado):
@@ -448,7 +453,9 @@ class PlantaoService:
 
             destinatarios = (
                 self.repository.session.execute(
-                    select(usuarios.c.id)
+                    self.repository.escopo(
+                        select(usuarios.c.id), usuarios, usuarios_unidades
+                    )
                     .join(
                         usuarios_unidades,
                         usuarios_unidades.c.usuario_id == usuarios.c.id,

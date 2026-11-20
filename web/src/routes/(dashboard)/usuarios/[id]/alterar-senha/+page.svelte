@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PasswordForm from '$lib/forms/password-form.svelte';
+	import PasswordForm from '#lib/forms/password-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
 

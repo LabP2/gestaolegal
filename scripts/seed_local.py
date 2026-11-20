@@ -10,8 +10,10 @@ Variáveis (todas opcionais):
   SEED_API_URL        substitui a URL montada a partir de APP_PORT
   SEED_ADMIN_EMAIL    admin usado para semear (padrão rvnovaes@gmail.com)
   SEED_ADMIN_PASSWORD senha desse admin (padrão admin)
-  ADMIN_SETUP_TOKEN   se o banco não tem usuários, cria o admin acima por
-                      auth/setup-admin com este token (o mesmo do .env)
+
+O admin precisa existir: o setup inicial pela API saiu com o multitenant (o
+primeiro admin de cada NPJ vem da plataforma). Num banco vazio, rode antes o
+`make seed` e aponte SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD para uma conta dele.
 
 Unidades: o seed vincula o admin e os usuários de exemplo a **todas** as
 unidades ativas (`GET /api/unidades`) e semeia atendidos e casos em cada uma
@@ -39,7 +41,6 @@ API = os.environ.get("SEED_API_URL") or f"http://localhost:{os.environ.get('APP_
 API = API.rstrip("/") + "/api"
 ADMIN_EMAIL = os.environ.get("SEED_ADMIN_EMAIL", "rvnovaes@gmail.com")
 ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "admin")
-SETUP_TOKEN = os.environ.get("ADMIN_SETUP_TOKEN")
 SENHA_PADRAO = "senha123"
 
 falhas = 0
@@ -108,24 +109,7 @@ def login(email, senha):
     return r["data"]["token"]
 
 
-def garantir_admin():
-    """Cria o admin pelo setup inicial se o banco estiver vazio."""
-    r = call("GET", "auth/needs-setup")
-    if r and r["data"]["needs_setup"]:
-        if not SETUP_TOKEN:
-            sys.exit("seed: banco sem usuários e ADMIN_SETUP_TOKEN não definido")
-        r = call(
-            "POST",
-            "auth/setup-admin",
-            body={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD, "setup_token": SETUP_TOKEN},
-        )
-        if not r:
-            sys.exit("seed: setup-admin falhou")
-        print("admin criado:", ADMIN_EMAIL)
-    return login(ADMIN_EMAIL, ADMIN_PASSWORD)
-
-
-admin = garantir_admin()
+admin = login(ADMIN_EMAIL, ADMIN_PASSWORD)
 me = call("GET", "user/me", admin)["data"]
 ADMIN_ID = me["id"]
 
@@ -134,7 +118,7 @@ if not UNIDADES:
     sys.exit("seed: nenhuma unidade ativa; rode as migrations antes (make migrate)")
 UNIDADE_IDS = [u["id"] for u in UNIDADES]
 
-# O admin nasce vinculado só à unidade padrão (setup-admin e migration); para
+# O admin pode estar vinculado a uma só unidade; para
 # semear as outras ele precisa do vínculo antes — e o header de uma unidade que
 # já é dele.
 minhas = [u["id"] for u in me.get("unidades") or []]

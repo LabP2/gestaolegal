@@ -4,7 +4,7 @@
 		HTMLInputAttributes,
 		HTMLInputTypeAttribute
 	} from 'svelte/elements';
-	import { cn, type WithElementRef } from '$lib/utils.js';
+	import { cn, type WithElementRef } from '#lib/utils.js';
 	import { Debounced, useDebounce } from 'runed';
 
 	type InputType = Exclude<HTMLInputTypeAttribute, 'file'>;
@@ -30,10 +30,14 @@
 		...restProps
 	}: Props = $props();
 
-	const debounced = new Debounced(() => value, debounceMs);
-	const debouncedInputHandler = ondebounceinput
-		? useDebounce(ondebounceinput, debounceMs)
-		: undefined;
+	const debounced = new Debounced(
+		() => value,
+		() => debounceMs
+	);
+	const debouncedInputHandler = useDebounce(
+		(event: Event & { currentTarget: EventTarget & HTMLInputElement }) => ondebounceinput?.(event),
+		() => debounceMs
+	);
 
 	function handleInput(event: Event & { currentTarget: EventTarget & HTMLInputElement }) {
 		restProps.oninput?.(event);

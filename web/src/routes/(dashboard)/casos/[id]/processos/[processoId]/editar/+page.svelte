@@ -1,11 +1,11 @@
 <script lang="ts">
-	import ProcessoForm from '$lib/forms/processo-form.svelte';
+	import ProcessoForm from '#lib/forms/processo-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
-	const { processo } = data;
+	const { processo } = $derived(data);
 
 	function onUpdate(data: any) {
 		toast.success('Processo atualizado com sucesso');
@@ -30,18 +30,20 @@
 					</h1>
 					<p class="mt-2 text-muted-foreground">Atualize as informações do processo no sistema</p>
 				</div>
-				<Button variant="outline" href="/casos/{processo.id_caso}/processos/{processo.id}"
-					>Voltar</Button
-				>
+				<Button variant="outline" href="/casos/{processo.id_caso}/processos/{processo.id}">
+					Voltar
+				</Button>
 			</div>
 		</div>
 	</div>
-	<ProcessoForm
-		data={data.form}
-		casoId={processo.id_caso}
-		processoId={processo.id}
-		{onUpdate}
-		{onError}
-		isCreateMode={false}
-	/>
+	{#key processo.id}
+		<ProcessoForm
+			data={data.form}
+			casoId={processo.id_caso ?? undefined}
+			processoId={processo.id}
+			{onUpdate}
+			{onError}
+			isCreateMode={false}
+		/>
+	{/key}
 </div>

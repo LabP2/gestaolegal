@@ -119,6 +119,14 @@ def test_delete_user(
     assert data["status"] is False
 
 
+def test_delete_user_inexistente_responde_404(
+    client: FlaskClient, auth_headers: dict[str, str]
+) -> None:
+    # Antes respondia "Usuário desativado com sucesso" sem desativar nada.
+    response = client.delete("/api/user/987654", headers=auth_headers)
+    assert response.status_code == 404
+
+
 def test_search_users(
     client: FlaskClient, auth_headers: dict[str, str], sample_user_data: dict[str, Any]
 ) -> None:
@@ -697,3 +705,21 @@ class TestUsuarioFiltroPorUnidade:
         assert filtrados["total"] == len(filtrados["items"])
         assert primeira_pagina["total"] == filtrados["total"]
         assert len(primeira_pagina["items"]) == 1
+
+
+def test_busca_usuario_por_email_respeita_status_papel_e_paginacao(
+    client, auth_headers, sample_user_data,
+):
+    payload = {**sample_user_data, 'nome': 'Nome sem o termo pesquisado', 'email': 'busca.email@example.test'}
+    user = _create_user(client, auth_headers, payload)
+    def search(**filters):
+        response = client.get('/api/user/', query_string={'search': 'BUSCA.EMAIL@', 'per_page': 1, **filters}, headers=auth_headers)
+        assert response.status_code == 200
+        return get_success_data(response)
+    found = search()
+    assert found['total'] == 1
+    assert [item['id'] for item in found['items']] == [user['id']]
+    assert search(funcao='admin')['total'] == 0
+    assert client.delete(f'/api/user/{user["id"]}', headers=auth_headers).status_code == 200
+    assert search()['total'] == 0
+    assert search(show_inactive='true')['total'] == 1

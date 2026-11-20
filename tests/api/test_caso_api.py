@@ -7,7 +7,9 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from gestaolegal.services import private_file_storage
+from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
 from tests.api.conftest import (
+    TENANT_DAJ,
     assert_success_response,
     clean_tables,
     get_success_data,
@@ -20,12 +22,12 @@ def caminho_do_anexo(app: Flask, ref: str) -> str:
     O banco guarda só a referência relativa à categoria; quem sabe traduzir
     para disco é o `private_file_storage`, e ele precisa do contexto do app.
     """
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return private_file_storage.resolve("casos", ref)
 
 
 def anexo_existe(app: Flask, ref: str) -> bool:
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         return private_file_storage.exists("casos", ref)
 
 
@@ -77,6 +79,15 @@ def test_get_caso_by_id(
 
 def test_get_caso_not_found(client: FlaskClient, auth_headers: dict[str, str]) -> None:
     response = client.get("/api/caso/99999", headers=auth_headers)
+
+    assert response.status_code == 404
+
+
+def test_get_historico_caso_not_found(
+    client: FlaskClient, auth_headers: dict[str, str]
+) -> None:
+    """Histórico de caso inexistente responde 404, como eventos e processos."""
+    response = client.get("/api/caso/99999/historico", headers=auth_headers)
 
     assert response.status_code == 404
 
@@ -921,6 +932,7 @@ def test_filter_casos_by_user_me(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_admin_data = {
@@ -939,7 +951,7 @@ def test_filter_casos_by_user_me(
     caso_non_admin_data = {
         **sample_caso_data,
         "area_direito": "civil",
-        "id_usuario_responsavel": 2,
+        "id_usuario_responsavel": non_admin_id,
     }
     non_admin_caso_response = client.post(
         "/api/caso/", json=caso_non_admin_data, headers=non_admin_auth_headers
@@ -966,6 +978,7 @@ def test_filter_casos_by_user_id(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_admin_data = {
@@ -985,7 +998,7 @@ def test_filter_casos_by_user_id(
     caso_non_admin_data = {
         **sample_caso_data,
         "area_direito": "consumidor",
-        "id_usuario_responsavel": 2,
+        "id_usuario_responsavel": non_admin_id,
     }
     non_admin_caso_response = client.post(
         "/api/caso/", json=caso_non_admin_data, headers=non_admin_auth_headers
@@ -1016,6 +1029,7 @@ def test_filter_casos_by_user_id_as_non_admin(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_admin_data = {
@@ -1034,7 +1048,7 @@ def test_filter_casos_by_user_id_as_non_admin(
     caso_non_admin_data = {
         **sample_caso_data,
         "area_direito": "civil",
-        "id_usuario_responsavel": 2,
+        "id_usuario_responsavel": non_admin_id,
     }
     non_admin_caso_response = client.post(
         "/api/caso/", json=caso_non_admin_data, headers=non_admin_auth_headers
@@ -1067,6 +1081,7 @@ def test_filter_casos_without_user_param_returns_all(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_admin_data = {
@@ -1085,7 +1100,7 @@ def test_filter_casos_without_user_param_returns_all(
     caso_non_admin_data = {
         **sample_caso_data,
         "area_direito": "tributario",
-        "id_usuario_responsavel": 2,
+        "id_usuario_responsavel": non_admin_id,
     }
     non_admin_caso_response = client.post(
         "/api/caso/", json=caso_non_admin_data, headers=non_admin_auth_headers
@@ -1112,6 +1127,7 @@ def test_filter_casos_by_invalid_user_param_returns_all(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_admin_data = {
@@ -1130,7 +1146,7 @@ def test_filter_casos_by_invalid_user_param_returns_all(
     caso_non_admin_data = {
         **sample_caso_data,
         "area_direito": "previdenciario",
-        "id_usuario_responsavel": 2,
+        "id_usuario_responsavel": non_admin_id,
     }
     non_admin_caso_response = client.post(
         "/api/caso/", json=caso_non_admin_data, headers=non_admin_auth_headers
@@ -1538,14 +1554,15 @@ def test_filter_casos_by_criado_por_me(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
-    # Admin cria um caso cujo responsável é o usuário 2; o outro usuário cria um
+    # Admin cria um caso cujo responsável é o outro usuário; o outro usuário cria um
     # caso cujo responsável é o admin. "Cadastrado por mim" olha só o criador.
     criado_pelo_admin = get_success_data(
         client.post(
             "/api/caso/",
-            json={**sample_caso_data, "id_usuario_responsavel": 2},
+            json={**sample_caso_data, "id_usuario_responsavel": non_admin_id},
             headers=auth_headers,
         )
     )["id"]
@@ -1590,15 +1607,16 @@ def test_filter_casos_by_participante_me_inclui_qualquer_papel(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
     papel: str,
 ) -> None:
     # O admin cadastra os dois casos (e é o responsável, salvo no caso do papel
-    # testado). O usuário 2 participa só do primeiro.
+    # testado). O outro usuário participa só do primeiro.
     com_usuario = get_success_data(
         client.post(
             "/api/caso/",
-            json={**sample_caso_data, "id_usuario_responsavel": 1, papel: 2},
+            json={**sample_caso_data, "id_usuario_responsavel": 1, papel: non_admin_id},
             headers=auth_headers,
         )
     )["id"]
@@ -1615,12 +1633,13 @@ def test_filter_user_continua_so_responsavel_e_lista_traz_estagiario(
     client: FlaskClient,
     auth_headers: dict[str, str],
     non_admin_auth_headers: dict[str, str],
+    non_admin_id: int,
     sample_caso_data: dict[str, Any],
 ) -> None:
     caso_id = get_success_data(
         client.post(
             "/api/caso/",
-            json={**sample_caso_data, "id_usuario_responsavel": 1, "id_estagiario": 2},
+            json={**sample_caso_data, "id_usuario_responsavel": 1, "id_estagiario": non_admin_id},
             headers=auth_headers,
         )
     )["id"]
@@ -1632,7 +1651,7 @@ def test_filter_user_continua_so_responsavel_e_lista_traz_estagiario(
     # A lista de casos devolve o estagiário, exibido na coluna "Estagiário".
     items = get_success_data(client.get("/api/caso/", headers=auth_headers))["items"]
     caso = next(c for c in items if c["id"] == caso_id)
-    assert caso["estagiario"]["id"] == 2
+    assert caso["estagiario"]["id"] == non_admin_id
     assert caso["estagiario"]["nome"]
 
 
@@ -1797,7 +1816,7 @@ def test_anexo_indisponivel_origem_pode_ser_recuperado_por_substituicao(app, cli
                                           headers=auth_headers, content_type="multipart/form-data"))
     assert arquivo["indisponivel_origem"] is False
     os.remove(caminho_do_anexo(app, arquivo["link_arquivo"]))
-    with get_session() as session:
+    with get_session() as session, sem_tenant("teste: acesso direto ao banco"):
         session.execute(update(arquivos_caso).where(arquivos_caso.c.id == arquivo["id"]).values(indisponivel_origem=True))
         session.commit()
     listed = get_success_data(client.get(rota, headers=auth_headers))["arquivos"][0]
@@ -1811,3 +1830,9 @@ def test_anexo_indisponivel_origem_pode_ser_recuperado_por_substituicao(app, cli
                                          headers=auth_headers, content_type="multipart/form-data"))
     assert updated["indisponivel_origem"] is False
     assert client.get(f"{item}/download", headers=auth_headers).data == b"recuperado"
+
+
+@pytest.fixture
+def non_admin_id(client, non_admin_auth_headers):
+    """Não presumir id2: outros módulos podem recriar o usuário de teste."""
+    return get_success_data(client.get('/api/user/me', headers=non_admin_auth_headers))['id']

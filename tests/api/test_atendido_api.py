@@ -4,6 +4,7 @@ import pytest
 from flask.testing import FlaskClient
 
 from tests.api.conftest import assert_success_response, clean_tables, get_success_data
+from gestaolegal.utils.request_context import sem_tenant
 
 
 @pytest.mark.parametrize("informar_campo", [False, True])
@@ -642,6 +643,35 @@ def test_atendido_de_outra_unidade_responde_404(
     )
 
 
+def test_sublistas_de_atendido_fora_do_escopo_respondem_404(
+    client: FlaskClient,
+    auth_headers: dict[str, str],
+    auth_headers_nl: dict[str, str],
+    sample_atendido_data: dict[str, Any],
+) -> None:
+    """Casos e orientações de um atendido inexistente ou de outra unidade dão
+    404, como a ficha, e não lista vazia."""
+    clean_tables("atendidos")
+
+    id_bh = get_success_data(
+        client.post("/api/atendido/", json=sample_atendido_data, headers=auth_headers)
+    )["id"]
+
+    for sub in ("casos", "orientacoes"):
+        assert (
+            client.get(f"/api/atendido/{id_bh}/{sub}", headers=auth_headers).status_code
+            == 200
+        )
+        assert (
+            client.get(f"/api/atendido/{id_bh}/{sub}", headers=auth_headers_nl).status_code
+            == 404
+        )
+        assert (
+            client.get(f"/api/atendido/999999/{sub}", headers=auth_headers).status_code
+            == 404
+        )
+
+
 def test_atendido_create_grava_unidade_ativa(
     client: FlaskClient,
     auth_headers_nl: dict[str, str],
@@ -737,10 +767,11 @@ def test_seletor_nao_duplica_pessoa_com_fichas_legadas_repetidas(
     assert client.post(f'/api/atendido/{aid}/tornar-assistido', json=sample_assistido_data,
                        headers=auth_headers).status_code == 200
     session = get_session()
-    original = dict(session.execute(select(assistidos).where(assistidos.c.id_atendido == aid)).mappings().one())
-    original.pop('id')
-    session.execute(assistidos.insert().values(**original))
-    session.commit()
+    with sem_tenant("teste: acesso direto ao banco"):
+        original = dict(session.execute(select(assistidos).where(assistidos.c.id_atendido == aid)).mappings().one())
+        original.pop('id')
+        session.execute(assistidos.insert().values(**original))
+        session.commit()
     r = client.get('/api/atendido/', query_string={'search': 'SELETOR DUPLICADO', 'tipo_busca': 'assistidos', 'per_page': 1}, headers=auth_headers)
     data = get_success_data(r)
     assert data['total'] == 1
@@ -748,3 +779,51 @@ def test_seletor_nao_duplica_pessoa_com_fichas_legadas_repetidas(
     assert [a['id'] for a in data['items']] == [aid]
     # Não deixe a duplicata proposital contaminar testes que reutilizam IDs.
     clean_tables('assistidos', 'atendidos')
+
+
+def test_edicao_legado_preserva_pendencias_e_valida_correcao(client, auth_headers, sample_atendido_data):
+    payload = {**sample_atendido_data, "cpf": "", "procurou_outro_local": "", "pj_constituida": ""}
+    created = client.post('/api/atendido/', json=payload, headers=auth_headers)
+    url = f'/api/atendido/{get_success_data(created)["id"]}'
+    changed = client.put(url, json={"celular": "(31) 98888-1234"}, headers=auth_headers)
+    assert changed.status_code == 200
+    assert get_success_data(changed)['cpf'] == ''
+    assert get_success_data(changed)['procurou_outro_local'] == ''
+    for field, value in [('cpf', '111.111.111-11'), ('procurou_outro_local', 'talvez'), ('pj_constituida', None)]:
+        assert client.put(url, json={field: value}, headers=auth_headers).status_code == 400
+    fixed = client.put(url, json={'cpf': '529.982.247-25', 'procurou_outro_local': 'nao', 'pj_constituida': 'nao'}, headers=auth_headers)
+    assert fixed.status_code == 200
+    for field in ['cpf', 'procurou_outro_local', 'pj_constituida']:
+        for value in ['', None]:
+            assert client.put(url, json={field: value}, headers=auth_headers).status_code == 400
+    assert get_success_data(client.get(url, headers=auth_headers))['cpf'] == '529.982.247-25'
+
+
+def test_reativar_atendido_preserva_dados_e_retorna_a_busca(
+    client, auth_headers, sample_atendido_data,
+):
+    created = client.post('/api/atendido/', json=sample_atendido_data, headers=auth_headers)
+    atendido = get_success_data(created)
+    url = f'/api/atendido/{atendido["id"]}'
+    assert client.delete(url, headers=auth_headers).status_code == 200
+    for _ in range(2):  # Reativação idempotente.
+        assert client.post(url + '/reativar', headers=auth_headers).status_code == 200
+    saved = get_success_data(client.get(url, headers=auth_headers))
+    assert saved['status'] == 1
+    for field in ('nome', 'cpf', 'email', 'endereco'):
+        assert saved[field] == atendido[field]
+    found = get_success_data(client.get('/api/atendido/', query_string={'search': atendido['cpf']}, headers=auth_headers))
+    assert atendido['id'] in [item['id'] for item in found['items']]
+
+
+def test_reativar_atendido_exige_admin_e_unidade_correta(
+    client, auth_headers, estagiario_auth_headers, auth_headers_nl, sample_atendido_data,
+):
+    created = client.post('/api/atendido/', json=sample_atendido_data, headers=auth_headers)
+    url = f'/api/atendido/{get_success_data(created)["id"]}'
+    assert client.delete(url, headers=auth_headers).status_code == 200
+    assert client.post(url + '/reativar').status_code == 401
+    assert client.post(url + '/reativar', headers=estagiario_auth_headers).status_code == 403
+    assert client.post(url + '/reativar', headers=auth_headers_nl).status_code == 404
+    assert client.post('/api/atendido/9999999/reativar', headers=auth_headers).status_code == 404
+    assert get_success_data(client.get(url, headers=auth_headers))['status'] == 0

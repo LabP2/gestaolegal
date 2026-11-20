@@ -1,11 +1,11 @@
-import { superValidate } from 'sveltekit-superforms';
+import { superValidate, type Infer } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { assistenciaJudiciariaUpdateFormSchema } from '$lib/forms/schemas/assistencia-judiciaria-schema';
+import { assistenciaJudiciariaUpdateFormSchema } from '#lib/forms/schemas/assistencia-judiciaria-schema.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
-import type { AssistenciaJudiciaria } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
+import type { AssistenciaJudiciaria } from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {
@@ -15,7 +15,8 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			fetch
 		);
 
-		const formData = {
+		// Dados da API ainda não validados: o schema abaixo verifica enums e campos legados.
+		const formData: Record<string, unknown> = {
 			nome: assistencia.nome,
 			regiao: assistencia.regiao,
 			areas_atendidas: assistencia.areas_atendidas ?? [],
@@ -30,7 +31,11 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			estado: assistencia.endereco?.estado ?? ''
 		};
 
-		const form = await superValidate(formData, zod4(assistenciaJudiciariaUpdateFormSchema));
+		const form = await superValidate<
+			Infer<typeof assistenciaJudiciariaUpdateFormSchema>,
+			unknown,
+			typeof formData
+		>(formData, zod4(assistenciaJudiciariaUpdateFormSchema));
 
 		return { form, assistencia };
 	} catch (err) {

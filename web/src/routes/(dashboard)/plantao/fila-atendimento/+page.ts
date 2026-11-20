@@ -1,7 +1,7 @@
-import type { FilaHoje } from '$lib/types';
-import { api } from '$lib/api-client';
+import type { FilaHoje } from '#lib/types/index.ts';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ fetch }) => {
 	try {

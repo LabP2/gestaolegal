@@ -1,5 +1,5 @@
-import { dev } from '$app/environment';
-import { env } from '$env/dynamic/public';
+import { dev } from '$app/env';
+import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiException, type ApiResponse } from './types/api-response';
 import { unidadeAtivaId } from './stores/unidade';
 
@@ -15,11 +15,11 @@ const isNonEmpty = (value: string | undefined | null) =>
 	value !== undefined && value !== null && value.trim().length > 0;
 
 const resolveConfiguredApiUrl = () => {
-	const configured = env.PUBLIC_API_URL;
+	const configured = PUBLIC_API_URL;
 	return isNonEmpty(configured) ? configured!.trim() : null;
 };
 
-const getApiBaseUrl = () => {
+export const getApiBaseUrl = () => {
 	const configuredUrl = resolveConfiguredApiUrl();
 
 	if (dev) {
@@ -57,12 +57,7 @@ export async function apiFetch(
 		headers.set('X-Unidade-Id', String(unidadeId));
 	}
 
-	if (
-		options.body &&
-		typeof options.body === 'string' &&
-		!headers.has('Content-Type') &&
-		!(options.body instanceof FormData)
-	) {
+	if (options.body && typeof options.body === 'string' && !headers.has('Content-Type')) {
 		headers.set('Content-Type', 'application/json');
 	}
 
@@ -85,7 +80,7 @@ export async function apiFetch(
 	return response;
 }
 
-async function unwrapApiResponse<T>(response: Response): Promise<T> {
+export async function unwrapApiResponse<T>(response: Response): Promise<T> {
 	let apiResponse: ApiResponse<T>;
 	try {
 		apiResponse = await response.json();

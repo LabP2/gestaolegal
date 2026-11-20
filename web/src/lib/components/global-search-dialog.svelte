@@ -1,15 +1,15 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Separator } from '$lib/components/ui/separator/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import { Separator } from '#lib/components/ui/separator/index.js';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import { goto } from '$app/navigation';
-	import type { SearchResponse, SearchResultItem } from '$lib/types/search';
+	import type { SearchResponse, SearchResultItem } from '#lib/types/search.ts';
 	import { Debounced } from 'runed';
-	import { getEntityIcon, getEntityLabel } from '$lib/constants';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { getEntityIcon, getEntityLabel } from '#lib/constants/index.ts';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 
 	let { open = $bindable(false), initialQuery = $bindable('') } = $props();
 

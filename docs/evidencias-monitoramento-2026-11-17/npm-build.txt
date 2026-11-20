@@ -1,0 +1,881 @@
+
+> gestaolegal-front@0.0.1 build
+> vite build
+
+vite v7.3.7 building ssr environment for production...
+transforming...
+6:25:36 AM [vite-plugin-svelte] src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:28:21 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+26:   let { data }: PageProps = $props();
+27:   const { evento, caso } = $derived(data);
+28:   const initialForm = data.form;
+                              ^
+29:   // Evento criado de uma publicação do DJEN: tipo, data e descrição vêm da
+30:   // publicação e a API recusa alteração (docs/plano-djen.md, §5).
+6:25:36 AM [vite-plugin-svelte] src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:94:43 This reference only captures the initial value of `evento`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+92:   const eventoFile = filesProxy(form, 'arquivos');
+93:
+94:   let selectedUsuario = $state<User | null>(evento.usuario_responsavel || null);
+                                                      ^
+95:
+96:   function handleUsuarioSelected(usuario: User | null) {
+6:25:36 AM [vite-plugin-svelte] src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:14:37 This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+12:
+13:   const me = $derived(data.me);
+14:   let estado = $state<EstadoPresenca>(data.estado);
+                                              ^
+15:   let hora = $state(data.estado.hora_sugerida);
+16:   let salvando = $state(false);
+6:25:36 AM [vite-plugin-svelte] src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:15:19 This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+13:   const me = $derived(data.me);
+14:   let estado = $state<EstadoPresenca>(data.estado);
+15:   let hora = $state(data.estado.hora_sugerida);
+                            ^
+16:   let salvando = $state(false);
+17:
+6:25:36 AM [vite-plugin-svelte] src/routes/(dashboard)/usuarios/eu/alterar-senha/+page.svelte:23:26 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+21:   let { data }: PageProps = $props();
+22:
+23:   let formData = superForm(data.form, {
+                                   ^
+24:     SPA: true,
+25:     validators: zod4Client(passwordChangeSchema),
+6:25:36 AM [vite-plugin-svelte] src/routes/esqueci-a-senha/+page.svelte:22:44 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+20:   let erro = $state<string | null>(null);
+21:
+22:   const form = superForm<ForgotPasswordData>(data.form, {
+                                                     ^
+23:     SPA: true,
+24:     validators: zod4Client(forgotPasswordSchema),
+6:25:36 AM [vite-plugin-svelte] src/routes/redefinir-senha/[token]/+page.svelte:24:43 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+22:   let erro = $state<string | null>(null);
+23:
+24:   const form = superForm<ResetPasswordData>(data.form, {
+                                                    ^
+25:     SPA: true,
+26:     validators: zod4Client(resetPasswordSchema),
+6:25:36 AM [vite-plugin-svelte] src/routes/login/+page.svelte:28:35 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+26:   let erroLogin = $state<string | null>(null);
+27:
+28:   const form = superForm<LoginData>(data.form, {
+                                            ^
+29:     SPA: true,
+30:     validators: zod4Client(loginSchema),
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/arquivo-form.svelte:16:21 This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+14:   const isEdit = $derived(!!arquivo);
+15:
+16:   let titulo = $state(arquivo?.titulo ?? '');
+                                 ^
+17:   let descricao = $state(arquivo?.descricao ?? '');
+18:   let file = $state<File | null>(null);
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/arquivo-form.svelte:17:24 This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+15:
+16:   let titulo = $state(arquivo?.titulo ?? '');
+17:   let descricao = $state(arquivo?.descricao ?? '');
+                                    ^
+18:   let file = $state<File | null>(null);
+19:   let submitting = $state(false);
+6:25:36 AM [vite-plugin-svelte] src/lib/components/evento-dialog.svelte:32:24 This reference only captures the initial value of `eventoFormData`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+30:   } = $props();
+31:
+32:   const form = superForm(eventoFormData, {
+                                           ^
+33:     SPA: true,
+34:     validators: zod4Client(eventoCreateFormSchema),
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:99:28 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ 97:   }
+ 98:
+ 99:   const casoForm = superForm(data, {
+                                      ^
+100:     SPA: true,
+101:     dataType: 'json',
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:177:5 This reference only captures the initial value of `isCreateMode`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+175:   // On a new caso the responsible user is the logged-in user (field hidden),
+176:   // and the deferral status defaults to "aguardando deferimento".
+177:   if (isCreateMode) {
+                       ^
+178:     if (currentUserId) {
+179:       $formData.id_usuario_responsavel = currentUserId;
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:178:6 This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+176:   // and the deferral status defaults to "aguardando deferimento".
+177:   if (isCreateMode) {
+178:     if (currentUserId) {
+                          ^
+179:       $formData.id_usuario_responsavel = currentUserId;
+180:     }
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:179:38 This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+177:   if (isCreateMode) {
+178:     if (currentUserId) {
+179:       $formData.id_usuario_responsavel = currentUserId;
+                                                           ^
+180:     }
+181:     if (!$formData.situacao_deferimento) {
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:186:45 This reference only captures the initial value of `assistidos`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+184:   }
+185:
+186:   let selectedAssistidos = $state<Atendido[]>(assistidos || []);
+                                                             ^
+187:
+188:   function handleAssistidosSelected(newAssistidos: Atendido[]) {
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/processo-form.svelte:41:32 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+39:   } = $props();
+40:
+41:   const processoForm = superForm(data, {
+                                         ^
+42:     SPA: true,
+43:     dataType: 'json',
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/assistencia-judiciaria-form.svelte:31:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+29:   } = $props();
+30:
+31:   const form = superForm(data, {
+                                 ^
+32:     SPA: true,
+33:     dataType: 'json',
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/atendido-form.svelte:54:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+52:     pj_constituida: 'PJ constituída?'
+53:   };
+54:   const form = superForm(data, {
+                                 ^
+55:     SPA: true,
+56:     validators: zod4Client(original ? legacyEditSchema(original) : atendidoCreateFormSchema),
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/assistido-form.svelte:34:49 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+32:   } = $props();
+33:
+34:   const form = superForm<AssistidoCreateFormData>(data, {
+                                                          ^
+35:     SPA: true,
+36:     dataType: 'json',
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/orientacao-juridica-form.svelte:45:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+43:   } = $props();
+44:
+45:   const form = superForm(data, {
+                                 ^
+46:     SPA: true,
+47:     dataType: 'json',
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/orientacao-juridica-form.svelte:89:44 This reference only captures the initial value of `orientacao`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+87:   const { form: formData, enhance } = form;
+88:
+89:   let selectedAtendidos = $state<Atendido[]>(orientacao?.atendidos || []);
+                                                           ^
+90:
+91:   let showSubArea = $derived(
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/password-form.svelte:31:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+29:   } = $props();
+30:
+31:   const form = superForm(data, {
+                                 ^
+32:     SPA: true,
+33:     validators: zod4Client(passwordChangeSchema),
+6:25:36 AM [vite-plugin-svelte] src/lib/forms/user-form.svelte:43:28 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+41:   } = $props();
+42:
+43:   const userForm = superForm(data, {
+                                     ^
+44:     SPA: true,
+45:     // unidade_ids é array: sem dataType 'json' o superforms serializa o
+✓ 4960 modules transformed.
+rendering chunks...
+vite v7.3.7 building client environment for production...
+transforming...
+6:25:43 AM [vite-plugin-svelte] src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:28:21 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+26:   let { data }: PageProps = $props();
+27:   const { evento, caso } = $derived(data);
+28:   const initialForm = data.form;
+                              ^
+29:   // Evento criado de uma publicação do DJEN: tipo, data e descrição vêm da
+30:   // publicação e a API recusa alteração (docs/plano-djen.md, §5).
+6:25:43 AM [vite-plugin-svelte] src/routes/(dashboard)/casos/[id]/eventos/[eventoId]/editar/+page.svelte:94:43 This reference only captures the initial value of `evento`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+92:   const eventoFile = filesProxy(form, 'arquivos');
+93:
+94:   let selectedUsuario = $state<User | null>(evento.usuario_responsavel || null);
+                                                      ^
+95:
+96:   function handleUsuarioSelected(usuario: User | null) {
+6:25:43 AM [vite-plugin-svelte] src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:14:37 This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+12:
+13:   const me = $derived(data.me);
+14:   let estado = $state<EstadoPresenca>(data.estado);
+                                              ^
+15:   let hora = $state(data.estado.hora_sugerida);
+16:   let salvando = $state(false);
+6:25:43 AM [vite-plugin-svelte] src/routes/(dashboard)/plantao/registro-presenca/+page.svelte:15:19 This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+13:   const me = $derived(data.me);
+14:   let estado = $state<EstadoPresenca>(data.estado);
+15:   let hora = $state(data.estado.hora_sugerida);
+                            ^
+16:   let salvando = $state(false);
+17:
+6:25:43 AM [vite-plugin-svelte] src/routes/(dashboard)/usuarios/eu/alterar-senha/+page.svelte:23:26 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+21:   let { data }: PageProps = $props();
+22:
+23:   let formData = superForm(data.form, {
+                                   ^
+24:     SPA: true,
+25:     validators: zod4Client(passwordChangeSchema),
+6:25:43 AM [vite-plugin-svelte] src/routes/esqueci-a-senha/+page.svelte:22:44 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+20:   let erro = $state<string | null>(null);
+21:
+22:   const form = superForm<ForgotPasswordData>(data.form, {
+                                                     ^
+23:     SPA: true,
+24:     validators: zod4Client(forgotPasswordSchema),
+6:25:43 AM [vite-plugin-svelte] src/routes/login/+page.svelte:28:35 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+26:   let erroLogin = $state<string | null>(null);
+27:
+28:   const form = superForm<LoginData>(data.form, {
+                                            ^
+29:     SPA: true,
+30:     validators: zod4Client(loginSchema),
+6:25:43 AM [vite-plugin-svelte] src/routes/redefinir-senha/[token]/+page.svelte:24:43 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+22:   let erro = $state<string | null>(null);
+23:
+24:   const form = superForm<ResetPasswordData>(data.form, {
+                                                    ^
+25:     SPA: true,
+26:     validators: zod4Client(resetPasswordSchema),
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/arquivo-form.svelte:16:21 This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+14:   const isEdit = $derived(!!arquivo);
+15:
+16:   let titulo = $state(arquivo?.titulo ?? '');
+                                 ^
+17:   let descricao = $state(arquivo?.descricao ?? '');
+18:   let file = $state<File | null>(null);
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/arquivo-form.svelte:17:24 This reference only captures the initial value of `arquivo`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+15:
+16:   let titulo = $state(arquivo?.titulo ?? '');
+17:   let descricao = $state(arquivo?.descricao ?? '');
+                                    ^
+18:   let file = $state<File | null>(null);
+19:   let submitting = $state(false);
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:99:28 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ 97:   }
+ 98:
+ 99:   const casoForm = superForm(data, {
+                                      ^
+100:     SPA: true,
+101:     dataType: 'json',
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:177:5 This reference only captures the initial value of `isCreateMode`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+175:   // On a new caso the responsible user is the logged-in user (field hidden),
+176:   // and the deferral status defaults to "aguardando deferimento".
+177:   if (isCreateMode) {
+                       ^
+178:     if (currentUserId) {
+179:       $formData.id_usuario_responsavel = currentUserId;
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:178:6 This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+176:   // and the deferral status defaults to "aguardando deferimento".
+177:   if (isCreateMode) {
+178:     if (currentUserId) {
+                          ^
+179:       $formData.id_usuario_responsavel = currentUserId;
+180:     }
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:179:38 This reference only captures the initial value of `currentUserId`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+177:   if (isCreateMode) {
+178:     if (currentUserId) {
+179:       $formData.id_usuario_responsavel = currentUserId;
+                                                           ^
+180:     }
+181:     if (!$formData.situacao_deferimento) {
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/caso-form.svelte:186:45 This reference only captures the initial value of `assistidos`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+184:   }
+185:
+186:   let selectedAssistidos = $state<Atendido[]>(assistidos || []);
+                                                             ^
+187:
+188:   function handleAssistidosSelected(newAssistidos: Atendido[]) {
+6:25:43 AM [vite-plugin-svelte] src/lib/components/evento-dialog.svelte:32:24 This reference only captures the initial value of `eventoFormData`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+30:   } = $props();
+31:
+32:   const form = superForm(eventoFormData, {
+                                           ^
+33:     SPA: true,
+34:     validators: zod4Client(eventoCreateFormSchema),
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/processo-form.svelte:41:32 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+39:   } = $props();
+40:
+41:   const processoForm = superForm(data, {
+                                         ^
+42:     SPA: true,
+43:     dataType: 'json',
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/assistencia-judiciaria-form.svelte:31:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+29:   } = $props();
+30:
+31:   const form = superForm(data, {
+                                 ^
+32:     SPA: true,
+33:     dataType: 'json',
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/atendido-form.svelte:54:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+52:     pj_constituida: 'PJ constituída?'
+53:   };
+54:   const form = superForm(data, {
+                                 ^
+55:     SPA: true,
+56:     validators: zod4Client(original ? legacyEditSchema(original) : atendidoCreateFormSchema),
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/assistido-form.svelte:34:49 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+32:   } = $props();
+33:
+34:   const form = superForm<AssistidoCreateFormData>(data, {
+                                                          ^
+35:     SPA: true,
+36:     dataType: 'json',
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/orientacao-juridica-form.svelte:45:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+43:   } = $props();
+44:
+45:   const form = superForm(data, {
+                                 ^
+46:     SPA: true,
+47:     dataType: 'json',
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/orientacao-juridica-form.svelte:89:44 This reference only captures the initial value of `orientacao`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally
+87:   const { form: formData, enhance } = form;
+88:
+89:   let selectedAtendidos = $state<Atendido[]>(orientacao?.atendidos || []);
+                                                           ^
+90:
+91:   let showSubArea = $derived(
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/password-form.svelte:31:24 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+29:   } = $props();
+30:
+31:   const form = superForm(data, {
+                                 ^
+32:     SPA: true,
+33:     validators: zod4Client(passwordChangeSchema),
+6:25:43 AM [vite-plugin-svelte] src/lib/forms/user-form.svelte:43:28 This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+41:   } = $props();
+42:
+43:   const userForm = superForm(data, {
+                                     ^
+44:     SPA: true,
+45:     // unidade_ids é array: sem dataType 'json' o superforms serializa o
+[plugin vite:resolve] Module "node:dns/promises" has been externalized for browser compatibility, imported by "/mnt/dados/gestaolegal-multitenant/web/node_modules/@vinejs/vine/build/chunk-YXNUTVGP.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin vite:resolve] Module "node:dns/promises" has been externalized for browser compatibility, imported by "/mnt/dados/gestaolegal-multitenant/web/node_modules/@vinejs/vine/build/chunk-YXNUTVGP.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 6662 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                                0.03 kB │ gzip:  0.05 kB
+.svelte-kit/output/client/.vite/manifest.json                             83.59 kB │ gzip:  7.97 kB
+.svelte-kit/output/client/_app/immutable/assets/24.BWW8dORY.css            0.25 kB │ gzip:  0.15 kB
+.svelte-kit/output/client/_app/immutable/assets/index.CV-KWLNP.css         0.29 kB │ gzip:  0.15 kB
+.svelte-kit/output/client/_app/immutable/assets/data-table.D9OHpYQd.css    0.50 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/assets/0.CnFqx827.css           107.34 kB │ gzip: 18.84 kB
+.svelte-kit/output/client/_app/immutable/chunks/DHYaFmqG.js                0.04 kB │ gzip:  0.06 kB
+.svelte-kit/output/client/_app/immutable/chunks/Beb3LO3v.js                0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/chunks/DsnmJJEf.js                0.07 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/chunks/iVyYmUk6.js                0.10 kB │ gzip:  0.09 kB
+.svelte-kit/output/client/_app/immutable/chunks/DN-XIVy9.js                0.10 kB │ gzip:  0.12 kB
+.svelte-kit/output/client/_app/immutable/chunks/rT3xRlD2.js                0.11 kB │ gzip:  0.12 kB
+.svelte-kit/output/client/_app/immutable/chunks/CqkleIqs.js                0.12 kB │ gzip:  0.13 kB
+.svelte-kit/output/client/_app/immutable/entry/start.DQN24Zt4.js           0.12 kB │ gzip:  0.11 kB
+.svelte-kit/output/client/_app/immutable/chunks/CVrbcedR.js                0.13 kB │ gzip:  0.12 kB
+.svelte-kit/output/client/_app/immutable/chunks/B0hI5iWL.js                0.14 kB │ gzip:  0.12 kB
+.svelte-kit/output/client/_app/immutable/nodes/20.GkQ3SEX8.js              0.15 kB │ gzip:  0.14 kB
+.svelte-kit/output/client/_app/immutable/chunks/BeiuzpPA.js                0.15 kB │ gzip:  0.15 kB
+.svelte-kit/output/client/_app/immutable/chunks/7X54PVaJ.js                0.19 kB │ gzip:  0.17 kB
+.svelte-kit/output/client/_app/immutable/nodes/27.BJWHWwZN.js              0.21 kB │ gzip:  0.20 kB
+.svelte-kit/output/client/_app/immutable/chunks/9YIOD-UD.js                0.21 kB │ gzip:  0.15 kB
+.svelte-kit/output/client/_app/immutable/chunks/BfsdYQ_P.js                0.25 kB │ gzip:  0.21 kB
+.svelte-kit/output/client/_app/immutable/chunks/C4CSHdIj.js                0.26 kB │ gzip:  0.22 kB
+.svelte-kit/output/client/_app/immutable/chunks/DtXXRGfy.js                0.29 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/chunks/DzJodJOU.js                0.31 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/chunks/oiOpTT5L.js                0.34 kB │ gzip:  0.25 kB
+.svelte-kit/output/client/_app/immutable/chunks/D8Sg8B65.js                0.37 kB │ gzip:  0.27 kB
+.svelte-kit/output/client/_app/immutable/chunks/6hHe_ACH.js                0.40 kB │ gzip:  0.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/S1T4SvC5.js                0.42 kB │ gzip:  0.31 kB
+.svelte-kit/output/client/_app/immutable/nodes/23.C7W8FybR.js              0.43 kB │ gzip:  0.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/RGmTrwjv.js                0.44 kB │ gzip:  0.27 kB
+.svelte-kit/output/client/_app/immutable/chunks/DLqotUkj.js                0.47 kB │ gzip:  0.33 kB
+.svelte-kit/output/client/_app/immutable/chunks/BmQNY_8k.js                0.49 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/B88qNkYi.js                0.49 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/B1GFAYEu.js                0.49 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/CYHGbWdA.js                0.49 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/LeXZgHMK.js                0.51 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/vb390mF1.js                0.52 kB │ gzip:  0.33 kB
+.svelte-kit/output/client/_app/immutable/chunks/RBTLopB9.js                0.53 kB │ gzip:  0.38 kB
+.svelte-kit/output/client/_app/immutable/chunks/CApptbqc.js                0.54 kB │ gzip:  0.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/sLnzVLsq.js                0.55 kB │ gzip:  0.38 kB
+.svelte-kit/output/client/_app/immutable/chunks/B25wVA7i.js                0.56 kB │ gzip:  0.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/CVu2TOkB.js                0.57 kB │ gzip:  0.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/0awmtc01.js                0.57 kB │ gzip:  0.40 kB
+.svelte-kit/output/client/_app/immutable/chunks/DII5AXQt.js                0.58 kB │ gzip:  0.25 kB
+.svelte-kit/output/client/_app/immutable/chunks/DZU8_LON.js                0.58 kB │ gzip:  0.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/Be8U6Dgb.js                0.59 kB │ gzip:  0.41 kB
+.svelte-kit/output/client/_app/immutable/chunks/tsRSNT3U.js                0.60 kB │ gzip:  0.40 kB
+.svelte-kit/output/client/_app/immutable/chunks/BpnZmJV8.js                0.60 kB │ gzip:  0.41 kB
+.svelte-kit/output/client/_app/immutable/chunks/DzbEXfTL.js                0.62 kB │ gzip:  0.30 kB
+.svelte-kit/output/client/_app/immutable/chunks/C6uiWieR.js                0.63 kB │ gzip:  0.40 kB
+.svelte-kit/output/client/_app/immutable/chunks/BtFqQ8F3.js                0.63 kB │ gzip:  0.42 kB
+.svelte-kit/output/client/_app/immutable/chunks/BrZTy-Fd.js                0.64 kB │ gzip:  0.40 kB
+.svelte-kit/output/client/_app/immutable/chunks/pcDD8dLK.js                0.64 kB │ gzip:  0.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/H29J9Sxf.js                0.64 kB │ gzip:  0.42 kB
+.svelte-kit/output/client/_app/immutable/chunks/OA8UcISh.js                0.64 kB │ gzip:  0.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/CnUHl5Rh.js                0.65 kB │ gzip:  0.42 kB
+.svelte-kit/output/client/_app/immutable/chunks/B-RPSa7w.js                0.67 kB │ gzip:  0.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/Cx1gyH84.js                0.67 kB │ gzip:  0.45 kB
+.svelte-kit/output/client/_app/immutable/chunks/BuNzLb-p.js                0.68 kB │ gzip:  0.43 kB
+.svelte-kit/output/client/_app/immutable/chunks/B6AG6vhY.js                0.68 kB │ gzip:  0.46 kB
+.svelte-kit/output/client/_app/immutable/chunks/CxtAdUFK.js                0.73 kB │ gzip:  0.36 kB
+.svelte-kit/output/client/_app/immutable/chunks/DWQHR_Rj.js                0.74 kB │ gzip:  0.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/P7DFgQMi.js                0.76 kB │ gzip:  0.47 kB
+.svelte-kit/output/client/_app/immutable/chunks/9-p0-VNF.js                0.77 kB │ gzip:  0.49 kB
+.svelte-kit/output/client/_app/immutable/chunks/8lTyh92k.js                0.79 kB │ gzip:  0.46 kB
+.svelte-kit/output/client/_app/immutable/chunks/DuFQCcTH.js                0.83 kB │ gzip:  0.50 kB
+.svelte-kit/output/client/_app/immutable/chunks/CyCo8iIw.js                0.86 kB │ gzip:  0.49 kB
+.svelte-kit/output/client/_app/immutable/chunks/cBNYxwFm.js                0.89 kB │ gzip:  0.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/Dx2E24WC.js                0.93 kB │ gzip:  0.55 kB
+.svelte-kit/output/client/_app/immutable/chunks/v5CkoGxB.js                0.96 kB │ gzip:  0.47 kB
+.svelte-kit/output/client/_app/immutable/chunks/B_EHsMMD.js                1.00 kB │ gzip:  0.60 kB
+.svelte-kit/output/client/_app/immutable/chunks/BNP0aqix.js                1.05 kB │ gzip:  0.52 kB
+.svelte-kit/output/client/_app/immutable/nodes/3.BaxQlqD-.js               1.07 kB │ gzip:  0.57 kB
+.svelte-kit/output/client/_app/immutable/nodes/9.Ccx57j3J.js               1.11 kB │ gzip:  0.70 kB
+.svelte-kit/output/client/_app/immutable/chunks/-NQOdyl3.js                1.11 kB │ gzip:  0.66 kB
+.svelte-kit/output/client/_app/immutable/chunks/DH855Jov.js                1.13 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/chunks/Daxj4aWQ.js                1.13 kB │ gzip:  0.62 kB
+.svelte-kit/output/client/_app/immutable/chunks/CBYaI8Ta.js                1.22 kB │ gzip:  0.47 kB
+.svelte-kit/output/client/_app/immutable/chunks/aFlega-v.js                1.24 kB │ gzip:  0.73 kB
+.svelte-kit/output/client/_app/immutable/chunks/jdyY6pmg.js                1.25 kB │ gzip:  0.71 kB
+.svelte-kit/output/client/_app/immutable/nodes/25.CxSrZORD.js              1.32 kB │ gzip:  0.79 kB
+.svelte-kit/output/client/_app/immutable/nodes/36.BRQqK1XA.js              1.32 kB │ gzip:  0.77 kB
+.svelte-kit/output/client/_app/immutable/nodes/45.DjCdha8-.js              1.34 kB │ gzip:  0.77 kB
+.svelte-kit/output/client/_app/immutable/chunks/qgjGxrBN.js                1.34 kB │ gzip:  0.64 kB
+.svelte-kit/output/client/_app/immutable/nodes/17.CoGXUUUE.js              1.35 kB │ gzip:  0.78 kB
+.svelte-kit/output/client/_app/immutable/nodes/31.DC9VZdTp.js              1.35 kB │ gzip:  0.78 kB
+.svelte-kit/output/client/_app/immutable/chunks/wbPk3Yxo.js                1.37 kB │ gzip:  0.66 kB
+.svelte-kit/output/client/_app/immutable/chunks/B3-SqYee.js                1.38 kB │ gzip:  0.50 kB
+.svelte-kit/output/client/_app/immutable/chunks/rGEnMdPS.js                1.41 kB │ gzip:  0.79 kB
+.svelte-kit/output/client/_app/immutable/chunks/D3TPNuEf.js                1.43 kB │ gzip:  0.58 kB
+.svelte-kit/output/client/_app/immutable/nodes/19.BItt-3Rp.js              1.45 kB │ gzip:  0.83 kB
+.svelte-kit/output/client/_app/immutable/nodes/8.hNkV_QM7.js               1.47 kB │ gzip:  0.88 kB
+.svelte-kit/output/client/_app/immutable/chunks/bSKtbwSA.js                1.50 kB │ gzip:  0.67 kB
+.svelte-kit/output/client/_app/immutable/nodes/59.Dqg7ncTC.js              1.54 kB │ gzip:  0.89 kB
+.svelte-kit/output/client/_app/immutable/chunks/CA2vqNvC.js                1.58 kB │ gzip:  0.74 kB
+.svelte-kit/output/client/_app/immutable/chunks/ksjK4QFO.js                1.67 kB │ gzip:  0.82 kB
+.svelte-kit/output/client/_app/immutable/chunks/BIcYQx5g.js                1.76 kB │ gzip:  0.63 kB
+.svelte-kit/output/client/_app/immutable/chunks/DpRDsTjy.js                1.79 kB │ gzip:  0.69 kB
+.svelte-kit/output/client/_app/immutable/chunks/CFzl-9JE.js                1.81 kB │ gzip:  0.89 kB
+.svelte-kit/output/client/_app/immutable/nodes/4.Cz4mauwV.js               1.82 kB │ gzip:  1.03 kB
+.svelte-kit/output/client/_app/immutable/nodes/50.DKgEBksb.js              1.83 kB │ gzip:  1.04 kB
+.svelte-kit/output/client/_app/immutable/chunks/CVKV05Kg.js                1.88 kB │ gzip:  0.98 kB
+.svelte-kit/output/client/_app/immutable/chunks/CSfZoH8b.js                1.91 kB │ gzip:  0.67 kB
+.svelte-kit/output/client/_app/immutable/nodes/44.Ci8S8JB8.js              1.95 kB │ gzip:  1.06 kB
+.svelte-kit/output/client/_app/immutable/nodes/30.BfmAthbv.js              2.12 kB │ gzip:  1.11 kB
+.svelte-kit/output/client/_app/immutable/chunks/gMwRIjsh.js                2.13 kB │ gzip:  1.02 kB
+.svelte-kit/output/client/_app/immutable/nodes/57.DnPIfGvW.js              2.20 kB │ gzip:  1.22 kB
+.svelte-kit/output/client/_app/immutable/chunks/DQy9rCNF.js                2.28 kB │ gzip:  1.27 kB
+.svelte-kit/output/client/_app/immutable/nodes/16.D9o-U14h.js              2.31 kB │ gzip:  1.21 kB
+.svelte-kit/output/client/_app/immutable/chunks/DPlWonQA.js                2.32 kB │ gzip:  0.87 kB
+.svelte-kit/output/client/_app/immutable/nodes/12.DzjcrVpL.js              2.37 kB │ gzip:  1.23 kB
+.svelte-kit/output/client/_app/immutable/nodes/49.BSiFN4sZ.js              2.47 kB │ gzip:  1.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/D0yH0KEE.js                2.50 kB │ gzip:  1.28 kB
+.svelte-kit/output/client/_app/immutable/chunks/B0rW5_Bz.js                2.57 kB │ gzip:  1.18 kB
+.svelte-kit/output/client/_app/immutable/chunks/3xxl5rkq.js                2.58 kB │ gzip:  1.31 kB
+.svelte-kit/output/client/_app/immutable/chunks/Dor8ueD0.js                2.58 kB │ gzip:  0.83 kB
+.svelte-kit/output/client/_app/immutable/nodes/18.ByRAIb8a.js              2.70 kB │ gzip:  1.38 kB
+.svelte-kit/output/client/_app/immutable/chunks/0C9M7VKK.js                2.74 kB │ gzip:  1.36 kB
+.svelte-kit/output/client/_app/immutable/chunks/BFf9UMnN.js                3.10 kB │ gzip:  1.21 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.tCicATU0.js               3.22 kB │ gzip:  1.52 kB
+.svelte-kit/output/client/_app/immutable/nodes/35.PT5UuRJO.js              3.32 kB │ gzip:  1.53 kB
+.svelte-kit/output/client/_app/immutable/chunks/0tn_SNIq.js                3.38 kB │ gzip:  1.63 kB
+.svelte-kit/output/client/_app/immutable/nodes/34.CDgJC3yg.js              3.56 kB │ gzip:  1.67 kB
+.svelte-kit/output/client/_app/immutable/nodes/6.NDg4JTAy.js               3.58 kB │ gzip:  1.77 kB
+.svelte-kit/output/client/_app/immutable/nodes/62.CKP50cv4.js              3.71 kB │ gzip:  1.73 kB
+.svelte-kit/output/client/_app/immutable/nodes/7.BOplT8J9.js               3.93 kB │ gzip:  1.81 kB
+.svelte-kit/output/client/_app/immutable/nodes/46.xavrGUtu.js              3.98 kB │ gzip:  1.60 kB
+.svelte-kit/output/client/_app/immutable/nodes/5.C6y8QWbS.js               4.09 kB │ gzip:  1.85 kB
+.svelte-kit/output/client/_app/immutable/nodes/64.DvfBPyU-.js              4.11 kB │ gzip:  2.12 kB
+.svelte-kit/output/client/_app/immutable/nodes/58.D_-ngfy5.js              4.20 kB │ gzip:  1.68 kB
+.svelte-kit/output/client/_app/immutable/chunks/C7r19_zE.js                4.28 kB │ gzip:  2.01 kB
+.svelte-kit/output/client/_app/immutable/nodes/66.D401oyKB.js              4.40 kB │ gzip:  2.15 kB
+.svelte-kit/output/client/_app/immutable/nodes/55.CzzT79s8.js              4.64 kB │ gzip:  2.06 kB
+.svelte-kit/output/client/_app/immutable/nodes/21.B431RN8n.js              4.73 kB │ gzip:  2.27 kB
+.svelte-kit/output/client/_app/immutable/nodes/32.BNbFhkS5.js              5.04 kB │ gzip:  2.24 kB
+.svelte-kit/output/client/_app/immutable/nodes/54.94D63jOA.js              5.07 kB │ gzip:  2.26 kB
+.svelte-kit/output/client/_app/immutable/nodes/56._cKnWpui.js              5.09 kB │ gzip:  2.21 kB
+.svelte-kit/output/client/_app/immutable/chunks/i3dKW2eg.js                5.18 kB │ gzip:  1.99 kB
+.svelte-kit/output/client/_app/immutable/nodes/15.DIeNNSiH.js              5.23 kB │ gzip:  2.28 kB
+.svelte-kit/output/client/_app/immutable/chunks/CdQI0HK6.js                5.25 kB │ gzip:  2.47 kB
+.svelte-kit/output/client/_app/immutable/nodes/60.Cd16PY17.js              5.26 kB │ gzip:  2.11 kB
+.svelte-kit/output/client/_app/immutable/nodes/40.C4IVqYAa.js              5.28 kB │ gzip:  2.57 kB
+.svelte-kit/output/client/_app/immutable/chunks/BVUpNunN.js                5.54 kB │ gzip:  2.00 kB
+.svelte-kit/output/client/_app/immutable/nodes/42.DhGB_Uqg.js              5.56 kB │ gzip:  2.42 kB
+.svelte-kit/output/client/_app/immutable/nodes/65.BcWlqG82.js              5.74 kB │ gzip:  2.76 kB
+.svelte-kit/output/client/_app/immutable/chunks/AxQevdlf.js                5.83 kB │ gzip:  2.58 kB
+.svelte-kit/output/client/_app/immutable/nodes/29.Ce2TMq7V.js              5.84 kB │ gzip:  2.39 kB
+.svelte-kit/output/client/_app/immutable/chunks/XgkkMI-j.js                5.97 kB │ gzip:  2.43 kB
+.svelte-kit/output/client/_app/immutable/chunks/GI_DUFMY.js                6.07 kB │ gzip:  2.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/J8888AA9.js                6.11 kB │ gzip:  2.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/63.mPq2KKdC.js              6.17 kB │ gzip:  2.68 kB
+.svelte-kit/output/client/_app/immutable/nodes/13.Dbwf-geW.js              6.20 kB │ gzip:  2.71 kB
+.svelte-kit/output/client/_app/immutable/chunks/DnCDBARD.js                6.28 kB │ gzip:  2.54 kB
+.svelte-kit/output/client/_app/immutable/nodes/28.Bjtx89c3.js              6.38 kB │ gzip:  2.47 kB
+.svelte-kit/output/client/_app/immutable/chunks/-Vt1Lp3s.js                6.50 kB │ gzip:  2.79 kB
+.svelte-kit/output/client/_app/immutable/nodes/47.jimcMGEX.js              6.63 kB │ gzip:  2.50 kB
+.svelte-kit/output/client/_app/immutable/nodes/10.DOpN4qqj.js              6.63 kB │ gzip:  2.74 kB
+.svelte-kit/output/client/_app/immutable/nodes/48.CITND0ui.js              7.24 kB │ gzip:  2.99 kB
+.svelte-kit/output/client/_app/immutable/chunks/DwI9TbPF.js                7.47 kB │ gzip:  2.90 kB
+.svelte-kit/output/client/_app/immutable/chunks/ctL8lcCZ.js                7.70 kB │ gzip:  2.88 kB
+.svelte-kit/output/client/_app/immutable/nodes/61.CpWqqMza.js              7.76 kB │ gzip:  2.79 kB
+.svelte-kit/output/client/_app/immutable/chunks/pLEKVl03.js                7.80 kB │ gzip:  2.90 kB
+.svelte-kit/output/client/_app/immutable/chunks/D8OGvmOu.js                7.83 kB │ gzip:  3.38 kB
+.svelte-kit/output/client/_app/immutable/chunks/BXC5hE6t.js                7.86 kB │ gzip:  3.48 kB
+.svelte-kit/output/client/_app/immutable/chunks/By4PDlcB.js                7.89 kB │ gzip:  2.64 kB
+.svelte-kit/output/client/_app/immutable/nodes/14.Bxn0wU6G.js              8.04 kB │ gzip:  3.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/BbOFntu4.js                8.20 kB │ gzip:  3.69 kB
+.svelte-kit/output/client/_app/immutable/chunks/B3d7kHo3.js                8.25 kB │ gzip:  2.13 kB
+.svelte-kit/output/client/_app/immutable/nodes/37.D7ptLzjk.js              8.43 kB │ gzip:  3.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/DCVBP1fq.js                8.49 kB │ gzip:  3.50 kB
+.svelte-kit/output/client/_app/immutable/chunks/31jawPLh.js                8.50 kB │ gzip:  3.45 kB
+.svelte-kit/output/client/_app/immutable/nodes/53.CMuXcRML.js              8.78 kB │ gzip:  3.44 kB
+.svelte-kit/output/client/_app/immutable/nodes/38.BvQp08uS.js              8.97 kB │ gzip:  3.15 kB
+.svelte-kit/output/client/_app/immutable/chunks/CMDoWQh7.js                9.04 kB │ gzip:  2.92 kB
+.svelte-kit/output/client/_app/immutable/chunks/BIanHK15.js                9.87 kB │ gzip:  3.90 kB
+.svelte-kit/output/client/_app/immutable/nodes/26.B4cJpu2E.js             10.10 kB │ gzip:  3.66 kB
+.svelte-kit/output/client/_app/immutable/nodes/41.D1pFwGHG.js             10.45 kB │ gzip:  3.38 kB
+.svelte-kit/output/client/_app/immutable/nodes/52.BWFwKBKM.js             10.54 kB │ gzip:  4.27 kB
+.svelte-kit/output/client/_app/immutable/chunks/CRy5rXKk.js               11.53 kB │ gzip:  3.99 kB
+.svelte-kit/output/client/_app/immutable/nodes/43.kL3x5arn.js             12.69 kB │ gzip:  4.60 kB
+.svelte-kit/output/client/_app/immutable/chunks/B81HqhTJ.js               12.95 kB │ gzip:  4.42 kB
+.svelte-kit/output/client/_app/immutable/nodes/39.BYtnERBs.js             13.00 kB │ gzip:  5.03 kB
+.svelte-kit/output/client/_app/immutable/nodes/24.C2xDPYi_.js             13.63 kB │ gzip:  5.20 kB
+.svelte-kit/output/client/_app/immutable/nodes/22.DY_XuZpB.js             14.37 kB │ gzip:  5.28 kB
+.svelte-kit/output/client/_app/immutable/chunks/C9yjzb9z.js               15.74 kB │ gzip:  4.97 kB
+.svelte-kit/output/client/_app/immutable/nodes/51.B_Cfk4ba.js             16.66 kB │ gzip:  5.33 kB
+.svelte-kit/output/client/_app/immutable/chunks/wNcsxBuw.js               17.03 kB │ gzip:  5.19 kB
+.svelte-kit/output/client/_app/immutable/chunks/SGwzgGPI.js               18.75 kB │ gzip:  7.15 kB
+.svelte-kit/output/client/_app/immutable/chunks/tUAe2S9p.js               20.01 kB │ gzip:  5.70 kB
+.svelte-kit/output/client/_app/immutable/chunks/DK1BfuO2.js               20.62 kB │ gzip:  6.05 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.C-qG2lWW.js              22.26 kB │ gzip:  8.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/tScsN14g.js               24.40 kB │ gzip:  9.51 kB
+.svelte-kit/output/client/_app/immutable/chunks/COD3hOy1.js               25.41 kB │ gzip:  8.09 kB
+.svelte-kit/output/client/_app/immutable/entry/app.CRQcpZ0U.js            27.35 kB │ gzip:  7.65 kB
+.svelte-kit/output/client/_app/immutable/chunks/C9S3maZ5.js               28.08 kB │ gzip:  9.66 kB
+.svelte-kit/output/client/_app/immutable/nodes/33.DOIFerHs.js             29.90 kB │ gzip:  8.28 kB
+.svelte-kit/output/client/_app/immutable/chunks/TmUeCiq7.js               30.79 kB │ gzip: 11.99 kB
+.svelte-kit/output/client/_app/immutable/nodes/11.QtIg5Vob.js             33.40 kB │ gzip: 10.43 kB
+.svelte-kit/output/client/_app/immutable/chunks/LCkobJvE.js               48.18 kB │ gzip: 14.71 kB
+.svelte-kit/output/client/_app/immutable/chunks/MNbbjcu5.js               52.64 kB │ gzip: 14.00 kB
+.svelte-kit/output/client/_app/immutable/chunks/sxrIO56U.js               78.06 kB │ gzip: 21.20 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.BxKn0Uky.js              98.28 kB │ gzip: 25.90 kB
+.svelte-kit/output/client/_app/immutable/chunks/DhVvvT12.js              141.48 kB │ gzip: 30.45 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bes2Bzt8.js              153.57 kB │ gzip: 46.25 kB
+✓ built in 8.30s
+.svelte-kit/output/server/.vite/manifest.json                                                                                      88.59 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.BWW8dORY.css                                                                  0.25 kB
+.svelte-kit/output/server/_app/immutable/assets/index.CV-KWLNP.css                                                                  0.29 kB
+.svelte-kit/output/server/_app/immutable/assets/data-table.D9OHpYQd.css                                                             0.50 kB
+.svelte-kit/output/server/_app/immutable/assets/_layout.BTWklZuD.css                                                              107.22 kB
+.svelte-kit/output/server/chunks/app.js                                                                                             0.09 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js                                                                               0.10 kB
+.svelte-kit/output/server/chunks/notificacoes.js                                                                                    0.10 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/_page.ts.js                                                             0.12 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/oabs/_page.ts.js                                                           0.13 kB
+.svelte-kit/output/server/chunks/npj.js                                                                                             0.14 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/oabs/_page.svelte.js                                                       0.14 kB
+.svelte-kit/output/server/chunks/utils3.js                                                                                          0.15 kB
+.svelte-kit/output/server/chunks/forgot-password-schema.js                                                                          0.16 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js                                                                        0.17 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/escalas/_page.ts.js                                                     0.18 kB
+.svelte-kit/output/server/chunks/functions.js                                                                                       0.21 kB
+.svelte-kit/output/server/chunks/shared-server.js                                                                                   0.21 kB
+.svelte-kit/output/server/chunks/arquivo.js                                                                                         0.21 kB
+.svelte-kit/output/server/chunks/erros.js                                                                                           0.22 kB
+.svelte-kit/output/server/chunks/login-schema.js                                                                                    0.22 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/busca-parte/_page.svelte.js                                                0.22 kB
+.svelte-kit/output/server/env.js                                                                                                    0.23 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_id_/_page.ts.js                                                    0.24 kB
+.svelte-kit/output/server/chunks/processo.js                                                                                        0.24 kB
+.svelte-kit/output/server/chunks/escalas.js                                                                                         0.27 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/_page.ts.js                                                                     0.27 kB
+.svelte-kit/output/server/chunks/djen.js                                                                                            0.31 kB
+.svelte-kit/output/server/chunks/index-server.js                                                                                    0.34 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/relatorios/_page.ts.js                                                          0.35 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/cadastrar-arquivo/_page.ts.js                                          0.37 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/fila-atendimento/_page.ts.js                                            0.40 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_id_/_page.ts.js                                                       0.41 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/registro-presenca/_page.ts.js                                           0.41 kB
+.svelte-kit/output/server/internal.js                                                                                               0.41 kB
+.svelte-kit/output/server/chunks/index-server2.js                                                                                   0.42 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_id_/_page.ts.js                                                      0.43 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/links-roteiro/_page.ts.js                                                 0.44 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/publicacoes/_id_/_page.ts.js                                               0.44 kB
+.svelte-kit/output/server/chunks/reset-password-schema.js                                                                           0.44 kB
+.svelte-kit/output/server/chunks/password-schema.js                                                                                 0.44 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/eventos/_eventoId_/_page.ts.js                                       0.45 kB
+.svelte-kit/output/server/chunks/state.svelte.js                                                                                    0.45 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_page.ts.js                                                               0.46 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_page.ts.js                                                           0.46 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_id_/_page.ts.js                               0.47 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/processos/_processoId_/_page.ts.js                                   0.48 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_page.ts.js                                                            0.48 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/monitoramento/_page.ts.js                                                  0.49 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/classificacao/_page.ts.js                                                  0.49 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_page.ts.js                                        0.50 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_page.ts.js                                                            0.50 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_page.ts.js                                                         0.50 kB
+.svelte-kit/output/server/chunks/notificacao.js                                                                                     0.55 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_layout.ts.js                                                       0.58 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/escala/_page.ts.js                                                      0.59 kB
+.svelte-kit/output/server/entries/pages/login/_page.ts.js                                                                           0.62 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/sem-caso/_page.ts.js                                                       0.62 kB
+.svelte-kit/output/server/chunks/internal.js                                                                                        0.62 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/unidades/_page.ts.js                                                            0.63 kB
+.svelte-kit/output/server/entries/pages/esqueci-a-senha/_page.ts.js                                                                 0.65 kB
+.svelte-kit/output/server/chunks/card-description.js                                                                                0.66 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_id_/_page.svelte.js                                                0.67 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/novo-usuario/_page.ts.js                                               0.68 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_id_/editar/_page.ts.js                                                0.68 kB
+.svelte-kit/output/server/chunks/client.js                                                                                          0.69 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_id_/_page.ts.js                                  0.69 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/eu/alterar-senha/_page.ts.js                                           0.71 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/novo-atendido/_page.ts.js                          0.71 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/notificacoes/_page.ts.js                                                        0.72 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/_layout.ts.js                                                                   0.72 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/novo/_page.ts.js                                                      0.72 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/_page.ts.js                                   0.73 kB
+.svelte-kit/output/server/chunks/download.js                                                                                        0.73 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/nova-orientacao-juridica/_page.ts.js              0.74 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/nova-assistencia-judiciaria/_page.ts.js        0.75 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/_page.ts.js                                                                0.75 kB
+.svelte-kit/output/server/chunks/index5.js                                                                                          0.78 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/confirmar-presenca/_page.ts.js                                          0.79 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/_page.ts.js                                                       0.80 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/cadastrar-arquivo/_page.svelte.js                                      0.81 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/cadastrar-novo-caso/_page.svelte.js                                       0.82 kB
+.svelte-kit/output/server/chunks/evento-schema.js                                                                                   0.82 kB
+.svelte-kit/output/server/chunks/stores.js                                                                                          0.85 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/sem-caso/_page.svelte.js                                                   0.89 kB
+.svelte-kit/output/server/chunks/unidade.js                                                                                         0.91 kB
+.svelte-kit/output/server/entries/pages/redefinir-senha/_token_/_page.ts.js                                                         0.91 kB
+.svelte-kit/output/server/chunks/processo-schema.js                                                                                 0.95 kB
+.svelte-kit/output/server/chunks/createPaginatedList.svelte.js                                                                      0.98 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_id_/editar/_page.svelte.js                                            0.99 kB
+.svelte-kit/output/server/chunks/cpf-validator.js                                                                                   1.00 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/_page.svelte.js                                                            1.03 kB
+.svelte-kit/output/server/chunks/date.js                                                                                            1.04 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/cadastrar-novo-caso/_page.ts.js                                           1.06 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/alterar-senha/_page.ts.js                                         1.08 kB
+.svelte-kit/output/server/chunks/utils2.js                                                                                          1.09 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_page.ts.js                                       1.13 kB
+.svelte-kit/output/server/chunks/watch.svelte.js                                                                                    1.15 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/editar/_page.svelte.js                                            1.16 kB
+.svelte-kit/output/server/chunks/textarea.js                                                                                        1.17 kB
+.svelte-kit/output/server/chunks/card-content.js                                                                                    1.18 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/novo-atendido/_page.svelte.js                      1.20 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_page.ts.js                                    1.21 kB
+.svelte-kit/output/server/chunks/tipo_evento.js                                                                                     1.21 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/configurar-abertura/_page.ts.js                                         1.22 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/nova-orientacao-juridica/_page.svelte.js          1.23 kB
+.svelte-kit/output/server/chunks/dialog-trigger.js                                                                                  1.24 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/nova-assistencia-judiciaria/_page.svelte.js    1.25 kB
+.svelte-kit/output/server/chunks/orientacao-juridica-schema.js                                                                      1.28 kB
+.svelte-kit/output/server/chunks/card-title.js                                                                                      1.29 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/tornar-assistido/_page.ts.js                  1.33 kB
+.svelte-kit/output/server/chunks/app-footer.js                                                                                      1.34 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_id_/editar/_page.ts.js                           1.38 kB
+.svelte-kit/output/server/chunks/atendido-selector-dialog.js                                                                        1.41 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_id_/editar/_page.svelte.js                    1.42 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/novo-usuario/_page.svelte.js                                           1.42 kB
+.svelte-kit/output/server/chunks/chevron-up.js                                                                                      1.46 kB
+.svelte-kit/output/server/chunks/chevron-down.js                                                                                    1.46 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_id_/editar/_page.svelte.js                       1.47 kB
+.svelte-kit/output/server/chunks/chevron-right.js                                                                                   1.47 kB
+.svelte-kit/output/server/chunks/chevron-left.js                                                                                    1.47 kB
+.svelte-kit/output/server/chunks/plus.js                                                                                            1.48 kB
+.svelte-kit/output/server/chunks/loader-circle.js                                                                                   1.50 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/editar/_page.svelte.js                                               1.50 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/processos/_processoId_/editar/_page.ts.js                            1.51 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/_layout.ts.js                                                        1.52 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_id_/editar/_page.ts.js                                               1.52 kB
+.svelte-kit/output/server/chunks/Icon.js                                                                                            1.53 kB
+.svelte-kit/output/server/chunks/search.js                                                                                          1.56 kB
+.svelte-kit/output/server/chunks/user.js                                                                                            1.60 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/eventos/_eventoId_/editar/_page.ts.js                                1.61 kB
+.svelte-kit/output/server/chunks/upload.js                                                                                          1.66 kB
+.svelte-kit/output/server/chunks/download2.js                                                                                       1.67 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_layout.svelte.js                                                   1.70 kB
+.svelte-kit/output/server/chunks/region.js                                                                                          1.71 kB
+.svelte-kit/output/server/chunks/assistencia-judiciaria-schema.js                                                                   1.72 kB
+.svelte-kit/output/server/chunks/briefcase.js                                                                                       1.73 kB
+.svelte-kit/output/server/chunks/usuario-selector-dialog.js                                                                         1.73 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_id_/editar/_page.ts.js                        1.76 kB
+.svelte-kit/output/server/chunks/external-link.js                                                                                   1.77 kB
+.svelte-kit/output/server/chunks/eye.js                                                                                             1.78 kB
+.svelte-kit/output/server/chunks/plataforma-client.js                                                                               1.80 kB
+.svelte-kit/output/server/chunks/triangle-alert.js                                                                                  1.80 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/processos/_processoId_/editar/_page.svelte.js                        1.81 kB
+.svelte-kit/output/server/chunks/user-roles.js                                                                                      1.83 kB
+.svelte-kit/output/server/chunks/bell.js                                                                                            1.85 kB
+.svelte-kit/output/server/chunks/trash-2.js                                                                                         1.86 kB
+.svelte-kit/output/server/chunks/superValidate.js                                                                                   1.87 kB
+.svelte-kit/output/server/chunks/user-plus.js                                                                                       1.87 kB
+.svelte-kit/output/server/chunks/badge.js                                                                                           1.88 kB
+.svelte-kit/output/server/chunks/caso-schema.js                                                                                     1.91 kB
+.svelte-kit/output/server/chunks/refresh-cw.js                                                                                      1.91 kB
+.svelte-kit/output/server/chunks/file-text.js                                                                                       1.92 kB
+.svelte-kit/output/server/chunks/square-pen.js                                                                                      1.98 kB
+.svelte-kit/output/server/chunks/scale.js                                                                                           1.99 kB
+.svelte-kit/output/server/chunks/newspaper.js                                                                                       2.00 kB
+.svelte-kit/output/server/chunks/info-card.js                                                                                       2.01 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/editar/_page.ts.js                                                   2.02 kB
+.svelte-kit/output/server/chunks/form-button.js                                                                                     2.09 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/editar/_page.ts.js                                                2.24 kB
+.svelte-kit/output/server/chunks/situacao-deferimento.js                                                                            2.38 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/novo/_page.svelte.js                                                  2.39 kB
+.svelte-kit/output/server/chunks/hidden-input.js                                                                                    2.55 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_id_/editar/_page.svelte.js                                           2.68 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/editar/_page.svelte.js                        2.73 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/editar/_page.ts.js                            2.80 kB
+.svelte-kit/output/server/chunks/button.js                                                                                          2.87 kB
+.svelte-kit/output/server/chunks/index.js                                                                                           2.94 kB
+.svelte-kit/output/server/chunks/internal2.js                                                                                       3.08 kB
+.svelte-kit/output/server/chunks/simple-textarea.js                                                                                 3.14 kB
+.svelte-kit/output/server/chunks/label.js                                                                                           3.18 kB
+.svelte-kit/output/server/chunks/area_direito.js                                                                                    3.44 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/classificacao/_page.svelte.js                                              3.49 kB
+.svelte-kit/output/server/chunks/table-row.js                                                                                       3.52 kB
+.svelte-kit/output/server/chunks/anexos-evento.js                                                                                   3.55 kB
+.svelte-kit/output/server/chunks/arrays.js                                                                                          3.66 kB
+.svelte-kit/output/server/chunks/dialog-description2.js                                                                             3.72 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/tornar-assistido/_page.svelte.js              3.91 kB
+.svelte-kit/output/server/chunks/arquivo-form.js                                                                                    3.93 kB
+.svelte-kit/output/server/chunks/api-client.js                                                                                      4.02 kB
+.svelte-kit/output/server/chunks/events.js                                                                                          4.18 kB
+.svelte-kit/output/server/chunks/simple-input.js                                                                                    4.25 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/links-roteiro/_page.svelte.js                                             4.52 kB
+.svelte-kit/output/server/chunks/atendido-schema.js                                                                                 5.07 kB
+.svelte-kit/output/server/chunks/masked-input.js                                                                                    5.13 kB
+.svelte-kit/output/server/chunks/input.js                                                                                           5.58 kB
+.svelte-kit/output/server/chunks/exports.js                                                                                         5.59 kB
+.svelte-kit/output/server/chunks/assistido-schema.js                                                                                5.60 kB
+.svelte-kit/output/server/chunks/toast-state.svelte.js                                                                              5.65 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_page.svelte.js                                                        5.65 kB
+.svelte-kit/output/server/chunks/user-schema.js                                                                                     5.88 kB
+.svelte-kit/output/server/entries/pages/redefinir-senha/_token_/_page.svelte.js                                                     6.03 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/arquivos/_id_/_page.svelte.js                                                   6.15 kB
+.svelte-kit/output/server/chunks/simple-select.js                                                                                   6.36 kB
+.svelte-kit/output/server/entries/pages/_error.svelte.js                                                                            6.36 kB
+.svelte-kit/output/server/chunks/permissoes.js                                                                                      6.62 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/login/_page.svelte.js                                               6.90 kB
+.svelte-kit/output/server/entries/pages/esqueci-a-senha/_page.svelte.js                                                             6.91 kB
+.svelte-kit/output/server/chunks/simple-datepicker.js                                                                               7.48 kB
+.svelte-kit/output/server/chunks/multiple-select.js                                                                                 7.61 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/novo/_page.svelte.js                                                7.75 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/escalas/_page.svelte.js                                                 7.91 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/_page.svelte.js                                                   8.04 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/_page.svelte.js                                                                 8.09 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/eu/alterar-senha/_page.svelte.js                                       8.62 kB
+.svelte-kit/output/server/entries/pages/login/_page.svelte.js                                                                       8.93 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_page.svelte.js                                    8.94 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/processos/_processoId_/_page.svelte.js                               9.27 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_page.svelte.js                                   9.33 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_page.svelte.js                                                        9.48 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/registro-presenca/_page.svelte.js                                       9.72 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/usuarios/_id_/alterar-senha/_page.svelte.js                                     9.93 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_id_/_page.svelte.js                          10.25 kB
+.svelte-kit/output/server/chunks/senha-modal.js                                                                                    10.42 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/eventos/_eventoId_/_page.svelte.js                                  11.26 kB
+.svelte-kit/output/server/chunks/form-field-errors.js                                                                              11.44 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_page.svelte.js                                                          11.53 kB
+.svelte-kit/output/server/chunks/publicacoes-processo.js                                                                           11.69 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/assistencias-judiciarias/_page.svelte.js                               12.08 kB
+.svelte-kit/output/server/chunks/index6.js                                                                                         12.17 kB
+.svelte-kit/output/server/chunks/dialog-description.js                                                                             12.28 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/termos-de-uso/_page.svelte.js                                                  12.57 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_page.svelte.js                                                      12.91 kB
+.svelte-kit/output/server/chunks/create-id.js                                                                                      13.10 kB
+.svelte-kit/output/server/chunks/index7.js                                                                                         13.48 kB
+.svelte-kit/output/server/chunks/index4.js                                                                                         13.68 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/processos/_id_/_page.svelte.js                                                 13.80 kB
+.svelte-kit/output/server/chunks/base-selector-dialog.js                                                                           14.03 kB
+.svelte-kit/output/server/chunks/partes-editor.js                                                                                  14.62 kB
+.svelte-kit/output/server/chunks/checkbox.js                                                                                       15.19 kB
+.svelte-kit/output/server/entries/pages/(plataforma)/plataforma/_page.svelte.js                                                    15.32 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/eventos/_eventoId_/editar/_page.svelte.js                           15.38 kB
+.svelte-kit/output/server/chunks/orientacao-juridica-form.js                                                                       15.50 kB
+.svelte-kit/output/server/chunks/processo-form.js                                                                                  16.09 kB
+.svelte-kit/output/server/chunks/assistencia-judiciaria-form.js                                                                    16.16 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/configurar-abertura/_page.svelte.js                                    17.05 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/notificacoes/_page.svelte.js                                                   19.92 kB
+.svelte-kit/output/server/chunks/lista-publicacoes.js                                                                              20.88 kB
+.svelte-kit/output/server/chunks/confirm-action.js                                                                                 22.68 kB
+.svelte-kit/output/server/chunks/acervo.js                                                                                         25.01 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/unidades/_page.svelte.js                                                       25.97 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/escala/_page.svelte.js                                                 26.27 kB
+.svelte-kit/output/server/chunks/user-form.js                                                                                      26.44 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/monitoramento/_page.svelte.js                                             28.19 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/orientacoes-juridicas/_id_/_page.svelte.js                             28.46 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/djen/publicacoes/_id_/_page.svelte.js                                          28.54 kB
+.svelte-kit/output/server/entries/pages/_layout.svelte.js                                                                          28.84 kB
+.svelte-kit/output/server/chunks/root.js                                                                                           29.24 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/confirmar-presenca/_page.svelte.js                                     30.67 kB
+.svelte-kit/output/server/chunks/data-table.js                                                                                     30.89 kB
+.svelte-kit/output/server/chunks/shared.js                                                                                         34.06 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/fila-atendimento/_page.svelte.js                                       36.37 kB
+.svelte-kit/output/server/remote-entry.js                                                                                          36.86 kB
+.svelte-kit/output/server/chunks/atendido-form.js                                                                                  37.13 kB
+.svelte-kit/output/server/chunks/caso-form.js                                                                                      38.21 kB
+.svelte-kit/output/server/chunks/index2.js                                                                                         42.55 kB
+.svelte-kit/output/server/chunks/scroll-lock.js                                                                                    42.66 kB
+.svelte-kit/output/server/chunks/assistido-form.js                                                                                 44.45 kB
+.svelte-kit/output/server/chunks/calendar.js                                                                                       48.12 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/plantao/atendidos-assistidos/_id_/_page.svelte.js                              58.16 kB
+.svelte-kit/output/server/chunks/calendar-prev-button.js                                                                           59.19 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/relatorios/_page.svelte.js                                                     59.57 kB
+.svelte-kit/output/server/chunks/utils.js                                                                                          63.81 kB
+.svelte-kit/output/server/chunks/busca-parte.js                                                                                    73.64 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/casos/_id_/_page.svelte.js                                                     83.75 kB
+.svelte-kit/output/server/chunks/zod4.js                                                                                           95.49 kB
+.svelte-kit/output/server/chunks/index3.js                                                                                         96.37 kB
+.svelte-kit/output/server/index.js                                                                                                131.06 kB
+.svelte-kit/output/server/entries/pages/(dashboard)/_layout.svelte.js                                                             194.79 kB
+✓ built in 16.29s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done

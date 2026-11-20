@@ -39,6 +39,11 @@ def create_app(config_object=None):
 
     register_error_handlers(app)
 
+    from gestaolegal.cli import djen_cli, plataforma_cli
+
+    app.cli.add_command(plataforma_cli)
+    app.cli.add_command(djen_cli)
+
     return app
 
 

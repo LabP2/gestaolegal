@@ -1,0 +1,19 @@
+{
+  "passed": [
+    "Filtros reais por parte e contexto; controle avançado recolhido",
+    "Importação no card com atendido sugerido cria processo",
+    "Lote sem parte: duas publicações do mesmo CNJ criam um único processo",
+    "Reimportar não duplica processo",
+    "Descarte operacional com contexto ativo",
+    "Detalhes abrem página própria com texto e link original",
+    "Processo importado apresenta parte confirmada",
+    "Classificação no treino sem importar publicação",
+    "Treino real entrou na fila",
+    "Worker real concluiu treinamento e tela atualizou automaticamente",
+    "Filtro por sugestão usa previsão gerada pelo worker real",
+    "Layout sem transbordamento horizontal em tablet",
+    "Nenhum erro de JavaScript ou HTTP na execução"
+  ],
+  "errors": [],
+  "httpErrors": []
+}

@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import AppFooter from '$lib/components/app-footer.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
+	import AppFooter from '#lib/components/app-footer.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
 	import {
 		resetPasswordSchema,
 		type ResetPasswordData
-	} from '$lib/forms/schemas/reset-password-schema';
-	import { api } from '$lib/api-client';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	} from '#lib/forms/schemas/reset-password-schema.ts';
+	import { api } from '#lib/api-client.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { toast } from 'svelte-sonner';

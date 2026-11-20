@@ -29,7 +29,10 @@ class OrientacaoJuridicaRepository(BaseRepository):
     def find_by_id(
         self, id: int, unidade_id: int | None = None
     ) -> OrientacaoJuridica | None:
-        stmt = select(orientacao_juridica).where(orientacao_juridica.c.id == id)
+        stmt = self.escopo(
+            select(orientacao_juridica).where(orientacao_juridica.c.id == id),
+            orientacao_juridica,
+        )
         if unidade_id is not None:
             stmt = stmt.where(orientacao_juridica.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
@@ -40,7 +43,10 @@ class OrientacaoJuridicaRepository(BaseRepository):
         return orientacao
 
     def search(self, params: SearchParams) -> PaginatedResult[OrientacaoJuridica]:
-        stmt = select(orientacao_juridica, func.count().over().label("total_count"))
+        stmt = self.escopo(
+            select(orientacao_juridica, func.count().over().label("total_count")),
+            orientacao_juridica,
+        )
 
         stmt = self._apply_where_clause(stmt, params.get("where"), orientacao_juridica)
         stmt = stmt.order_by(orientacao_juridica.c.data_criacao.desc())
@@ -71,6 +77,7 @@ class OrientacaoJuridicaRepository(BaseRepository):
             .where(atendidos.c.nome.ilike(f"%{nome}%"))
             .distinct()
         )
+        stmt = self.escopo(stmt, atendido_xOrientacaoJuridica, atendidos)
         return [
             row[0] for row in self.session.execute(stmt).all() if row[0] is not None
         ]
@@ -82,55 +89,68 @@ class OrientacaoJuridicaRepository(BaseRepository):
             .where(atendido_xOrientacaoJuridica.c.id_atendido == atendido_id)
             .distinct()
         )
+        stmt = self.escopo(stmt, atendido_xOrientacaoJuridica)
         return [
             row[0] for row in self.session.execute(stmt).all() if row[0] is not None
         ]
 
     def find_one(self, params: SearchParams) -> OrientacaoJuridica | None:
-        stmt = select(orientacao_juridica)
+        stmt = self.escopo(select(orientacao_juridica), orientacao_juridica)
         stmt = self._apply_where_clause(stmt, params.get("where"), orientacao_juridica)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(OrientacaoJuridica, dict(result._mapping)) if result else None
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(orientacao_juridica)
+        stmt = self.escopo(
+            select(func.count()).select_from(orientacao_juridica), orientacao_juridica
+        )
         stmt = self._apply_where_clause(stmt, params.get("where"), orientacao_juridica)
 
         result = self.session.execute(stmt).scalar()
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(orientacao_juridica).values(**data)
+        stmt = insert(orientacao_juridica).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
         stmt = (
-            sql_update(orientacao_juridica)
-            .where(orientacao_juridica.c.id == id)
-            .values(**data)
+            self.escopo(
+                sql_update(orientacao_juridica).where(orientacao_juridica.c.id == id),
+                orientacao_juridica,
+            ).values(**data)
         )
         self.session.execute(stmt)
 
     def add_related_atendidos(
         self, orientacao_id: int, atendidos_ids: list[int]
     ) -> None:
-        stmt = sql_delete(atendido_xOrientacaoJuridica).where(
-            atendido_xOrientacaoJuridica.c.id_orientacaoJuridica == orientacao_id
+        stmt = self.escopo(
+            sql_delete(atendido_xOrientacaoJuridica).where(
+                atendido_xOrientacaoJuridica.c.id_orientacaoJuridica == orientacao_id
+            ),
+            atendido_xOrientacaoJuridica,
         )
         self.session.execute(stmt)
 
         for atendido_id in atendidos_ids:
             stmt = insert(atendido_xOrientacaoJuridica).values(
-                id_orientacaoJuridica=orientacao_id, id_atendido=atendido_id
+                **self.valores(
+                    {
+                        "id_orientacaoJuridica": orientacao_id,
+                        "id_atendido": atendido_id,
+                    }
+                )
             )
             self.session.execute(stmt)
 
     def delete(self, id: int) -> None:
         stmt = (
-            sql_update(orientacao_juridica)
-            .where(orientacao_juridica.c.id == id)
-            .values(status=0)
+            self.escopo(
+                sql_update(orientacao_juridica).where(orientacao_juridica.c.id == id),
+                orientacao_juridica,
+            ).values(status=0)
         )
         self.session.execute(stmt)

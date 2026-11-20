@@ -7,7 +7,7 @@ e como provar**.
 
 Escopo: as quatro pendências de código que sobraram da Fase A. **Fora de
 escopo** a Fase B (importação de Nova Lima, já entregue em
-`scripts/importar_unidade.py`), a execução de qualquer coisa contra QA ou
+ferramenta de importação, descontinuada após a fusão; ver `docs/unidades.md`), a execução de qualquer coisa contra QA ou
 produção, e a conferência das telas em navegador — que é trabalho de humano,
 não de loop.
 

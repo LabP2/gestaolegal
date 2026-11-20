@@ -1,13 +1,21 @@
 <script lang="ts">
-	import { api, apiFetch } from '$lib/api-client';
-	import type { ArquivoEvento } from '$lib/types/evento';
-	import { Button } from '$lib/components/ui/button';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api, apiFetch } from '#lib/api-client.ts';
+	import type { ArquivoEvento } from '#lib/types/evento.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
 	import { toast } from 'svelte-sonner';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 
-	let { casoId, eventoId, arquivos, podeExcluir = false }: {
-		casoId: number; eventoId: number; arquivos: ArquivoEvento[]; podeExcluir?: boolean;
+	let {
+		casoId,
+		eventoId,
+		arquivos,
+		podeExcluir = false
+	}: {
+		casoId: number;
+		eventoId: number;
+		arquivos: ArquivoEvento[];
+		podeExcluir?: boolean;
 	} = $props();
 	let removidos = $state<number[]>([]);
 	const visiveis = $derived(arquivos.filter((a) => !removidos.includes(a.id)));
@@ -42,17 +50,29 @@
 <div class="space-y-3">
 	{#each visiveis as arquivo (arquivo.id)}
 		<div class="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3">
-			<div class="min-w-0 break-all text-sm">
+			<div class="min-w-0 text-sm break-all">
 				<span>{arquivo.nome}</span>
 				{#if arquivo.indisponivel_origem}
 					<p class="text-muted-foreground">Arquivo indisponível no acervo original</p>
 				{/if}
 			</div>
 			<div class="flex shrink-0 gap-2">
-				<Button type="button" variant="outline" size="sm" disabled={arquivo.indisponivel_origem} onclick={() => baixar(arquivo)}>Baixar</Button>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={arquivo.indisponivel_origem}
+					onclick={() => baixar(arquivo)}
+				>
+					Baixar
+				</Button>
 				{#if podeExcluir}
-					<ConfirmAction title="Excluir anexo?" description={`O arquivo ${arquivo.nome} será removido deste evento.`}
-						confirmText="Excluir" onConfirm={() => excluir(arquivo)}>
+					<ConfirmAction
+						title="Excluir anexo?"
+						description={`O arquivo ${arquivo.nome} será removido deste evento.`}
+						confirmText="Excluir"
+						onConfirm={() => excluir(arquivo)}
+					>
 						{#snippet trigger()}Excluir{/snippet}
 					</ConfirmAction>
 				{/if}

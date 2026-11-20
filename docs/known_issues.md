@@ -122,6 +122,24 @@ A validação precisa conferir também `ativa`, com teste de acesso após a
 desativação. Administradores também dependem de vínculo; o papel não concede
 acesso automático a todas as unidades.
 
+## Recuperação de senha: NPJ desativado não avisa a pessoa
+
+`POST /api/auth/forgot-password` para conta de um NPJ desativado responde
+200 com a mesma mensagem genérica e não envia e-mail, como faz para conta
+inexistente. É proposital: avisar "seu NPJ está inativo" revelaria que a conta
+existe. O custo é que a pessoa não recebe nenhum sinal do motivo. Se a
+coordenação preferir avisar, o caminho é um e-mail informativo apenas quando
+a conta existe e o NPJ está inativo, sem mudar a resposta HTTP.
+
+## Termos de uso: texto fixo da DAJ/UFMG
+
+`web/src/routes/(dashboard)/termos-de-uso/+page.svelte` cita a DAJ, a
+Diretoria Adjunta e a URL da UFMG, e aparece igual em qualquer NPJ. Os demais
+textos de tela que diziam "DAJ" já usam a sigla do NPJ ativo
+(`$lib/utils/npj.ts`). Os termos são texto jurídico e precisam de versão por
+NPJ, ou de redação genérica definida pela coordenação, antes de serem
+parametrizados.
+
 ## Correções já entregues
 
 Os itens abaixo não são mais limitações do código atual:
@@ -133,6 +151,7 @@ Os itens abaixo não são mais limitações do código atual:
 | [#183 — múltiplos anexos de evento](https://github.com/gestaolegalufmg/gestaolegal/issues/183) | Criação aceita vários anexos; edição acrescenta arquivos e permite gerenciar os existentes. |
 | [#190 — arquivos privados em pasta pública](https://github.com/gestaolegalufmg/gestaolegal/issues/190) | Raiz privada, downloads autenticados e bloqueio dos caminhos estáticos. |
 | [#205 — número longo de processo](https://github.com/gestaolegalufmg/gestaolegal/issues/205) | Número como texto de até 25 caracteres, preservando pontuação e zeros iniciais. |
+| Referência a id de outro NPJ no corpo (multitenant) | Caso, orientação, fila, lembrete, evento e processo conferem no repositório do tenant cada id recebido no corpo. Id de outro NPJ e id inexistente dão o mesmo 400, com o campo (`tests/api/test_referencias_api.py`, `test_tenant_vazamento.py`). |
 | [#366 — atalho Plantão com 404](https://github.com/gestaolegalufmg/gestaolegal/issues/366) | O atalho usa uma rota existente, que redireciona para a listagem de escalas. |
 
 As mudanças de plantão estão descritas em [Escalas de plantão](escalas-plantao.md).

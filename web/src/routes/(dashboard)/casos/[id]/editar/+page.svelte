@@ -1,8 +1,8 @@
 <script lang="ts">
-	import CasoForm from '$lib/forms/caso-form.svelte';
+	import CasoForm from '#lib/forms/caso-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -25,14 +25,16 @@
 	</div>
 
 	<div class="rounded-lg border bg-card p-6">
-		<CasoForm
-			data={data.form}
-			casoId={data.caso.id}
-			caso={data.caso}
-			{onError}
-			isCreateMode={false}
-			usuarios={data.usuarios}
-			assistidos={data.assistidos}
-		/>
+		{#key data.caso.id}
+			<CasoForm
+				data={data.form}
+				casoId={data.caso.id}
+				caso={data.caso}
+				{onError}
+				isCreateMode={false}
+				usuarios={data.usuarios}
+				assistidos={data.assistidos}
+			/>
+		{/key}
 	</div>
 </div>

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import and_, func, insert, select
 from sqlalchemy import update as sql_update
 
 from gestaolegal.database.tables import atendidos, fila_atendimentos
@@ -20,7 +20,10 @@ class FilaAtendimentoRepository(BaseRepository):
     def find_by_id(
         self, id: int, unidade_id: int | None = None
     ) -> FilaAtendimento | None:
-        stmt = select(fila_atendimentos).where(fila_atendimentos.c.id == id)
+        stmt = self.escopo(
+            select(fila_atendimentos).where(fila_atendimentos.c.id == id),
+            fila_atendimentos,
+        )
         if unidade_id is not None:
             stmt = stmt.where(fila_atendimentos.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
@@ -42,6 +45,7 @@ class FilaAtendimentoRepository(BaseRepository):
                 fila_atendimentos.c.data_criacao <= fim,
             )
         )
+        stmt = self.escopo(stmt, fila_atendimentos)
         if unidade_id is not None:
             stmt = stmt.where(fila_atendimentos.c.unidade_id == unidade_id)
         return self.session.execute(stmt).scalar() or 0
@@ -61,27 +65,35 @@ class FilaAtendimentoRepository(BaseRepository):
                 fila_atendimentos.c.data_saida,
                 atendidos.c.nome,
             )
-            .outerjoin(atendidos, atendidos.c.id == fila_atendimentos.c.id_atendido)
+            .outerjoin(
+                atendidos,
+                and_(
+                    atendidos.c.id == fila_atendimentos.c.id_atendido,
+                    self.no_tenant(atendidos),
+                ),
+            )
             .where(
                 fila_atendimentos.c.data_criacao >= inicio,
                 fila_atendimentos.c.data_criacao <= fim,
             )
         )
+        stmt = self.escopo(stmt, fila_atendimentos)
         if unidade_id is not None:
             stmt = stmt.where(fila_atendimentos.c.unidade_id == unidade_id)
         results = self.session.execute(stmt).mappings().all()
         return [dict(row) for row in results]
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(fila_atendimentos).values(**data)
+        stmt = insert(fila_atendimentos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
         stmt = (
-            sql_update(fila_atendimentos)
-            .where(fila_atendimentos.c.id == id)
-            .values(**data)
+            self.escopo(
+                sql_update(fila_atendimentos).where(fila_atendimentos.c.id == id),
+                fila_atendimentos,
+            ).values(**data)
         )
         self.session.execute(stmt)

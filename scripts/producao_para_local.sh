@@ -238,6 +238,11 @@ restaurar() {
 
     info "aplicando migrations do checkout e subindo a stack..."
     "${compose[@]}" run --rm --no-deps migrate
+    info "conferindo e organizando anexos por tenant no volume local..."
+    "${compose[@]}" run --rm --no-deps -T --user root --entrypoint python api - \
+        --raiz-privada /data/gestaolegal/uploads --dry-run < scripts/mover_arquivos_tenant.py
+    "${compose[@]}" run --rm --no-deps -T --user root --entrypoint python api - \
+        --raiz-privada /data/gestaolegal/uploads < scripts/mover_arquivos_tenant.py
     "${compose[@]}" up -d
     rm -rf -- "$tmp"; trap - EXIT
     info "pronto. E-mails locais vão para o Mailpit; as senhas são as da produção."

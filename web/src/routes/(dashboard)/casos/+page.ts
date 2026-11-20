@@ -1,10 +1,11 @@
-import type { ListCaso, Paginated } from '$lib/types';
-import { api } from '$lib/api-client';
+import type { ListCaso, Paginated } from '#lib/types/index.ts';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ url, fetch }) => {
-	const urlParams = url.searchParams;
+	const urlParams = new URLSearchParams(url.searchParams);
+	if (!urlParams.has('per_page')) urlParams.set('per_page', '20');
 
 	try {
 		const data = await api.get<Paginated<ListCaso>>(`caso?${urlParams.toString()}`, {}, fetch);

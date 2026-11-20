@@ -17,7 +17,7 @@ class LembreteRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int, unidade_id: int | None = None) -> Lembrete | None:
-        stmt = select(lembretes).where(lembretes.c.id == id)
+        stmt = self.escopo(select(lembretes).where(lembretes.c.id == id), lembretes)
         if unidade_id is not None:
             stmt = stmt.where(lembretes.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
@@ -29,7 +29,9 @@ class LembreteRepository(BaseRepository):
         include_inactive: bool = False,
         unidade_id: int | None = None,
     ) -> list[Lembrete]:
-        stmt = select(lembretes).where(lembretes.c.id_caso == caso_id)
+        stmt = self.escopo(
+            select(lembretes).where(lembretes.c.id_caso == caso_id), lembretes
+        )
         if unidade_id is not None:
             stmt = stmt.where(lembretes.c.unidade_id == unidade_id)
         if not include_inactive:
@@ -39,21 +41,28 @@ class LembreteRepository(BaseRepository):
         return [from_dict(Lembrete, dict(row._mapping)) for row in results]
 
     def count_by_caso(self, caso_id: int) -> int:
-        stmt = select(func.count()).select_from(lembretes).where(
-            lembretes.c.id_caso == caso_id
+        stmt = self.escopo(
+            select(func.count())
+            .select_from(lembretes)
+            .where(lembretes.c.id_caso == caso_id),
+            lembretes,
         )
         return self.session.execute(stmt).scalar() or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(lembretes).values(**data)
+        stmt = insert(lembretes).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(lembretes).where(lembretes.c.id == id).values(**data)
+        stmt = self.escopo(
+            sql_update(lembretes).where(lembretes.c.id == id), lembretes
+        ).values(**data)
         self.session.execute(stmt)
 
     def delete(self, id: int) -> None:
-        stmt = sql_update(lembretes).where(lembretes.c.id == id).values(status=False)
+        stmt = self.escopo(
+            sql_update(lembretes).where(lembretes.c.id == id), lembretes
+        ).values(status=False)
         self.session.execute(stmt)

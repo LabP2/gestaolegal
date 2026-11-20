@@ -1,19 +1,21 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Edit from '@lucide/svelte/icons/edit';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Scale from '@lucide/svelte/icons/scale';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
-	import SenhaModal from '$lib/components/senha-modal.svelte';
-	import { formatDateOnly } from '$lib/utils/date';
+	import SenhaModal from '#lib/components/senha-modal.svelte';
+	import { formatDateOnly } from '#lib/utils/date.ts';
+	import { siglaNpj } from '#lib/utils/npj.ts';
+	import NomesDjen from '#lib/components/atendidos/nomes-djen.svelte';
 
 	let { data }: { data: PageData } = $props();
-	let { atendido } = data;
+	const { atendido } = $derived(data);
 	const casos = $derived(data.casos ?? []);
 	const orientacoes = $derived(data.orientacoes ?? []);
 
@@ -24,7 +26,13 @@
 
 	let senhaModalOpen = $state(false);
 
-	function formatDate(dateString: string | null): string {
+	// Campos que o cadastro simplificado (parte sem triagem) deixa vazios.
+	function rotulo(labels: Record<string, string>, valor: string | null | undefined): string {
+		if (!valor) return 'Não informado';
+		return labels[valor] || valor;
+	}
+
+	function formatDate(dateString: string | null | undefined): string {
 		if (!dateString) return 'Não informado';
 		const date = new Date(dateString);
 		// Birth dates are calendar dates — format in UTC to avoid a timezone day-shift.
@@ -132,7 +140,9 @@
 						<Badge variant={atendido.status === 1 ? 'default' : 'secondary'}>
 							{atendido.status === 1 ? 'Ativo' : 'Inativo'}
 						</Badge>
-						{#if atendido.assistido}
+						{#if atendido.sem_triagem}
+							<Badge variant="secondary">Sem triagem</Badge>
+						{:else if atendido.assistido}
 							<Badge variant="default" class="bg-green-600">Assistido</Badge>
 						{:else}
 							<Badge variant="secondary">Atendido</Badge>
@@ -174,7 +184,7 @@
 				<Card.Content class="grid gap-4 md:grid-cols-2">
 					<div>
 						<p class="text-sm text-muted-foreground">CPF</p>
-						<p class="font-medium">{atendido.cpf}</p>
+						<p class="font-medium">{atendido.cpf || 'Não informado'}</p>
 					</div>
 
 					<div>
@@ -192,18 +202,18 @@
 					<div>
 						<p class="text-sm text-muted-foreground">Estado Civil</p>
 						<p class="font-medium">
-							{estadoCivilLabels[atendido.estado_civil] || atendido.estado_civil}
+							{rotulo(estadoCivilLabels, atendido.estado_civil)}
 						</p>
 					</div>
 
 					<div>
 						<p class="text-sm text-muted-foreground">Email</p>
-						<p class="font-medium">{atendido.email}</p>
+						<p class="font-medium">{atendido.email || 'Não informado'}</p>
 					</div>
 
 					<div>
 						<p class="text-sm text-muted-foreground">Celular</p>
-						<p class="font-medium">{atendido.celular}</p>
+						<p class="font-medium">{atendido.celular || 'Não informado'}</p>
 					</div>
 
 					{#if atendido.telefone}
@@ -214,6 +224,8 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
+
+			<NomesDjen atendidoId={atendido.id} urole={data.me.urole} />
 
 			{#if atendido.endereco}
 				<Card.Root>
@@ -256,13 +268,13 @@
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Como Conheceu o DAJ</Card.Title>
+					<Card.Title>Como conheceu o {siglaNpj()}</Card.Title>
 				</Card.Header>
 				<Card.Content class="grid gap-4 md:grid-cols-2">
 					<div>
 						<p class="text-sm text-muted-foreground">Como conheceu</p>
 						<p class="font-medium">
-							{comoConheceuLabels[atendido.como_conheceu] || atendido.como_conheceu}
+							{rotulo(comoConheceuLabels, atendido.como_conheceu)}
 						</p>
 					</div>
 
@@ -275,7 +287,13 @@
 
 					<div>
 						<p class="text-sm text-muted-foreground">Procurou outro local?</p>
-						<p class="font-medium">{atendido.procurou_outro_local === 'sim' ? 'Sim' : 'Não'}</p>
+						<p class="font-medium">
+							{atendido.procurou_outro_local
+								? atendido.procurou_outro_local === 'sim'
+									? 'Sim'
+									: 'Não'
+								: 'Não informado'}
+						</p>
 					</div>
 
 					{#if atendido.procurou_qual_local}

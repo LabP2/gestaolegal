@@ -4,6 +4,7 @@ import pytest
 from flask.testing import FlaskClient
 
 from tests.api.conftest import clean_tables, criar_usuario, get_success_data, headers_para
+from gestaolegal.utils.request_context import sem_tenant
 
 TABELAS = ("registro_entrada", "dias_marcados_plantao", "dias_plantao", "plantao")
 
@@ -44,10 +45,10 @@ def _inserir_registro(
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import registro_entrada
 
-    with app.app_context():
+    with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         result = session.execute(
-            insert(registro_entrada).values(
+            insert(registro_entrada).values(tenant_id=1, 
                 data_entrada=entrada,
                 data_saida=saida or datetime.combine(entrada.date(), time(23, 59, 59)),
                 id_usuario=id_usuario,
@@ -66,7 +67,7 @@ def _id_do_usuario(app, email: str) -> int:
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import usuarios
 
-    with app.app_context():
+    with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         return session.execute(
             select(usuarios.c.id).where(usuarios.c.email == email)
@@ -102,7 +103,7 @@ class TestRegistroDePonto:
         _registrar(client, auth_headers, "09:00")
         _registrar(client, auth_headers, "12:30")
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             row = session.execute(select(registro_entrada)).first()
 
@@ -131,7 +132,7 @@ class TestRegistroDePonto:
         from gestaolegal.database.session import get_session
         from gestaolegal.database.tables import registro_entrada
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             status = session.execute(
                 select(registro_entrada.c.status).where(
@@ -205,11 +206,11 @@ class TestConfirmacao:
         id_admin = _id_do_usuario(app, "admin@gl.com")
         ontem = date.today() - timedelta(days=1)
 
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             ativa = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -219,8 +220,8 @@ class TestConfirmacao:
             ).lastrowid
             # Marcação apagada pelo botão "Editar": a v2 continuava listando
             session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -264,11 +265,11 @@ class TestConfirmacao:
         presenca_id = _inserir_registro(
             app, id_admin, ontem, saida=ontem + timedelta(hours=3), status=False
         )
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             plantao_id = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem_data,
                     id_usuario=id_admin,
                     confirmacao="aberto",
@@ -424,11 +425,11 @@ class TestUnidade:
 
         ontem = date.today() - timedelta(days=1)
         admin_id = _id_do_usuario(app, "admin@gl.com")
-        with app.app_context():
+        with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
             session = get_session()
             marcacao_bh = session.execute(
-                insert(dias_marcados_plantao).values(
-                    plantao_id=session.execute(insert(plantao).values(unidade_id=1)).lastrowid,
+                insert(dias_marcados_plantao).values(tenant_id=1, 
+                    plantao_id=session.execute(insert(plantao).values(tenant_id=1, unidade_id=1)).lastrowid,
                     data_marcada=ontem,
                     id_usuario=admin_id,
                     confirmacao="aberto",

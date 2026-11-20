@@ -9,15 +9,27 @@ from gestaolegal.models.assistido_input import (
     AssistidoCreateInput,
     AssistidoUpdateInput,
 )
-from gestaolegal.models.atendido_input import AtendidoCreateInput, AtendidoUpdateInput
+from gestaolegal.models.atendido_input import (
+    AtendidoCreateInput,
+    AtendidoSimplificadoInput,
+    AtendidoUpdateInput,
+)
 from gestaolegal.services.atendido_service import AtendidoService
 from gestaolegal.services.caso_service import CasoService
 from gestaolegal.services.orientacao_juridica_service import OrientacaoJuridicaService
+from gestaolegal.services.processo_service import PAPEIS_SEM_CASO
 from gestaolegal.utils import StringBool
 from gestaolegal.utils.api_decorators import authenticated, authorized
 from gestaolegal.utils.api_response import success_response
 
 atendido_controller = Blueprint("atendido_api", __name__)
+
+
+def _exigir_atendido(id: int) -> None:
+    """Sublistas de um atendido fora do escopo (outro NPJ ou outra unidade)
+    respondem 404, como a ficha, em vez de lista vazia."""
+    if not AtendidoService().find_by_id(id):
+        raise NotFoundException(resource="Atendido", resource_id=id)
 
 
 @atendido_controller.route("/", methods=["GET"])
@@ -56,6 +68,7 @@ def find_by_id(id: int):
 @authenticated
 def get_casos(id: int):
     """Casos vinculados a um atendido/assistido (partes envolvidas)."""
+    _exigir_atendido(id)
     caso_service = CasoService()
     result = caso_service.search(
         page_params=PageParams(page=1, per_page=100),
@@ -69,6 +82,7 @@ def get_casos(id: int):
 @authenticated
 def get_orientacoes(id: int):
     """Orientações jurídicas vinculadas a um atendido/assistido."""
+    _exigir_atendido(id)
     orientacao_service = OrientacaoJuridicaService()
     result = orientacao_service.search(
         page_params=PageParams(page=1, per_page=100),
@@ -115,6 +129,13 @@ def delete(id: int):
     atendido_service.soft_delete(id)
 
     return success_response(message="Atendido desativado com sucesso")
+
+
+@atendido_controller.route("/<int:id>/reativar", methods=["POST"])
+@authorized("admin")
+def reactivate(id: int):
+    AtendidoService().reactivate(id)
+    return success_response(message="Atendido reativado com sucesso")
 
 
 @atendido_controller.route("/<int:id>/tornar-assistido", methods=["POST"])
@@ -187,3 +208,43 @@ def update_assistido(id: int):
     return success_response(
         data=asdict(atendido), message="Assistido atualizado com sucesso"
     )
+
+
+# --- parte sem triagem e variações do nome (docs/plano-processos-avulsos.md) ---
+
+
+@atendido_controller.route("/simplificado", methods=["POST"])
+@authorized(*PAPEIS_SEM_CASO)
+def criar_simplificado():
+    json_data = request.get_json(silent=True)
+    dados = AtendidoSimplificadoInput.model_validate(
+        json_data if isinstance(json_data, dict) else {}
+    )
+    atendido = AtendidoService().criar_simplificado(dados)
+    return success_response(
+        data=asdict(atendido),
+        message="Parte cadastrada sem triagem",
+        status_code=201,
+    )
+
+
+@atendido_controller.route("/<int:id>/nomes", methods=["GET"])
+@authenticated
+def listar_nomes(id: int):
+    return success_response(data=AtendidoService().nomes(id))
+
+
+@atendido_controller.route("/<int:id>/nomes", methods=["POST"])
+@authorized(*PAPEIS_SEM_CASO)
+def adicionar_nome(id: int):
+    json_data = request.get_json(silent=True)
+    nome = json_data.get("nome") if isinstance(json_data, dict) else None
+    nomes = AtendidoService().adicionar_nome(id, nome)
+    return success_response(data=nomes, message="Nome adicionado", status_code=201)
+
+
+@atendido_controller.route("/<int:id>/nomes/<int:nome_id>", methods=["DELETE"])
+@authorized(*PAPEIS_SEM_CASO)
+def remover_nome(id: int, nome_id: int):
+    AtendidoService().remover_nome(id, nome_id)
+    return success_response(message="Nome removido")

@@ -80,7 +80,7 @@ class NotificacaoService:
         self,
         tipo: TipoNotificacao,
         acao: str,
-        executor_id: int,
+        executor_id: int | None,
         destinatarios: Iterable[int | None] = (),
         id_caso: int | None = None,
         id_referencia: int | None = None,
@@ -91,6 +91,8 @@ class NotificacaoService:
 
         Valores vazios em `destinatarios` são ignorados. `geral=True` cria um
         único aviso sem destinatário (visto por orientadores e estagiários).
+        `executor_id=None`: ação da rotina do DJEN, sem usuário; ninguém é
+        pulado.
         Devolve quantas foram criadas. Chamar dentro da transação da origem.
         """
         agora = datetime.now()
@@ -189,6 +191,45 @@ class NotificacaoService:
             id_caso=id_caso,
             id_referencia=lembrete_id,
             detalhe=descricao,
+        )
+
+    def djen_publicacoes(
+        self, caso, eventos: list, executor_id: int | None
+    ) -> int:
+        """Publicação nova no DJEN: avisa orientador, estagiário e colaborador.
+
+        Várias publicações do mesmo caso numa captura viram um aviso só, que
+        leva ao evento mais recente (o histórico de um processo pode trazer
+        dezenas de uma vez).
+        """
+        if not eventos:
+            return 0
+        recente = max(eventos, key=lambda e: (e.data_evento, e.id or 0))
+        acao = (
+            f"Nova publicação no DJEN no caso {caso.id}"
+            if len(eventos) == 1
+            else f"{len(eventos)} novas publicações no DJEN no caso {caso.id}"
+        )
+        return self.notificar(
+            "djen",
+            acao,
+            executor_id,
+            [caso.id_orientador, caso.id_estagiario, caso.id_colaborador],
+            id_caso=caso.id,
+            id_referencia=recente.id,
+            detalhe=recente.descricao or recente.tipo,
+        )
+
+    def djen_cancelada(self, caso, evento, executor_id: int | None) -> int:
+        """A publicação de um evento do DJEN foi cancelada; nada é apagado."""
+        return self.notificar(
+            "djen",
+            f"Publicação do DJEN cancelada no caso {caso.id} (evento {evento.num_evento})",
+            executor_id,
+            [caso.id_orientador, caso.id_estagiario, caso.id_colaborador],
+            id_caso=caso.id,
+            id_referencia=evento.id,
+            detalhe=evento.descricao or evento.tipo,
         )
 
     def plantao_aberto(self, executor_id: int, periodo: str | None = None) -> int:

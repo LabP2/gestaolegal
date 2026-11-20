@@ -15,7 +15,6 @@ services:
     volumes:
       - ./web/src:/app/src
       - ./web/static:/app/static
-      - ./web/svelte.config.js:/app/svelte.config.js
       - ./web/vite.config.ts:/app/vite.config.ts
       - ./web/tsconfig.json:/app/tsconfig.json
       - ./web/.prettierrc:/app/.prettierrc:ro
@@ -84,6 +83,30 @@ services:
           path: ./pyproject.toml
         - action: rebuild
           path: ./uv.lock
+
+  djen-worker:
+    build:
+      context: .
+      target: dev
+    command: ["python", "scripts/agendar_djen.py"]
+    env_file: [.env]
+    environment:
+      <<: *dev_environment
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./gestaolegal:/code/gestaolegal:ro
+      - ./scripts:/code/scripts:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  djen-ml-worker:
+    extends:
+      service: djen-worker
+    command: ["python", "-m", "scripts.processar_djen_modelos"]
 
   db:
     image: mysql:8.0.42

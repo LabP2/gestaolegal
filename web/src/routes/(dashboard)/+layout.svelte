@@ -1,22 +1,22 @@
 <script lang="ts">
-	import AppFooter from '$lib/components/app-footer.svelte';
-	import AppSidebar from '$lib/components/app-sidebar.svelte';
-	import DynamicBreadcrumb from '$lib/components/dynamic-breadcrumb.svelte';
-	import GlobalSearchDialog from '$lib/components/global-search-dialog.svelte';
-	import NotificacaoBell from '$lib/components/notificacao-bell.svelte';
-	import { Separator } from '$lib/components/ui/separator/index.js';
-	import UnidadeSelector from '$lib/components/unidade-selector.svelte';
-	import { unidadesAtivas } from '$lib/stores/unidade';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import AppFooter from '#lib/components/app-footer.svelte';
+	import AppSidebar from '#lib/components/app-sidebar.svelte';
+	import DynamicBreadcrumb from '#lib/components/dynamic-breadcrumb.svelte';
+	import GlobalSearchDialog from '#lib/components/global-search-dialog.svelte';
+	import NotificacaoBell from '#lib/components/notificacao-bell.svelte';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import UnidadeSelector from '#lib/components/unidade-selector.svelte';
+	import { unidadesAtivas } from '#lib/stores/unidade.ts';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { page } from '$app/state';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
 	import { onMount } from 'svelte';
 
 	let { children, data } = $props();
 
 	const isOnRoot = $derived(page.url.pathname === '/');
 
-	// Derivado, e não cópia: depois do invalidateAll() da troca de unidade o
+	// Derivado, e não cópia: depois do refreshAll() da troca de unidade o
 	// `data` vem recarregado, e o cabeçalho precisa acompanhar.
 	const user = $derived(data.me);
 	let searchDialogOpen = $state(false);
@@ -68,6 +68,13 @@
 				/>
 			</div>
 			<div class="ml-auto flex items-center gap-3">
+				{#if user.tenant}
+					<!-- O NPJ da conta, para quem atua em mais de um com e-mails diferentes. -->
+					<span class="text-sm text-muted-foreground" title={user.tenant.nome}>
+						<span class="font-semibold text-foreground">{user.tenant.sigla}</span>
+						<span class="hidden lg:inline">· {user.tenant.nome}</span>
+					</span>
+				{/if}
 				<UnidadeSelector unidades={unidadesAtivas(user.unidades)} />
 				<NotificacaoBell />
 			</div>

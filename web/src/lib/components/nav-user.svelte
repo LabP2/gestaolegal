@@ -1,8 +1,8 @@
 <script lang="ts">
-	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
+	import * as Avatar from '#lib/components/ui/avatar/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
+	import { useSidebar } from '#lib/components/ui/sidebar/index.js';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import { UserIcon } from '@lucide/svelte';
@@ -12,11 +12,13 @@
 	let { user }: { user: { nome: string; email: string } } = $props();
 	const sidebar = useSidebar();
 
-	const initials = user.nome
-		.split(' ')
-		.slice(0, 2)
-		.map((name) => name[0])
-		.join('');
+	const initials = $derived(
+		user.nome
+			.split(' ')
+			.slice(0, 2)
+			.map((name) => name[0])
+			.join('')
+	);
 
 	function logout() {
 		if (typeof document !== 'undefined') {

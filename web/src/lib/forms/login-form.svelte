@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { LoginData } from './schemas/login-schema';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';

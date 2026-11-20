@@ -113,7 +113,6 @@ class Config:
     FLASK_ENV: ClassVar[Environment] = _get_flask_env()
     COMPANY_NAME: ClassVar[str] = os.environ.get("COMPANY_NAME", "Gestão Legal")
     JWT_SECRET_KEY: ClassVar[str] = _get_or_generate_jwt_secret_key(FLASK_ENV)
-    ADMIN_SETUP_TOKEN: ClassVar[str] = os.environ["ADMIN_SETUP_TOKEN"]
     # Raiz do volume privado dos anexos. Precisa ficar FORA de app.static_folder:
     # o Flask serve a pasta estática em /static/<path> sem autenticação (#190).
     # A validação da subida está em gestaolegal/__init__.py.
@@ -174,3 +173,24 @@ class Config:
     PASSWORD_RESET_MAX_PEDIDOS: ClassVar[int] = 3
     PASSWORD_RESET_JANELA_MINUTES: ClassVar[int] = 15
     PASSWORD_MIN_LENGTH: ClassVar[int] = 8
+
+    # DJEN (docs/plano-djen.md, §4 "Configuração"). DJEN_SYNC_ENABLED é a
+    # trava do ambiente: desligada, a rotina sai sem chamar a API, mesmo para
+    # NPJs com `tenants.djen_ativo` ligado. Ligar em QA ou produção exige
+    # decisão explícita (a rotina gera notificações para usuários reais).
+    DJEN_API_URL: ClassVar[str] = os.environ.get(
+        "DJEN_API_URL", "https://comunicaapi.pje.jus.br"
+    ).rstrip("/")
+    DJEN_SYNC_ENABLED: ClassVar[bool] = _parse_bool(os.environ.get("DJEN_SYNC_ENABLED"))
+    DJEN_JANELA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIAS", "7"))
+    DJEN_LOG_RETENCAO_DIAS: ClassVar[int] = int(os.environ.get("DJEN_LOG_RETENCAO_DIAS", "90"))
+    DJEN_JANELA_DIURNA_DIAS: ClassVar[int] = int(os.environ.get("DJEN_JANELA_DIURNA_DIAS", "3"))
+    DJEN_MAX_PROCESSOS: ClassVar[int] = int(os.environ.get("DJEN_MAX_PROCESSOS", "15"))
+    # Publicações descartadas e pendentes sem caso são apagadas depois disto.
+    DJEN_RETENCAO_DIAS: ClassVar[int] = 90
+    # Banco de exemplos (treino da sugestão automática): texto e destinatários
+    # dos exemplos rotulados são anulados depois disto, contado do rótulo. As
+    # não revisadas seguem DJEN_RETENCAO_DIAS (docs/plano-djen.md, §8).
+    DJEN_EXEMPLOS_RETENCAO_DIAS: ClassVar[int] = int(
+        os.environ.get("DJEN_EXEMPLOS_RETENCAO_DIAS", "730")
+    )

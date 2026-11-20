@@ -1,22 +1,24 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { untrack } from 'svelte';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { atendidoCreateFormSchema } from './schemas/atendido-schema';
+	import { atendidoCreateFormSchema, legacyEditSchema } from './schemas/atendido-schema';
 	import {
 		SimpleInput,
 		MaskedInput,
 		SimpleSelect,
 		SimpleTextArea,
 		SimpleDatePicker
-	} from '$lib/components/forms';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { fetchCepData } from '$lib/utils/cep';
+	} from '#lib/components/forms/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { fetchCepData } from '#lib/utils/cep.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
-	import type { Atendido } from '$lib/types';
+	import type { Atendido } from '#lib/types/index.ts';
+	import { siglaNpj } from '#lib/utils/npj.ts';
 
 	let {
 		data,
@@ -24,6 +26,7 @@
 		atendidoId,
 		onError,
 		onUpdate,
+		legacyOriginal,
 		hideSubmitButton = false
 	}: {
 		data: any;
@@ -32,11 +35,25 @@
 		onError?: (error: any) => void;
 		onUpdate?: (responseData: any) => void;
 		hideSubmitButton?: boolean;
+		legacyOriginal?: Record<string, unknown>;
 	} = $props();
 
+	const original = untrack(() => legacyOriginal);
+	const originalCheck = original ? atendidoCreateFormSchema.safeParse(original) : null;
+	const pendingFields =
+		originalCheck && !originalCheck.success
+			? [...new Set(originalCheck.error.issues.map((i) => String(i.path[0])))].filter((f) =>
+					['cpf', 'procurou_outro_local', 'pj_constituida'].includes(f)
+				)
+			: [];
+	const pendingLabels: Record<string, string> = {
+		cpf: 'CPF',
+		procurou_outro_local: 'Procurou outro local?',
+		pj_constituida: 'PJ constituída?'
+	};
 	const form = superForm(data, {
 		SPA: true,
-		validators: zod4Client(atendidoCreateFormSchema),
+		validators: zod4Client(original ? legacyEditSchema(original) : atendidoCreateFormSchema),
 		onUpdate: async ({ form, result }) => {
 			try {
 				if (result.type === 'failure') {
@@ -44,9 +61,15 @@
 					return;
 				}
 
+				const payload = { ...form.data };
+				// Preservar inclusive null e valores legados sem normalizações implícitas.
+				if (original)
+					for (const field of ['cpf', 'procurou_outro_local', 'pj_constituida']) {
+						if (payload[field] === (original[field] ?? '')) delete payload[field];
+					}
 				const response = isCreateMode
 					? await api.post<Atendido>('atendido', form.data)
-					: await api.put<Atendido>(`atendido/${atendidoId}`, form.data);
+					: await api.put<Atendido>(`atendido/${atendidoId}`, payload);
 
 				toast.success(
 					isCreateMode ? 'Atendido criado com sucesso!' : 'Atendido atualizado com sucesso!'
@@ -56,9 +79,9 @@
 				if (onUpdate) {
 					onUpdate(response);
 				} else {
-					// invalidateAll so the destination view reloads fresh data instead of
+					// refreshAll so the destination view reloads fresh data instead of
 					// showing the pre-edit values from SvelteKit's cached load.
-					await goto(`/plantao/atendidos-assistidos/${response.id}`, { invalidateAll: true });
+					await goto(`/plantao/atendidos-assistidos/${response.id}`, { refreshAll: true });
 				}
 			} catch (error) {
 				console.error('Atendido form error:', error);
@@ -115,6 +138,13 @@
 	}
 </script>
 
+{#if pendingFields.length}
+	<p class="mb-4 text-sm text-muted-foreground" role="note">
+		Pendências do cadastro antigo: {pendingFields.map((f) => pendingLabels[f]).join(', ')}. Você
+		pode editar outros campos preservando essas pendências. Ao corrigir esses dados, informe valores
+		válidos. Respostas ausentes não serão preenchidas automaticamente.
+	</p>
+{/if}
 <form method="POST" use:enhance class="space-y-6">
 	<Card.Root>
 		<Card.Header>
@@ -276,7 +306,7 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Como Conheceu o DAJ</Card.Title>
+			<Card.Title>Como conheceu o {siglaNpj()}</Card.Title>
 		</Card.Header>
 		<Card.Content class="grid gap-4">
 			<SimpleSelect

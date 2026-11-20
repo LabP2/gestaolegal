@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
-import { api } from '$lib/api-client';
-import { ApiException, type Unidade } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException, type Unidade } from '#lib/types/index.ts';
 
 export const load = async ({ parent, fetch, depends }) => {
 	const { me } = await parent();

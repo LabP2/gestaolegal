@@ -1,11 +1,11 @@
 import { superValidate } from 'sveltekit-superforms';
 import { error } from '@sveltejs/kit';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { assistidoCreateFormSchema } from '$lib/forms/schemas/assistido-schema';
+import { assistidoCreateFormSchema } from '#lib/forms/schemas/assistido-schema.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import type { Atendido } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import type { Atendido } from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {

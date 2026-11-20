@@ -1,13 +1,13 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { User } from '$lib/types';
+import type { Me } from '#lib/types/index.ts';
 import type { LayoutLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import { sincronizarUnidades } from '$lib/stores/unidade';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import { sincronizarUnidades } from '#lib/stores/unidade.ts';
 
 export const load: LayoutLoad = async ({ url, fetch }) => {
 	try {
-		const me = await api.get<User>('user/me', {}, fetch);
+		const me = await api.get<Me>('user/me', {}, fetch);
 		// A unidade guardada só vale enquanto o vínculo existir: se o admin tirou
 		// o usuário dela, cai para a primeira da lista.
 		sincronizarUnidades(me.unidades);

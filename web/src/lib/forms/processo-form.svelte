@@ -1,17 +1,23 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Form from '$lib/components/ui/form/index.js';
-	import { Button } from '$lib/components/ui/button';
-	import { FormSection, SimpleInput, SimpleSelect, SimpleTextArea } from '$lib/components/forms';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Form from '#lib/components/ui/form/index.js';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import {
+		FormSection,
+		SimpleInput,
+		SimpleSelect,
+		SimpleTextArea
+	} from '#lib/components/forms/index.ts';
 	import { processoCreateFormSchema } from './schemas/processo-schema';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
-	import SimpleCurrencyInput from '$lib/components/forms/simple-currency-input.svelte';
+	import SimpleCurrencyInput from '#lib/components/forms/simple-currency-input.svelte';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
-	import type { Caso } from '$lib/types';
+	import type { Caso } from '#lib/types/index.ts';
+	import type { Snippet } from 'svelte';
 
 	let {
 		data,
@@ -20,7 +26,9 @@
 		onCancel,
 		isCreateMode = true,
 		casoId,
-		processoId
+		processoId,
+		salvar,
+		extra
 	}: {
 		data: SuperValidated<Infer<typeof processoCreateFormSchema>>;
 		isCreateMode?: boolean;
@@ -29,6 +37,10 @@
 		onUpdate?: (data: any) => void;
 		onError?: (error: any) => void;
 		onCancel?: () => void;
+		/** Envio próprio (processo sem caso, `/api/processos`); sem ele, usa a rota do caso. */
+		salvar?: (dados: Infer<typeof processoCreateFormSchema>) => Promise<{ id: number }>;
+		/** Seção extra antes dos botões (partes do processo sem caso). */
+		extra?: Snippet;
 	} = $props();
 
 	const processoForm = superForm(data, {
@@ -44,9 +56,11 @@
 					return;
 				}
 
-				const response = isCreateMode
-					? await api.post<Caso>(`caso/${casoId}/processos`, form.data)
-					: await api.put<Caso>(`caso/${casoId}/processos/${processoId}`, form.data);
+				const response = salvar
+					? await salvar(form.data)
+					: isCreateMode
+						? await api.post<Caso>(`caso/${casoId}/processos`, form.data)
+						: await api.put<Caso>(`caso/${casoId}/processos/${processoId}`, form.data);
 
 				toast.success(
 					isCreateMode ? 'Processo criado com sucesso!' : 'Processo atualizado com sucesso!'
@@ -207,6 +221,8 @@
 			rows={4}
 		/>
 	</FormSection>
+
+	{@render extra?.()}
 
 	<div class="flex items-center justify-between border-t border-border pt-6">
 		<Button type="button" variant="outline" onclick={() => onCancel?.()}>Cancelar</Button>

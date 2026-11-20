@@ -4,8 +4,8 @@ import {
 	GENDER_VALUES,
 	MARITAL_STATUS_VALUES,
 	YES_NO_VALUES
-} from '$lib/constants';
-import { validateCPF } from '$lib/utils/cpf-validator';
+} from '#lib/constants/index.ts';
+import { validateCPF } from '#lib/utils/cpf-validator.ts';
 
 const baseUserFormSchema = z
 	.object({
@@ -112,7 +112,7 @@ const baseUserFormSchema = z
 		ferias: z.string().max(100, 'Férias deve ter no máximo 100 caracteres').nullish(),
 
 		cert_atuacao_DAJ: z.enum(YES_NO_VALUES, {
-			error: 'Selecione se possui certificado de atuação DAJ'
+			error: 'Selecione se possui certificado de atuação'
 		}),
 
 		obs: z.string().max(1000, 'Observações devem ter no máximo 1000 caracteres').nullish(),

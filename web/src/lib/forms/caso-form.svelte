@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Form from '$lib/components/ui/form/index.js';
-	import { Button } from '$lib/components/ui/button';
-	import { FormSection, SimpleSelect, SimpleTextArea } from '$lib/components/forms';
+	import * as Form from '#lib/components/ui/form/index.js';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { FormSection, SimpleSelect, SimpleTextArea } from '#lib/components/forms/index.ts';
 	import { casoCreateFormSchema } from './schemas/caso-schema';
 	import { intProxy, superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
@@ -10,23 +10,23 @@
 		AREA_DIREITO_OPTIONS,
 		SUB_AREA_DIREITO_ADMINISTRATIVO_OPTIONS,
 		SUB_AREA_DIREITO_CIVEL_OPTIONS
-	} from '$lib/constants/area_direito';
-	import { SITUACAO_DEFERIMENTO_OPTIONS } from '$lib/constants/situacao-deferimento';
-	import type { UserOption, Atendido } from '$lib/types';
-	import AssistidoSelectorDialog from '$lib/components/assistido-selector-dialog.svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	} from '#lib/constants/area_direito.ts';
+	import { SITUACAO_DEFERIMENTO_OPTIONS } from '#lib/constants/situacao-deferimento.ts';
+	import type { UserOption, Atendido } from '#lib/types/index.ts';
+	import AssistidoSelectorDialog from '#lib/components/assistido-selector-dialog.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import X from '@lucide/svelte/icons/x';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
-	import type { Caso } from '$lib/types';
-	import SimpleCombobox from '$lib/components/forms/simple-combobox.svelte';
-	import { USER_ROLES } from '$lib/constants/user-roles';
+	import type { Caso } from '#lib/types/index.ts';
+	import SimpleCombobox from '#lib/components/forms/simple-combobox.svelte';
+	import { USER_ROLES } from '#lib/constants/user-roles.ts';
 
 	let {
 		data,
@@ -123,9 +123,9 @@
 				if (onUpdate) {
 					onUpdate(responseData);
 				} else {
-					// invalidateAll so the destination view reloads fresh data instead of
+					// refreshAll so the destination view reloads fresh data instead of
 					// showing the pre-edit values from SvelteKit's cached load.
-					await goto(`/casos/${responseData.id}`, { invalidateAll: true });
+					await goto(`/casos/${responseData.id}`, { refreshAll: true });
 				}
 			} catch (err) {
 				if (err instanceof ApiException) {

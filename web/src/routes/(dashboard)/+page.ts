@@ -1,4 +1,4 @@
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 
 /** Contagem de notificações não lidas (badge do atalho). */
 type NaoLidas = { total: number };

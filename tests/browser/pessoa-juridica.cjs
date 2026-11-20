@@ -26,7 +26,7 @@ const base = process.env.GL_BASE_URL || 'http://localhost:5002';
     const writes = [];
     await page.route('**/api/**', async route => {
       const url = new URL(route.request().url());
-      let data = { items: [], total: 0, total_pages: 0 };
+      let data = { items: [], total: 0, page: 1, per_page: 20, total_pages: 0, has_next_page: false, has_previous_page: false };
       if (url.pathname.endsWith('/user/me')) data = { id: 1, nome: 'Operador sintético', urole: 'admin', status: true, unidades: [{ id: 1, nome: 'Belo Horizonte', sigla: 'BH', ativa: true }] };
       else if (/\/atendido\/1$/.test(url.pathname)) data = pessoa;
       else if (/\/atendido\/1\/assistido$/.test(url.pathname)) {

@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import AppFooter from '$lib/components/app-footer.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
-	import { loginSchema, type LoginData } from '$lib/forms/schemas/login-schema';
+	import AppFooter from '#lib/components/app-footer.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
+	import { loginSchema, type LoginData } from '#lib/forms/schemas/login-schema.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
-	import { ApiException, type User } from '$lib/types';
-	import { sincronizarUnidades } from '$lib/stores/unidade';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException, type User } from '#lib/types/index.ts';
+	import { sincronizarUnidades } from '#lib/stores/unidade.ts';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { superForm } from 'sveltekit-superforms';
@@ -18,6 +22,7 @@
 	let { data }: { data: PageData } = $props();
 
 	/** Aviso exibido junto ao formulário quando o login não é aceito. */
+	let mostrarSenha = $state(false);
 	let erroLogin = $state<string | null>(null);
 
 	const form = superForm<LoginData>(data.form, {
@@ -26,6 +31,7 @@
 		resetForm: false,
 		onSubmit: async ({ formData }) => {
 			const payload = Object.fromEntries(formData) as LoginData;
+			payload.email = payload.email.trim();
 			erroLogin = null;
 
 			try {
@@ -55,9 +61,7 @@
 					// descobrir quais e-mails existem.
 					erroLogin =
 						err.statusCode === 401
-							? data.needsSetup
-								? 'Nenhum usuário cadastrado ainda. Configure o administrador para acessar o sistema.'
-								: 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
+							? 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
 							: err.message;
 				} else {
 					console.error('Login error:', err);
@@ -100,10 +104,6 @@
 									Esqueci minha senha
 								</a>
 							</p>
-
-							{#if data.needsSetup}
-								<a href="/setup-admin" class="font-medium underline">Configurar administrador</a>
-							{/if}
 						</div>
 					</div>
 				{/if}
@@ -116,14 +116,36 @@
 						bind:value={$formData.email}
 						autocomplete="email"
 					/>
-					<SimpleInput
-						{form}
-						name="password"
-						type="password"
-						label="Senha"
-						bind:value={$formData.password}
-						autocomplete="current-password"
-					/>
+					<Form.Field {form} name="password">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Senha</Form.Label>
+								<div class="relative">
+									<Input
+										{...props}
+										type={mostrarSenha ? 'text' : 'password'}
+										bind:value={$formData.password}
+										autocomplete="current-password"
+										class="pr-12"
+									/>
+									<button
+										type="button"
+										class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+										aria-controls={props.id}
+										aria-pressed={mostrarSenha}
+										onclick={() => (mostrarSenha = !mostrarSenha)}
+									>
+										{#if mostrarSenha}<EyeOff class="h-4 w-4" aria-hidden="true" />{:else}<Eye
+												class="h-4 w-4"
+												aria-hidden="true"
+											/>{/if}
+									</button>
+								</div>
+							{/snippet}
+						</Form.Control>
+						<Form.FieldErrors />
+					</Form.Field>
 					<Button type="submit" class="h-12 w-full">
 						{#if $delayed}
 							<div class="flex items-center gap-2">
@@ -141,17 +163,6 @@
 						Esqueci minha senha
 					</a>
 				</p>
-
-				{#if data.needsSetup}
-					<div class="mt-4 text-center text-sm text-gray-600">
-						<p class="cursor-default">
-							Primeiro acesso?
-							<a href="/setup-admin" class="font-medium text-primary hover:underline">
-								Configure o administrador
-							</a>
-						</p>
-					</div>
-				{/if}
 			</div>
 		</div>
 	</div>

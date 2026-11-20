@@ -24,12 +24,9 @@ export interface PaginationMeta {
 /**
  * Paginated response structure from the backend.
  *
- * The backend now returns pagination metadata separately from items.
+ * PaginatedResult.to_dict() returns metadata alongside items.
  */
-export interface Paginated<T> {
+export interface Paginated<T> extends PaginationMeta {
 	/** Array of items for the current page */
 	items: T[];
-
-	/** Pagination metadata */
-	pagination: PaginationMeta;
 }

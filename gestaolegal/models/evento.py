@@ -20,10 +20,15 @@ class Evento:
     tipo: str
     data_evento: date
     data_criacao: datetime
-    id_criado_por: int
+    # Nulo só em evento criado pela rotina do DJEN.
+    id_criado_por: int | None
     status: bool
 
     id: int | None = None
+    origem: str = "manual"
+    id_djen_comunicacao: int | None = None
+    # Falso = a publicação de origem foi cancelada no DJEN (selo no caso).
+    djen_ativa: bool | None = None
     unidade_id: int | None = None
     num_evento: int | None = None
     descricao: str | None = None
@@ -47,3 +52,6 @@ class ListEvento:
     usuario_responsavel: str | None = None
     num_evento: int | None = None
     descricao: str | None = None
+    origem: str = "manual"
+    id_djen_comunicacao: int | None = None
+    djen_ativa: bool | None = None

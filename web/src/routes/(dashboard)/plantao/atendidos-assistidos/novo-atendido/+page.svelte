@@ -1,8 +1,8 @@
 <script lang="ts">
-	import AtendidoForm from '$lib/forms/atendido-form.svelte';
+	import AtendidoForm from '#lib/forms/atendido-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Button from '#lib/components/ui/button/button.svelte';
 
 	let { data }: { data: PageData } = $props();
 

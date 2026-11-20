@@ -1,23 +1,23 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { filesProxy, superForm, type SuperValidated } from 'sveltekit-superforms';
 	import type { Infer } from 'sveltekit-superforms';
 	import {
 		eventoCreateFormSchema,
 		type EventoCreateFormSchema
-	} from '$lib/forms/schemas/evento-schema';
+	} from '#lib/forms/schemas/evento-schema.ts';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { SimpleDatePicker, SimpleInput, SimpleSelect, SimpleTextArea } from './forms';
-	import { TIPO_EVENTO_OPTIONS } from '$lib/constants/tipo_evento';
+	import { TIPO_EVENTO_OPTIONS } from '#lib/constants/tipo_evento.ts';
 	import { Button } from './ui/button';
 	import UsuarioSelectorDialog from './usuario-selector-dialog.svelte';
-	import type { User } from '$lib/types';
+	import type { User } from '#lib/types/index.ts';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import X from '@lucide/svelte/icons/x';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let {
 		open = $bindable(false),
@@ -35,7 +35,7 @@
 		resetForm: false,
 		onSubmit: async ({ formData }) => {
 			try {
-				const casoId = $page.params.id;
+				const casoId = page.params.id;
 
 				// Create FormData for multipart upload
 				const data = new FormData();

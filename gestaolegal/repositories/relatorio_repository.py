@@ -36,6 +36,7 @@ class RelatorioRepository(BaseRepository):
             .where(casos.c.data_criacao >= inicio)
             .where(casos.c.data_criacao < fim)
         )
+        stmt = self.escopo(stmt, casos)
         if unidade_id is not None:
             stmt = stmt.where(casos.c.unidade_id == unidade_id)
         if areas:
@@ -64,6 +65,7 @@ class RelatorioRepository(BaseRepository):
             .where(casos.c.data_criacao >= inicio)
             .where(casos.c.data_criacao < fim)
         )
+        stmt = self.escopo(stmt, casos)
         if unidade_id is not None:
             stmt = stmt.where(casos.c.unidade_id == unidade_id)
         if areas:
@@ -97,6 +99,7 @@ class RelatorioRepository(BaseRepository):
             .where(orientacao_juridica.c.data_criacao >= inicio)
             .where(orientacao_juridica.c.data_criacao < fim)
         )
+        stmt = self.escopo(stmt, orientacao_juridica)
         if unidade_id is not None:
             stmt = stmt.where(orientacao_juridica.c.unidade_id == unidade_id)
         if areas:
@@ -136,6 +139,7 @@ class RelatorioRepository(BaseRepository):
             .where(registro_entrada.c.data_saida >= inicio)
             .where(registro_entrada.c.data_saida < fim)
         )
+        stmt = self.escopo(stmt, registro_entrada, usuarios)
         if unidade_id is not None:
             stmt = stmt.where(registro_entrada.c.unidade_id == unidade_id)
         if usuarios_ids:
@@ -162,10 +166,18 @@ class RelatorioRepository(BaseRepository):
             )
             .join(usuarios, usuarios.c.id == dias_marcados_plantao.c.id_usuario)
             .where(dias_marcados_plantao.c.status.is_(True))
-            .where(dias_marcados_plantao.c.plantao_id.in_(select(plantao.c.id).where(plantao.c.cancelado.is_(False))))
+            .where(
+                dias_marcados_plantao.c.plantao_id.in_(
+                    self.escopo(
+                        select(plantao.c.id).where(plantao.c.cancelado.is_(False)),
+                        plantao,
+                    )
+                )
+            )
             .where(dias_marcados_plantao.c.data_marcada >= inicio.date())
             .where(dias_marcados_plantao.c.data_marcada < fim.date())
         )
+        stmt = self.escopo(stmt, dias_marcados_plantao, usuarios)
         if unidade_id is not None:
             stmt = stmt.where(dias_marcados_plantao.c.unidade_id == unidade_id)
         if usuarios_ids:

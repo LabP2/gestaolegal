@@ -32,8 +32,9 @@ class AssistenciaJudiciariaRepository(BaseRepository):
     def find_by_id(
         self, id: int, unidade_id: int | None = None
     ) -> AssistenciaJudiciaria | None:
-        stmt = select(assistencias_judiciarias).where(
-            assistencias_judiciarias.c.id == id
+        stmt = self.escopo(
+            select(assistencias_judiciarias).where(assistencias_judiciarias.c.id == id),
+            assistencias_judiciarias,
         )
         if unidade_id is not None:
             stmt = stmt.where(assistencias_judiciarias.c.unidade_id == unidade_id)
@@ -43,8 +44,9 @@ class AssistenciaJudiciariaRepository(BaseRepository):
         )
 
     def search(self, params: SearchParams) -> PaginatedResult[AssistenciaJudiciaria]:
-        stmt = select(
-            assistencias_judiciarias, func.count().over().label("total_count")
+        stmt = self.escopo(
+            select(assistencias_judiciarias, func.count().over().label("total_count")),
+            assistencias_judiciarias,
         )
         stmt = self._apply_where_clause(
             stmt, params.get("where"), assistencias_judiciarias
@@ -68,7 +70,10 @@ class AssistenciaJudiciariaRepository(BaseRepository):
         )
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(assistencias_judiciarias)
+        stmt = self.escopo(
+            select(func.count()).select_from(assistencias_judiciarias),
+            assistencias_judiciarias,
+        )
         stmt = self._apply_where_clause(
             stmt, params.get("where"), assistencias_judiciarias
         )
@@ -76,24 +81,30 @@ class AssistenciaJudiciariaRepository(BaseRepository):
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(assistencias_judiciarias).values(**data)
+        stmt = insert(assistencias_judiciarias).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
         stmt = (
-            sql_update(assistencias_judiciarias)
-            .where(assistencias_judiciarias.c.id == id)
-            .values(**data)
+            self.escopo(
+                sql_update(assistencias_judiciarias).where(
+                    assistencias_judiciarias.c.id == id
+                ),
+                assistencias_judiciarias,
+            ).values(**data)
         )
         self.session.execute(stmt)
 
     def delete(self, id: int) -> None:
         stmt = (
-            sql_update(assistencias_judiciarias)
-            .where(assistencias_judiciarias.c.id == id)
-            .values(status=0)
+            self.escopo(
+                sql_update(assistencias_judiciarias).where(
+                    assistencias_judiciarias.c.id == id
+                ),
+                assistencias_judiciarias,
+            ).values(status=0)
         )
         self.session.execute(stmt)
 
@@ -114,6 +125,7 @@ class AssistenciaJudiciariaRepository(BaseRepository):
             )
             .where(join_table.c.id_assistenciaJudiciaria == assistencia_id)
         )
+        stmt = self.escopo(stmt, join_table, orientacao_juridica)
         results = self.session.execute(stmt).all()
         return [
             OrientacaoJuridicaResumo(
@@ -141,6 +153,7 @@ class AssistenciaJudiciariaRepository(BaseRepository):
             .where(join_table.c.id_orientacaoJuridica == id_orientacao)
             .order_by(assistencias_judiciarias.c.nome.asc())
         )
+        stmt = self.escopo(stmt, join_table, assistencias_judiciarias)
         if unidade_id is not None:
             stmt = stmt.where(assistencias_judiciarias.c.unidade_id == unidade_id)
         results = self.session.execute(stmt).all()
@@ -151,25 +164,35 @@ class AssistenciaJudiciariaRepository(BaseRepository):
     def link_orientacao(self, assistencia_id: int, id_orientacao: int) -> None:
         join_table = assistenciasJudiciarias_xOrientacao_juridica
         existing = self.session.execute(
-            select(join_table.c.id).where(
-                join_table.c.id_assistenciaJudiciaria == assistencia_id,
-                join_table.c.id_orientacaoJuridica == id_orientacao,
+            self.escopo(
+                select(join_table.c.id).where(
+                    join_table.c.id_assistenciaJudiciaria == assistencia_id,
+                    join_table.c.id_orientacaoJuridica == id_orientacao,
+                ),
+                join_table,
             )
         ).one_or_none()
         if existing:
             return
         self.session.execute(
             insert(join_table).values(
-                id_assistenciaJudiciaria=assistencia_id,
-                id_orientacaoJuridica=id_orientacao,
+                **self.valores(
+                    {
+                        "id_assistenciaJudiciaria": assistencia_id,
+                        "id_orientacaoJuridica": id_orientacao,
+                    }
+                )
             )
         )
 
     def unlink_orientacao(self, assistencia_id: int, id_orientacao: int) -> None:
         join_table = assistenciasJudiciarias_xOrientacao_juridica
         self.session.execute(
-            sql_delete(join_table).where(
-                join_table.c.id_assistenciaJudiciaria == assistencia_id,
-                join_table.c.id_orientacaoJuridica == id_orientacao,
+            self.escopo(
+                sql_delete(join_table).where(
+                    join_table.c.id_assistenciaJudiciaria == assistencia_id,
+                    join_table.c.id_orientacaoJuridica == id_orientacao,
+                ),
+                join_table,
             )
         )

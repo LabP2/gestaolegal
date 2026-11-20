@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { passwordChangeSchema, type PasswordChangeSchema } from './schemas/password-schema';
-	import { Button } from '$lib/components/ui/button';
-	import { SimpleInput } from '$lib/components/forms';
-	import * as Card from '$lib/components/ui/card';
-	import { api } from '$lib/api-client';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { SimpleInput } from '#lib/components/forms/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 

@@ -6,7 +6,9 @@ from flask import Flask
 from gestaolegal.models.unidade import Unidade
 from gestaolegal.repositories.unidade_repository import UnidadeRepository
 
-from .conftest import UNIDADE_BH, UNIDADE_NL
+from gestaolegal.utils.request_context import contexto_tenant
+
+from .conftest import TENANT_DAJ, UNIDADE_BH, UNIDADE_NL
 
 # Usuários fictícios: os vínculos só exercitam usuarios_unidades, e o SQLite dos
 # testes não impõe as chaves estrangeiras.
@@ -16,7 +18,7 @@ USUARIO_B = 90002
 
 @pytest.fixture
 def repo(app: Flask, unidades: None):
-    with app.app_context():
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
         repository = UnidadeRepository()
         yield repository
         repository.session.rollback()

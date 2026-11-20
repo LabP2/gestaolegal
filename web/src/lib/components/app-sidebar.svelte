@@ -1,11 +1,11 @@
 <script lang="ts">
 	import NavMain from './nav-main.svelte';
 	import NavUser from './nav-user.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import type { ComponentProps } from 'svelte';
 	import CompanyLogo from './company-logo.svelte';
-	import type { User } from '$lib/types';
-	import { podeVer, type ItemComPapeis } from '$lib/utils/permissoes';
+	import type { Me } from '#lib/types/index.ts';
+	import { podeVer, type ItemComPapeis } from '#lib/utils/permissoes.ts';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -13,10 +13,15 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
+	import NewspaperIcon from '@lucide/svelte/icons/newspaper';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import { PROCESSO_PAPEIS_SEM_CASO } from '#lib/types/index.ts';
 
 	type NavItem = ItemComPapeis & {
 		title: string;
 		url: string;
+		/** Só aparece com o DJEN ligado para o NPJ (`tenant.djen_ativo`). */
+		djen?: boolean;
 	};
 
 	const baseNavMain: (NavItem & { icon: unknown; isActive?: boolean; items: NavItem[] })[] = [
@@ -88,6 +93,22 @@
 			]
 		},
 		{
+			title: 'Processos',
+			url: '/processos',
+			icon: ScaleIcon,
+			items: [
+				{
+					title: 'Lista de processos',
+					url: '/processos'
+				},
+				{
+					title: 'Novo processo sem caso',
+					url: '/processos/novo',
+					roles: PROCESSO_PAPEIS_SEM_CASO
+				}
+			]
+		},
+		{
 			title: 'Arquivos',
 			url: '/arquivos',
 			icon: FolderIcon,
@@ -100,6 +121,28 @@
 				{
 					title: 'Ver Arquivos',
 					url: '/arquivos'
+				}
+			]
+		},
+		{
+			title: 'DJEN',
+			url: '/djen',
+			icon: NewspaperIcon,
+			djen: true,
+			items: [
+				{
+					title: 'Publicações',
+					url: '/djen'
+				},
+				{
+					title: 'Acervo para treino',
+					url: '/djen/classificacao',
+					roles: ['admin', 'prof', 'orient']
+				},
+				{
+					title: 'Monitoramento',
+					url: '/djen/monitoramento',
+					roles: ['admin', 'prof', 'orient']
 				}
 			]
 		},
@@ -130,15 +173,16 @@
 		collapsible = 'icon',
 		user,
 		...restProps
-	}: ComponentProps<typeof Sidebar.Root> & { user: User } = $props();
+	}: ComponentProps<typeof Sidebar.Root> & { user: Me } = $props();
+
+	const djenAtivo = $derived(user.tenant?.djen_ativo === true);
+	const visivel = (item: NavItem) => podeVer(item, user.urole) && (!item.djen || djenAtivo);
 
 	let navMainItems = $derived(
-		baseNavMain
-			.filter((item) => podeVer(item, user.urole))
-			.map((item) => ({
-				...item,
-				items: item.items.filter((subitem) => podeVer(subitem, user.urole))
-			}))
+		baseNavMain.filter(visivel).map((item) => ({
+			...item,
+			items: item.items.filter(visivel)
+		}))
 	);
 
 	let formattedUser = $derived({

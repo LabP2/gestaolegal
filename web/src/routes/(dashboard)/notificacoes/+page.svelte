@@ -9,13 +9,13 @@
 	import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
 	import Mail from '@lucide/svelte/icons/mail';
 	import MailOpen from '@lucide/svelte/icons/mail-open';
-	import { api } from '$lib/api-client';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { naoLidas } from '$lib/stores/notificacoes';
-	import { destinoDaNotificacao, type Notificacao } from '$lib/types';
-	import { formatDateTime } from '$lib/utils/date';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { api } from '#lib/api-client.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { naoLidas } from '#lib/stores/notificacoes.ts';
+	import { destinoDaNotificacao, type Notificacao } from '#lib/types/index.ts';
+	import { formatDateTime } from '#lib/utils/date.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -98,7 +98,7 @@
 	}
 
 	function irParaFiltro(valor: string) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new URLSearchParams(page.url.search);
 		if (valor === 'nao') params.delete('arquivadas');
 		else params.set('arquivadas', valor);
 		// Troca de visão sempre volta para a primeira página.
@@ -108,7 +108,7 @@
 	}
 
 	function irParaPagina(p: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new URLSearchParams(page.url.search);
 		params.set('page', String(p));
 		goto(`/notificacoes?${params.toString()}`);
 	}
@@ -190,8 +190,9 @@
 							<ExternalLink class="mr-1 h-4 w-4" /> Abrir
 						</Button>
 					{:else if !n.lida}
-						<Button variant="ghost" size="sm" onclick={() => marcarLida(n)}>Marcar como lida</Button
-						>
+						<Button variant="ghost" size="sm" onclick={() => marcarLida(n)}>
+							Marcar como lida
+						</Button>
 					{/if}
 					{#if n.data_arquivamento}
 						<Button
@@ -219,21 +220,26 @@
 
 		{#if totalPaginas > 1}
 			<div class="flex items-center justify-between text-sm text-muted-foreground">
-				<span>Página {notificacoes.page} de {totalPaginas} · {notificacoes.total} notificações</span
-				>
+				<span>
+					Página {notificacoes.page} de {totalPaginas} · {notificacoes.total} notificações
+				</span>
 				<div class="flex gap-2">
 					<Button
 						variant="outline"
 						size="sm"
 						disabled={notificacoes.page <= 1}
-						onclick={() => irParaPagina(notificacoes.page - 1)}>Anterior</Button
+						onclick={() => irParaPagina(notificacoes.page - 1)}
 					>
+						Anterior
+					</Button>
 					<Button
 						variant="outline"
 						size="sm"
 						disabled={notificacoes.page >= totalPaginas}
-						onclick={() => irParaPagina(notificacoes.page + 1)}>Próxima</Button
+						onclick={() => irParaPagina(notificacoes.page + 1)}
 					>
+						Próxima
+					</Button>
 				</div>
 			</div>
 		{/if}

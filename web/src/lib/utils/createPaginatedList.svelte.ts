@@ -13,9 +13,8 @@ export function usePaginatedFilters<TFilters extends Record<string, any>>(
 
 	function updateBrowserUrl(params: URLSearchParams) {
 		goto(`${page.url.pathname}?${params.toString()}`, {
-			replaceState: true,
-			noScroll: true,
-			keepFocus: true
+			replace: true,
+			reset: false
 		});
 	}
 

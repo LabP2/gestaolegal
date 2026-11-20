@@ -1,17 +1,17 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Edit from '@lucide/svelte/icons/edit';
-	import EncaminharAssistenciaDialog from '$lib/components/encaminhar-assistencia-dialog.svelte';
-	import { invalidateAll } from '$app/navigation';
+	import EncaminharAssistenciaDialog from '#lib/components/encaminhar-assistencia-dialog.svelte';
+	import { refreshAll } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
 	let { orientacao, assistencias } = $derived(data);
 
 	async function refreshEncaminhamentos() {
-		await invalidateAll();
+		await refreshAll();
 	}
 
 	function formatDate(dateString: string | null | undefined): string {

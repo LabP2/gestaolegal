@@ -1,5 +1,5 @@
 import { superValidate } from 'sveltekit-superforms';
-import { assistenciaJudiciariaCreateFormSchema } from '$lib/forms/schemas/assistencia-judiciaria-schema';
+import { assistenciaJudiciariaCreateFormSchema } from '#lib/forms/schemas/assistencia-judiciaria-schema.ts';
 import { zod4 } from 'sveltekit-superforms/adapters';
 
 export const load = async () => {

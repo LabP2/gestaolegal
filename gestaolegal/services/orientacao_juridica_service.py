@@ -27,6 +27,7 @@ from gestaolegal.repositories.repository import (
 )
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.services.referencias import exigir_existentes
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,9 @@ class OrientacaoJuridicaService:
             f"Creating orientacao juridica with area_direito: {orientacao_input.area_direito}, created by user: {id_usuario}, atendidos count: {len(orientacao_input.atendidos_ids) if orientacao_input.atendidos_ids else 0}"
         )
 
+        if orientacao_input.atendidos_ids:
+            exigir_existentes("atendidos", orientacao_input.atendidos_ids, "atendidos_ids")
+
         with transaction():
             orientacao_data = orientacao_input.model_dump(exclude={"atendidos_ids"})
             orientacao_data["id_usuario"] = id_usuario
@@ -275,6 +279,8 @@ class OrientacaoJuridicaService:
         if not existing:
             logger.error(f"Update failed: orientacao juridica not found with id: {id}")
             raise NotFoundException(resource="Orientacao Juridica", resource_id=id)
+        if orientacao_input.atendidos_ids:
+            exigir_existentes("atendidos", orientacao_input.atendidos_ids, "atendidos_ids")
 
         with transaction():
             update_data = orientacao_input.model_dump(

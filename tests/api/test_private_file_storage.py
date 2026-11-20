@@ -8,14 +8,21 @@ from werkzeug.datastructures import FileStorage
 
 from gestaolegal.services import private_file_storage as pfs
 from gestaolegal.services.private_file_storage import PrivateFileError
+from gestaolegal.utils.request_context import contexto_tenant
+
+from .conftest import TENANT_DAJ, TENANT_OUTRO
 
 
 @pytest.fixture
 def raiz(app, tmp_path, monkeypatch):
-    """Raiz privada isolada por teste, dentro do app real da suíte."""
+    """Pasta do tenant 1 numa raiz privada isolada por teste.
+
+    A raiz é `tmp_path`; o storage grava em `<raiz>/<tenant_id>/<categoria>`,
+    então o que os testes enxergam como "raiz" é `tmp_path / "1"`.
+    """
     monkeypatch.setitem(app.config, "PRIVATE_FILES_ROOT", str(tmp_path))
-    with app.app_context():
-        yield tmp_path
+    with app.app_context(), contexto_tenant(TENANT_DAJ):
+        yield tmp_path / str(TENANT_DAJ)
 
 
 def _upload(nome: str, conteudo: bytes = b"conteudo") -> FileStorage:
@@ -153,3 +160,64 @@ def test_raiz_nao_configurada(app, monkeypatch):
     with app.app_context():
         with pytest.raises(PrivateFileError, match="não configurada"):
             pfs.resolve("casos", "x.txt")
+
+
+# ------------------------------------------------------------------ tenant
+
+
+def test_grava_na_pasta_do_tenant_ativo(raiz):
+    ref = pfs.save("casos", _upload("x.txt"))
+    assert (raiz / "casos" / ref).is_file()
+    assert raiz.name == str(TENANT_DAJ)
+
+
+def test_sem_tenant_nao_le_nem_grava(app, tmp_path, monkeypatch):
+    monkeypatch.setitem(app.config, "PRIVATE_FILES_ROOT", str(tmp_path))
+    with app.app_context():
+        with pytest.raises(RuntimeError, match="tenant"):
+            pfs.save("casos", _upload("x.txt"))
+        with pytest.raises(RuntimeError, match="tenant"):
+            pfs.resolve("casos", "x.txt")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_anexo_de_outro_tenant_nao_e_alcancado(app, tmp_path, monkeypatch):
+    monkeypatch.setitem(app.config, "PRIVATE_FILES_ROOT", str(tmp_path))
+    with app.app_context():
+        with contexto_tenant(TENANT_OUTRO):
+            ref = pfs.save("casos", _upload("segredo.pdf", b"do outro NPJ"))
+            assert pfs.exists("casos", ref)
+
+        with contexto_tenant(TENANT_DAJ):
+            # A mesma referência, no tenant 1, aponta para a pasta do tenant 1.
+            assert not pfs.exists("casos", ref)
+            assert pfs.resolve("casos", ref).startswith(str(tmp_path / "1") + os.sep)
+            # E não há como subir até a pasta do outro.
+            with pytest.raises(PrivateFileError):
+                pfs.resolve("casos", f"../../{TENANT_OUTRO}/casos/{ref}")
+            pfs.remove("casos", ref)
+
+        with contexto_tenant(TENANT_OUTRO):
+            assert pfs.exists("casos", ref)
+
+
+def test_symlink_para_a_pasta_de_outro_tenant_e_recusado(app, tmp_path, monkeypatch):
+    monkeypatch.setitem(app.config, "PRIVATE_FILES_ROOT", str(tmp_path))
+    with app.app_context():
+        with contexto_tenant(TENANT_OUTRO):
+            ref = pfs.save("casos", _upload("segredo.pdf"))
+        with contexto_tenant(TENANT_DAJ):
+            categoria = tmp_path / "1" / "casos"
+            categoria.mkdir(parents=True)
+            os.symlink(str(tmp_path / str(TENANT_OUTRO) / "casos" / ref), str(categoria / "atalho.pdf"))
+            with pytest.raises(PrivateFileError, match="fora da raiz"):
+                pfs.resolve("casos", "atalho.pdf")
+
+
+def test_layout_antigo_sem_tenant_nao_e_lido(raiz):
+    # Sem fallback: um anexo deixado em `<raiz>/<categoria>` (antes do
+    # scripts/mover_arquivos_tenant.py) não é encontrado.
+    antigo = raiz.parent / "casos"
+    antigo.mkdir()
+    (antigo / "legado.pdf").write_bytes(b"x")
+    assert not pfs.exists("casos", "legado.pdf")

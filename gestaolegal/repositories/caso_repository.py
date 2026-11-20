@@ -23,14 +23,16 @@ class CasoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int, unidade_id: int | None = None) -> Caso | None:
-        stmt = select(casos).where(casos.c.id == id)
+        stmt = self.escopo(select(casos).where(casos.c.id == id), casos)
         if unidade_id is not None:
             stmt = stmt.where(casos.c.unidade_id == unidade_id)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Caso, dict(result._mapping)) if result else None
 
     def search(self, params: SearchParams) -> PaginatedResult[Caso]:
-        stmt = select(casos, func.count().over().label("total_count"))
+        stmt = self.escopo(
+            select(casos, func.count().over().label("total_count")), casos
+        )
 
         stmt = self._apply_where_clause(stmt, params.get("where"), casos)
         stmt = stmt.order_by(casos.c.data_criacao.desc())
@@ -49,46 +51,56 @@ class CasoRepository(BaseRepository):
         )
 
     def find_one(self, params: SearchParams) -> Caso | None:
-        stmt = select(casos)
+        stmt = self.escopo(select(casos), casos)
         stmt = self._apply_where_clause(stmt, params.get("where"), casos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Caso, dict(result._mapping)) if result else None
 
     def count(self, params: CountParams) -> int:
-        stmt = select(func.count()).select_from(casos)
+        stmt = self.escopo(select(func.count()).select_from(casos), casos)
         stmt = self._apply_where_clause(stmt, params.get("where"), casos)
 
         result = self.session.execute(stmt).scalar()
         return result or 0
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(casos).values(**data)
+        stmt = insert(casos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        stmt = sql_update(casos).where(casos.c.id == id).values(**data)
+        stmt = self.escopo(sql_update(casos).where(casos.c.id == id), casos).values(
+            **data
+        )
         self.session.execute(stmt)
 
     def delete(self, id: int) -> bool:
-        stmt = sql_update(casos).where(casos.c.id == id).values(status=False)
+        stmt = self.escopo(sql_update(casos).where(casos.c.id == id), casos).values(
+            status=False
+        )
         result = self.session.execute(stmt)
         return result.rowcount > 0
 
     def link_atendidos(self, caso_id: int, atendido_ids: list[int]) -> None:
-        stmt = sql_delete(casos_atendidos).where(casos_atendidos.c.id_caso == caso_id)
+        stmt = self.escopo(
+            sql_delete(casos_atendidos).where(casos_atendidos.c.id_caso == caso_id),
+            casos_atendidos,
+        )
         self.session.execute(stmt)
 
         for atendido_id in atendido_ids:
             stmt = insert(casos_atendidos).values(
-                id_caso=caso_id, id_atendido=atendido_id
+                **self.valores({"id_caso": caso_id, "id_atendido": atendido_id})
             )
             self.session.execute(stmt)
 
     def get_atendido_ids_by_caso_id(self, caso_id: int) -> list[int]:
-        stmt = select(casos_atendidos.c.id_atendido).where(
-            casos_atendidos.c.id_caso == caso_id
+        stmt = self.escopo(
+            select(casos_atendidos.c.id_atendido).where(
+                casos_atendidos.c.id_caso == caso_id
+            ),
+            casos_atendidos,
         )
         results = self.session.execute(stmt).all()
         return [row.id_atendido for row in results]
@@ -100,6 +112,7 @@ class CasoRepository(BaseRepository):
             .where(casos_atendidos.c.id_atendido == atendido_id)
             .distinct()
         )
+        stmt = self.escopo(stmt, casos_atendidos)
         return [
             row[0] for row in self.session.execute(stmt).all() if row[0] is not None
         ]
@@ -113,6 +126,7 @@ class CasoRepository(BaseRepository):
             .where(atendidos.c.nome.ilike(f"%{nome}%"))
             .distinct()
         )
+        stmt = self.escopo(stmt, casos_atendidos, atendidos)
         return [
             row[0] for row in self.session.execute(stmt).all() if row[0] is not None
         ]

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
-	import type { Arquivo } from '$lib/types';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
+	import { api } from '#lib/api-client.ts';
+	import type { Arquivo } from '#lib/types/index.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 
 	let { arquivo = null }: { arquivo?: Arquivo | null } = $props();
 
@@ -93,9 +93,9 @@
 	</div>
 
 	<div class="flex justify-end gap-2">
-		<Button variant="outline" href={isEdit && arquivo ? `/arquivos/${arquivo.id}` : '/arquivos'}
-			>Cancelar</Button
-		>
+		<Button variant="outline" href={isEdit && arquivo ? `/arquivos/${arquivo.id}` : '/arquivos'}>
+			Cancelar
+		</Button>
 		<Button type="submit" disabled={submitting}>
 			{submitting ? 'Salvando...' : isEdit ? 'Salvar' : 'Cadastrar'}
 		</Button>

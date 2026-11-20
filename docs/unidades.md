@@ -270,7 +270,14 @@ manda o header a partir dela; trocar de unidade dispara `invalidateAll()`.
   banco. O caminho seria um `?incluir_inativas=1` no controller.
 - **`notificacao` e `arquivos`** seguem sem filtro, conforme as decisões 1 e 5.
 
-### Fase B: script de importação de Nova Lima
+### Fase B concluída: histórico da importação de Nova Lima
+
+**Atualização de 08/11/2026:** a fusão dos bancos de Belo Horizonte e Nova Lima
+foi concluída. O importador e seus testes exclusivos foram removidos por decisão
+do responsável pelo projeto; não haverá adaptação à multitenancy. A implementação
+permanece no histórico do Git, por exemplo no commit `947661c`.
+Esta seção descreve o procedimento histórico, **não é um roteiro operacional**.
+Não repetir a importação. Uma futura necessidade exige novo escopo e ferramenta.
 
 1. Restaurar o dump de NL num banco temporário e rodar as migrações da 3.0
    até a revisão da Fase A (o dump já está numa revisão conhecida).
@@ -293,15 +300,15 @@ manda o header a partir dela; trocar de unidade dispara `invalidateAll()`.
    unidades.
 5. Ensaio completo em QA com o dump atual. Virada em produção com dump novo.
 
-O passo 2 está entregue: `scripts/importar_unidade.py`, com 14 testes em
+O passo 2 foi entregue à época: `scripts/importar_unidade.py`, com 14 testes em
 `tests/scripts/test_importar_unidade.py` (dois bancos SQLite montados a partir
 de `tables.py`, exercitando o mesmo caminho de reflection que rodará contra o
-MySQL). Os passos 1, 3, 4 e 5 continuam abertos — e os que tocam dado real são
-gate humano.
+MySQL). A execução da fusão já foi concluída; as pendências descritas abaixo
+são o registro do planejamento original.
 
 #### 5.3 O script de importação (`scripts/importar_unidade.py`)
 
-**Como se usa.** `--origem` e `--destino` são URLs SQLAlchemy; `--sigla NL`
+**Como funcionava (ferramenta removida).** `--origem` e `--destino` eram URLs SQLAlchemy; `--sigla NL`
 resolve a unidade no destino. **Sem `--executar` o script roda a importação
 inteira e dá rollback**: as contagens e os avisos do relatório são os da
 importação de verdade, mas nada é gravado. Com `--executar`, a mesma transação
@@ -425,13 +432,11 @@ garantir que a base não andou nesse meio-tempo.
       ativa ou se algum precisa consolidar as duas. **Todos filtram pela unidade
       ativa** (as cinco consultas de `RelatorioRepository`). Não há relatório
       consolidado das duas unidades; se for preciso, é story nova.
-- [ ] Decidir o tratamento das colisões de `UNIQUE` na importação de NL:
-      `assistencias_judiciarias.email` e `processos.numero` (ver §5.3). Só dá
-      para decidir olhando os valores que colidem, o que exige o ensaio da
-      Fase B em QA.
+- [x] Fusão de BH/Nova Lima concluída. A preparação de colisões da Fase B
+      pertence ao histórico; o importador foi descontinuado, sem nova execução.
 - [ ] Rodar `make test` também sobre `tests/scripts/` (hoje só `tests/api/`; o
-      CI já roda `tests/` inteiro, então os testes do importador valem no
-      portão do CI mas não no comando local).
+      CI já roda `tests/` inteiro; os testes de seed, reset e arquivos continuam
+      necessários mesmo após a retirada dos testes exclusivos do importador).
 - [ ] Conferir em navegador as telas da Fase 5 (seletor no cabeçalho, unidades no
       formulário de usuário, tela `/unidades`) — ver "O que ficou adiado" em §5.1.
 - [ ] Decidir se a listagem de usuários do admin passa a filtrar por

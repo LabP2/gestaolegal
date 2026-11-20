@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import * as Select from '$lib/components/ui/select';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';
 
@@ -19,8 +19,6 @@
 		type?: 'single' | 'multiple';
 		options: readonly { value: string; label: string }[];
 	} = $props();
-
-	placeholder = placeholder ?? `Digite o ${name}`;
 
 	let selectedOptionLabel = $derived(options.find((option) => option.value === value)?.label);
 </script>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
+	import * as Breadcrumb from '#lib/components/ui/breadcrumb/index.js';
 
 	const routeMap: Record<string, { label: string; href?: string }> = {
 		'/': { label: 'Dashboard', href: '/' },
@@ -16,7 +16,7 @@
 		},
 		'/casos/gestao-casos': { label: 'Gestão de Casos', href: '/casos/gestao-casos' },
 		'/casos/gerenciar-roteiros': { label: 'Gerenciar Roteiros', href: '/casos/gerenciar-roteiros' },
-		'/plantao': { label: 'Plantão', href: '/plantao' },
+		'/plantao': { label: 'Plantão', href: '/plantao/escalas' },
 		'/plantao/atendidos-assistidos': {
 			label: 'Atendidos/Assistidos',
 			href: '/plantao/atendidos-assistidos'

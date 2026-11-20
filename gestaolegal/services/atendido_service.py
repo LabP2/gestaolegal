@@ -9,8 +9,10 @@ from gestaolegal.models.assistido_input import (
     AssistidoUpdateInput,
 )
 from gestaolegal.models.atendido import Atendido
+from gestaolegal.integrations.djen_html import para_latin1
 from gestaolegal.models.atendido_input import (
     AtendidoCreateInput,
+    AtendidoSimplificadoInput,
     AtendidoUpdateInput,
     ListAtendido,
 )
@@ -22,6 +24,7 @@ from gestaolegal.repositories.repository import (
     WhereClause,
 )
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.cpf import cpf_valido
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +152,7 @@ class AtendidoService:
             logger.error(f"Update failed: atendido not found with id: {atendido_id}")
             raise NotFoundException(resource="Atendido", resource_id=atendido_id)
 
+        self._validar_edicao_legado(existing, atendido_input)
         update_data = atendido_input.model_dump(exclude_none=True)
 
         endereco_data = self.__extract_endereco_data_for_update(update_data)
@@ -160,6 +164,21 @@ class AtendidoService:
             self.repository.update(atendido_id, update_data)
         logger.info(f"Atendido updated successfully with id: {atendido_id}")
         return self.find_by_id(atendido_id)
+
+    @staticmethod
+    def _validar_edicao_legado(existing: Atendido, atendido_input: AtendidoUpdateInput) -> None:
+        # Conferir o estado persistido, nunca uma alegação de legado do cliente.
+        supplied = atendido_input.model_dump(exclude_unset=True)
+        for field in ("cpf", "procurou_outro_local", "pj_constituida"):
+            if field not in supplied or supplied[field] == getattr(existing, field):
+                continue
+            value = supplied[field]
+            if field == "cpf":
+                valid = isinstance(value, str) and cpf_valido(value)
+            else:
+                valid = value in ("sim", "nao")
+            if not valid:
+                raise ValidationException("Informe um valor válido para o campo alterado", field=field)
 
     def create_assistido(
         self, id_atendido: int, assistido_input: AssistidoCreateInput
@@ -187,6 +206,9 @@ class AtendidoService:
 
         try:
             assistido_id = self.repository.create_assistido(assistido_data)
+            if atendido.sem_triagem:
+                # A triagem feita depois mantém o atendido e encerra o "sem triagem".
+                self.repository.update(id_atendido, {"sem_triagem": False})
             if pj is not None:
                 self.repository.salvar_pessoa_juridica(assistido_id, pj.model_dump())
             logger.info(
@@ -236,6 +258,7 @@ class AtendidoService:
 
         try:
             if atendido_input:
+                self._validar_edicao_legado(atendido, atendido_input)
                 update_data = atendido_input.model_dump(exclude_none=True)
 
                 endereco_data = self.__extract_endereco_data_for_update(update_data)
@@ -262,6 +285,71 @@ class AtendidoService:
             self.repository.session.rollback()
             raise
 
+    # --- cadastro simplificado e variações do nome ------------------------------
+    # docs/plano-processos-avulsos.md, §2: parte de processo sem caso.
+
+    @staticmethod
+    def _documento(valor: str | None, digitos: int, campo: str, rotulo: str) -> str | None:
+        if valor is None:
+            return None
+        so_digitos = "".join(c for c in valor if c.isdigit())
+        if len(so_digitos) != digitos or not so_digitos.isascii():
+            raise ValidationException(f"{rotulo} inválido", field=campo)
+        if digitos == 11:
+            d = so_digitos
+            return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}"
+        d = so_digitos
+        return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+
+    def criar_simplificado(self, dados: AtendidoSimplificadoInput) -> Atendido:
+        """Só nome, documento e observação; o resto fica nulo até a triagem."""
+        registro = {
+            # `atendidos` tem colunas legadas em latin1 no MySQL.
+            "nome": para_latin1(dados.nome),
+            "cpf": self._documento(dados.cpf, 11, "cpf", "CPF"),
+            "cnpj": self._documento(dados.cnpj, 14, "cnpj", "CNPJ"),
+            "obs": para_latin1(dados.obs),
+            "status": 1,
+            "sem_triagem": True,
+            "unidade_id": RequestContext.get_unidade_ativa(),
+        }
+        atendido_id = self.repository.create(registro)
+        logger.info(f"Atendido {atendido_id} cadastrado sem triagem")
+        atendido = self.find_by_id(atendido_id)
+        assert atendido is not None
+        return atendido
+
+    def _da_unidade(self, atendido_id: int) -> Atendido:
+        atendido = self.repository.find_by_id(
+            atendido_id, unidade_id=RequestContext.get_unidade_ativa()
+        )
+        if not atendido:
+            raise NotFoundException(resource="Atendido", resource_id=atendido_id)
+        return atendido
+
+    def nomes(self, atendido_id: int) -> list[dict[str, Any]]:
+        self._da_unidade(atendido_id)
+        return self.repository.nomes(atendido_id)
+
+    def adicionar_nome(self, atendido_id: int, nome: Any) -> list[dict[str, Any]]:
+        atendido = self._da_unidade(atendido_id)
+        if not isinstance(nome, str) or not " ".join(nome.split()):
+            raise ValidationException("Informe o nome", field="nome")
+        nome = " ".join(nome.split())
+        if len(nome) > 150:
+            raise ValidationException("Nome com mais de 150 caracteres", field="nome")
+        if nome.lower() == (atendido.nome or "").lower() or self.repository.nome_existe(
+            atendido_id, nome
+        ):
+            raise ValidationException("Este nome já está cadastrado", field="nome")
+        self.repository.adicionar_nome(atendido_id, nome)
+        return self.repository.nomes(atendido_id)
+
+    def remover_nome(self, atendido_id: int, nome_id: int) -> None:
+        self._da_unidade(atendido_id)
+        if not self.repository.remover_nome(atendido_id, nome_id):
+            raise NotFoundException(resource="Nome", resource_id=nome_id)
+
     def soft_delete(self, atendido_id: int):
         logger.info(f"Soft deleting atendido with id: {atendido_id}")
         existing = self.repository.find_by_id(
@@ -274,6 +362,14 @@ class AtendidoService:
             raise NotFoundException(resource="Atendido", resource_id=atendido_id)
         self.repository.delete(atendido_id)
         logger.info(f"Atendido soft deleted successfully with id: {atendido_id}")
+
+    def reactivate(self, atendido_id: int):
+        existing = self.repository.find_by_id(
+            atendido_id, unidade_id=RequestContext.get_unidade_ativa()
+        )
+        if not existing:
+            raise NotFoundException(resource="Atendido", resource_id=atendido_id)
+        self.repository.update(atendido_id, {"status": 1})
 
     def __extract_endereco_data(self, atendido_data: dict[str, Any]):
         return {

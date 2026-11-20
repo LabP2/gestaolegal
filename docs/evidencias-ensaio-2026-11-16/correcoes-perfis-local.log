@@ -1,0 +1,25 @@
+{
+  "todos": {
+    "status": 200,
+    "total": 616
+  },
+  "meus": {
+    "status": 200,
+    "total": 24
+  },
+  "proprio": {
+    "status": 200
+  },
+  "terceiros": {
+    "status": 200
+  },
+  "outraUnidade": {
+    "status": 404
+  },
+  "outroNPJ": {
+    "status": 404
+  },
+  "avulso": {
+    "status": 404
+  }
+}

@@ -1,10 +1,10 @@
-import type { OrientacaoJuridica, Paginated } from '$lib/types';
-import { orientacaoSearchSchema } from '$lib/forms/schemas/orientacao-juridica-schema';
+import type { OrientacaoJuridica, Paginated } from '#lib/types/index.ts';
+import { orientacaoSearchSchema } from '#lib/forms/schemas/orientacao-juridica-schema.ts';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate } from 'sveltekit-superforms/client';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ depends, url, fetch }) => {
 	depends('app:orientacoes-juridicas');

@@ -1,5 +1,5 @@
-import { api } from '$lib/api-client';
-import { ApiException, type Arquivo } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException, type Arquivo } from '#lib/types/index.ts';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 

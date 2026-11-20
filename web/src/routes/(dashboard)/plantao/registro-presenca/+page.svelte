@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { api } from '$lib/api-client';
-	import { ApiException, type EstadoPresenca, type RegistroPresencaResultado } from '$lib/types';
-	import { getUserRoleLabel } from '$lib/constants/user-roles';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Card from '$lib/components/ui/card';
+	import { api } from '#lib/api-client.ts';
+	import {
+		ApiException,
+		type EstadoPresenca,
+		type RegistroPresencaResultado
+	} from '#lib/types/index.ts';
+	import { getUserRoleLabel } from '#lib/constants/user-roles.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import { toast } from 'svelte-sonner';
 
 	let { data }: { data: PageData } = $props();

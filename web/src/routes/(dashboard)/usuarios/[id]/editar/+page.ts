@@ -1,13 +1,13 @@
-import { userUpdateFormSchema } from '$lib/forms/schemas/user-schema';
+import { userUpdateFormSchema } from '#lib/forms/schemas/user-schema.ts';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import type { User } from '$lib/types/user';
-import { flattenObject } from '$lib/utils/object';
-import { toISODateInput } from '$lib/utils/date';
+import { api } from '#lib/api-client.ts';
+import type { User } from '#lib/types/user.ts';
+import { flattenObject } from '#lib/utils/object.ts';
+import { toISODateInput } from '#lib/utils/date.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
 
 // The API serializes dates as GMT strings; the form's date pickers need ISO
 // "YYYY-MM-DD" or the update request fails backend validation.

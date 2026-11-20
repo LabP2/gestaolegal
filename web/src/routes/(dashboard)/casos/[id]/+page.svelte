@@ -1,38 +1,38 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { nomeOriginalArquivo } from '$lib/utils/arquivos';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import { cn } from '$lib/utils';
-	import InfoCard from '$lib/components/ui/info-card.svelte';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { nomeOriginalArquivo } from '#lib/utils/arquivos.ts';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import { cn } from '#lib/utils.ts';
+	import InfoCard from '#lib/components/ui/info-card.svelte';
 	import type { PageProps } from './$types';
-	import { SITUACAO_DEFERIMENTO_OPTIONS } from '$lib/constants/situacao-deferimento';
+	import { SITUACAO_DEFERIMENTO_OPTIONS } from '#lib/constants/situacao-deferimento.ts';
 	import Edit from '@lucide/svelte/icons/edit';
 	import User from '@lucide/svelte/icons/user';
 	import { Eye, File, Plus, FileText, Download, Upload, Trash2 } from '@lucide/svelte';
-	import DataTable, { type Column } from '$lib/components/data-table.svelte';
-	import EventoDialog from '$lib/components/evento-dialog.svelte';
-	import ProcessoDialog from '$lib/components/processo-dialog.svelte';
-	import type { Evento } from '$lib/types/evento';
-	import type { Processo } from '$lib/types';
-	import type { Paginated } from '$lib/types/paginated';
-	import type { TipoEvento } from '$lib/constants/tipo_evento';
-	import { TIPO_EVENTO, TIPO_EVENTO_OPTIONS } from '$lib/constants/tipo_evento';
-	import * as Select from '$lib/components/ui/select';
+	import DataTable, { type Column } from '#lib/components/data-table.svelte';
+	import EventoDialog from '#lib/components/evento-dialog.svelte';
+	import ProcessoDialog from '#lib/components/processo-dialog.svelte';
+	import type { Evento } from '#lib/types/evento.ts';
+	import type { Processo } from '#lib/types/index.ts';
+	import type { Paginated } from '#lib/types/paginated.ts';
+	import type { TipoEvento } from '#lib/constants/tipo_evento.ts';
+	import { TIPO_EVENTO, TIPO_EVENTO_OPTIONS } from '#lib/constants/tipo_evento.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-	import type { BadgeVariant } from '$lib/components/ui/badge';
+	import type { BadgeVariant } from '#lib/components/ui/badge/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { api, apiFetch } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
-	import LembreteDialog from '$lib/components/lembrete-dialog.svelte';
-	import type { Lembrete } from '$lib/types';
-	import { invalidateAll } from '$app/navigation';
-	import { Bell, History } from '@lucide/svelte';
-	import { formatDateOnly } from '$lib/utils/date';
+	import { api, apiFetch } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
+	import LembreteDialog from '#lib/components/lembrete-dialog.svelte';
+	import type { Lembrete } from '#lib/types/index.ts';
+	import { refreshAll } from '$app/navigation';
+	import { Bell, History, Newspaper } from '@lucide/svelte';
+	import { formatDateOnly } from '#lib/utils/date.ts';
 
 	let { data }: PageProps = $props();
-	const { caso, eventoFormData, eventos: initialEventos } = data;
+	const { caso, eventoFormData, eventos: initialEventos } = $derived(data);
 	const unidadeCaso = $derived(
 		data.me?.unidades?.find((unidade) => unidade.id === caso.unidade_id)
 	);
@@ -53,14 +53,14 @@
 	}
 
 	async function refreshLembretes() {
-		await invalidateAll();
+		await refreshAll();
 	}
 
 	async function deleteLembrete(lembreteId: number) {
 		try {
 			await api.delete(`caso/${caso.id}/lembretes/${lembreteId}`);
 			toast.success('Lembrete removido');
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Erro ao remover lembrete'));
 		}
@@ -73,7 +73,7 @@
 		indeferimento: 'Indeferimento'
 	};
 
-	let arquivos = $state(caso.arquivos || []);
+	let arquivos = $derived(caso.arquivos || []);
 	let fileInput: HTMLInputElement;
 	let replaceInput: HTMLInputElement;
 	let isUploading = $state(false);
@@ -90,7 +90,7 @@
 		return date.toLocaleString('pt-BR');
 	}
 
-	const caseInfoData = [
+	const caseInfoData = $derived([
 		{
 			label: 'Área do Direito',
 			value: caso.area_direito,
@@ -102,23 +102,23 @@
 		...(caso.justif_indeferimento
 			? [{ label: 'Justificativa de Indeferimento', value: caso.justif_indeferimento }]
 			: [])
-	];
+	]);
 
-	const responsiblesData = [
+	const responsiblesData = $derived([
 		{ label: 'Usuário Responsável', value: caso.usuario_responsavel?.nome || '--' },
 		{ label: 'Orientador', value: caso.orientador?.nome || '--' },
 		{ label: 'Estagiário', value: caso.estagiario?.nome || '--' },
 		{ label: 'Colaborador', value: caso.colaborador?.nome || '--' }
-	];
+	]);
 
-	const auditInfoData = [
+	const auditInfoData = $derived([
 		{ label: 'Criado Por', value: caso.criado_por?.nome },
 		{ label: 'Data de Criação', value: caso.data_criacao, formatter: formatDateTime },
 		...(caso.modificado_por ? [{ label: 'Modificado Por', value: caso.modificado_por.nome }] : []),
 		...(caso.data_modificacao
 			? [{ label: 'Data de Modificação', value: caso.data_modificacao, formatter: formatDateTime }]
 			: [])
-	];
+	]);
 
 	const badges: Record<TipoEvento, { text: string; variant: BadgeVariant }> = {
 		[TIPO_EVENTO.AUDIENCIA]: { text: 'Audiência', variant: 'default' },
@@ -134,9 +134,22 @@
 		[TIPO_EVENTO.OUTROS]: { text: 'Outros', variant: 'default' }
 	};
 
+	// Selo de origem: evento vindo do DJEN (e se a publicação foi cancelada).
+	const origemBadges: Record<string, { text: string; variant: BadgeVariant }> = {
+		djen: { text: 'DJEN', variant: 'outline' },
+		djen_cancelada: { text: 'DJEN · cancelada', variant: 'destructive' }
+	};
+
 	const eventoColumns: Column[] = [
 		{ header: 'Nº', key: 'num_evento', class: 'w-[60px] whitespace-nowrap' },
 		{ header: 'Tipo', key: 'tipo', type: 'badge', badgeMap: badges, class: 'w-[200px]' },
+		{
+			header: 'Origem',
+			key: 'origem_selo',
+			type: 'badge',
+			badgeMap: origemBadges,
+			class: 'w-[130px]'
+		},
 		{ header: 'Descrição', key: 'descricao', type: 'preview', previewClass: 'max-w-[520px]' },
 		{ header: 'Data', key: 'data_evento', type: 'date', class: 'w-[120px] whitespace-nowrap' },
 		{ header: 'Responsável', key: 'usuario_responsavel.nome', class: 'w-[200px]' }
@@ -160,8 +173,16 @@
 		}
 	}
 
+	const djenAtivo = $derived(data.me?.tenant?.djen_ativo === true);
+
 	const eventoButtons = [
 		{ title: 'Ver', icon: Eye, href: (v: Evento) => `/casos/${caso.id}/eventos/${v.id}` },
+		{
+			title: 'Ver publicação no DJEN',
+			icon: Newspaper,
+			show: (v: Evento) => djenAtivo && !!v.id_djen_comunicacao,
+			href: (v: Evento) => `/djen/publicacoes/${v.id_djen_comunicacao}`
+		},
 		{
 			title: 'Excluir',
 			icon: Trash2,
@@ -178,16 +199,31 @@
 
 	let eventoDialogOpen = $state(false);
 
-	let eventos = $state(initialEventos);
+	let eventos = $derived(initialEventos);
 	let eventoTipoFiltro = $state('todos');
+	let eventoOrigemFiltro = $state('todos');
 
 	const eventoTipoOptions = [{ value: 'todos', label: 'Todos os tipos' }, ...TIPO_EVENTO_OPTIONS];
+	const eventoOrigemOptions = [
+		{ value: 'todos', label: 'Todas as origens' },
+		{ value: 'manual', label: 'Cadastrados à mão' },
+		{ value: 'djen', label: 'Vindos do DJEN' }
+	];
+
+	const eventosListados = $derived({
+		...eventos,
+		items: eventos.items.map((e) => ({
+			...e,
+			origem_selo: e.origem === 'djen' ? (e.djen_ativa === false ? 'djen_cancelada' : 'djen') : ''
+		}))
+	});
 
 	async function refreshEventos() {
 		// api.get already unwraps the response body — it returns the paginated
 		// data directly, so there is no Response.json() to call here.
 		const params = new URLSearchParams();
 		if (eventoTipoFiltro !== 'todos') params.set('tipo', eventoTipoFiltro);
+		if (eventoOrigemFiltro !== 'todos') params.set('origem', eventoOrigemFiltro);
 		const query = params.toString();
 		eventos = await api.get<Paginated<Evento>>(
 			`caso/${caso.id}/eventos${query ? `?${query}` : ''}`
@@ -195,7 +231,7 @@
 	}
 
 	// --- Processos (CRUD via modal) ---
-	const processos = $derived(data.caso.processos ?? []);
+	const processos = $derived((data.caso.processos ?? []).filter((processo) => processo.status));
 	let processoDialogOpen = $state(false);
 	let editingProcesso = $state<Processo | undefined>(undefined);
 
@@ -213,7 +249,7 @@
 		try {
 			await api.delete(`caso/${caso.id}/processos/${processoId}`);
 			toast.success('Processo inativado com sucesso');
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			if (err instanceof ApiException) {
 				toast.error(err.message);
@@ -400,9 +436,12 @@
 								<div class="flex min-w-0 items-center gap-2">
 									<File class="h-4 w-4 shrink-0" />
 									<div class="min-w-0">
-										<p class="truncate font-medium">
+										<a
+											href="/casos/{caso.id}/processos/{processo.id}"
+											class="block truncate font-medium hover:underline"
+										>
 											{processo.especie}{processo.numero ? ` · Nº ${processo.numero}` : ''}
-										</p>
+										</a>
 										<p class="truncate text-xs text-muted-foreground">
 											{#if processo.vara}{processo.vara}{/if}
 											{#if processo.probabilidade}· Prob.: {processo.probabilidade}{/if}
@@ -410,6 +449,14 @@
 									</div>
 								</div>
 								<div class="flex shrink-0 gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										href="/casos/{caso.id}/processos/{processo.id}"
+										title="Ver detalhes"
+									>
+										<Eye class="h-4 w-4" />
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -534,6 +581,20 @@
 							{/each}
 						</Select.Content>
 					</Select.Root>
+					<Select.Root
+						type="single"
+						bind:value={eventoOrigemFiltro}
+						onValueChange={() => refreshEventos()}
+					>
+						<Select.Trigger class="w-[180px]" aria-label="Filtrar eventos por origem">
+							{eventoOrigemOptions.find((o) => o.value === eventoOrigemFiltro)?.label}
+						</Select.Trigger>
+						<Select.Content>
+							{#each eventoOrigemOptions as option (option.value)}
+								<Select.Item value={option.value}>{option.label}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
 					<Button variant="default" size="sm" onclick={() => (eventoDialogOpen = true)}>
 						<Plus class="h-4 w-4" /> Novo Evento
 					</Button>
@@ -542,7 +603,7 @@
 		</Card.Header>
 		<Card.Content>
 			<DataTable
-				data={eventos}
+				data={eventosListados}
 				columns={eventoColumns}
 				actions={{ buttons: eventoButtons }}
 				emptyText="Nenhum evento associado a este caso."
@@ -602,9 +663,9 @@
 							<div class="space-y-0.5">
 								<p class="text-sm font-medium">
 									{acaoLabels[item.acao ?? ''] ?? item.acao ?? 'Alteração'}
-									{#if item.usuario}<span class="font-normal text-muted-foreground"
-											>· {item.usuario.nome}</span
-										>{/if}
+									{#if item.usuario}<span class="font-normal text-muted-foreground">
+											· {item.usuario.nome}
+										</span>{/if}
 								</p>
 								{#if item.descricao}
 									<p class="text-sm text-muted-foreground">{item.descricao}</p>
@@ -625,7 +686,7 @@
 	processo={editingProcesso}
 	formData={data.processoFormData}
 	bind:open={processoDialogOpen}
-	onSuccess={invalidateAll}
+	onSuccess={refreshAll}
 />
 <LembreteDialog
 	casoId={caso.id}

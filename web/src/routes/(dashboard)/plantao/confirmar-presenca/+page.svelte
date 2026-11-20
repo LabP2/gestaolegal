@@ -1,13 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
-	import { api } from '$lib/api-client';
-	import { ApiException, CONFIRMACAO, type Confirmacao, type ConfirmacaoItem } from '$lib/types';
-	import { getUserRoleLabel } from '$lib/constants/user-roles';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Card from '$lib/components/ui/card';
-	import * as Table from '$lib/components/ui/table';
+	import { api } from '#lib/api-client.ts';
+	import {
+		ApiException,
+		CONFIRMACAO,
+		type Confirmacao,
+		type ConfirmacaoItem
+	} from '#lib/types/index.ts';
+	import { getUserRoleLabel } from '#lib/constants/user-roles.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
 	import { toast } from 'svelte-sonner';
 
 	let { data }: { data: PageData } = $props();
@@ -48,7 +53,7 @@
 		carregando = true;
 		try {
 			await goto(`/plantao/confirmar-presenca?data=${encodeURIComponent(data)}`, {
-				invalidateAll: true
+				refreshAll: true
 			});
 			escolhasPresenca = {};
 			escolhasPlantao = {};
@@ -185,13 +190,14 @@
 						<Table.Body>
 							{#each pendencias.plantoes as plantao (plantao.id)}
 								<Table.Row>
-									<Table.Cell
-										>{plantao.nome}<br /><a
+									<Table.Cell>
+										{plantao.nome}<br /><a
 											class="text-primary underline"
 											href={`/plantao/escala?escala_id=${plantao.escala_id}`}
-											>{plantao.escala_nome}</a
-										></Table.Cell
-									>
+										>
+											{plantao.escala_nome}
+										</a>
+									</Table.Cell>
 									<Table.Cell>{getUserRoleLabel(plantao.urole)}</Table.Cell>
 									{#each OPCOES as opcao (opcao.valor)}
 										<Table.Cell class="text-center">

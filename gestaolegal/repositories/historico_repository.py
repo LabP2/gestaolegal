@@ -17,14 +17,17 @@ class HistoricoRepository(BaseRepository):
         super().__init__()
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(historicos).values(**data)
+        stmt = insert(historicos).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def get_by_caso(self, caso_id: int, params: SearchParams) -> PaginatedResult[Historico]:
-        stmt = select(historicos, func.count().over().label("total_count")).where(
-            historicos.c.id_caso == caso_id
+        stmt = self.escopo(
+            select(historicos, func.count().over().label("total_count")).where(
+                historicos.c.id_caso == caso_id
+            ),
+            historicos,
         )
         stmt = stmt.order_by(historicos.c.data.desc())
         stmt = self._apply_pagination(stmt, params.get("page_params"))

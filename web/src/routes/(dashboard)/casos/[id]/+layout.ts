@@ -1,14 +1,14 @@
-import { eventoCreateFormSchema } from '$lib/forms/schemas/evento-schema';
-import { processoCreateFormSchema } from '$lib/forms/schemas/processo-schema';
-import type { Caso } from '$lib/types/caso';
-import type { Evento } from '$lib/types/evento';
-import type { Paginated } from '$lib/types/paginated';
-import type { Historico, Lembrete } from '$lib/types';
+import { eventoCreateFormSchema } from '#lib/forms/schemas/evento-schema.ts';
+import { processoCreateFormSchema } from '#lib/forms/schemas/processo-schema.ts';
+import type { Caso } from '#lib/types/caso.ts';
+import type { Evento } from '#lib/types/evento.ts';
+import type { Paginated } from '#lib/types/paginated.ts';
+import type { Historico, Lembrete } from '#lib/types/index.ts';
 import { error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
 
 export const load = async ({ params, fetch }) => {
 	try {

@@ -47,3 +47,9 @@ gestaolegal/static/arquivos
 
 # Dumps de banco: pesados e com dados reais, não entram na imagem.
 dumps
+
+# Anexos e configurações pessoais do ambiente local não pertencem à imagem.
+/uploads/
+/uploads.anterior-*/
+/docs/.obsidian/
+/graft/

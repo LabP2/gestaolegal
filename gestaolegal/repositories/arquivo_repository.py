@@ -1,7 +1,7 @@
 from typing import Any
 
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import func, insert, or_, select
+from sqlalchemy import and_, func, insert, or_, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,7 @@ class ArquivoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int) -> Arquivo | None:
-        stmt = select(arquivos).where(arquivos.c.id == id)
+        stmt = self.escopo(select(arquivos).where(arquivos.c.id == id), arquivos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Arquivo, dict(result._mapping)) if result else None
 
@@ -31,7 +31,16 @@ class ArquivoRepository(BaseRepository):
                 usuarios.c.nome.label("criado_por"),
                 func.count().over().label("total_count"),
             )
-            .select_from(arquivos.outerjoin(usuarios, usuarios.c.id == arquivos.c.id_criado_por))
+            .select_from(
+                arquivos.outerjoin(
+                    usuarios,
+                    and_(
+                        usuarios.c.id == arquivos.c.id_criado_por,
+                        self.no_tenant(usuarios),
+                    ),
+                )
+            )
+            .where(self.no_tenant(arquivos))
             .order_by(arquivos.c.data_criacao.desc(), arquivos.c.id.desc())
         )
         if search:
@@ -54,13 +63,19 @@ class ArquivoRepository(BaseRepository):
         )
 
     def create(self, data: dict[str, Any]) -> int:
-        result = self.session.execute(insert(arquivos).values(**data))
+        result = self.session.execute(insert(arquivos).values(**self.valores(data)))
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
-        self.session.execute(sql_update(arquivos).where(arquivos.c.id == id).values(**data))
+        self.session.execute(
+            self.escopo(sql_update(arquivos).where(arquivos.c.id == id), arquivos).values(
+                **data
+            )
+        )
 
     def delete(self, id: int) -> bool:
-        result = self.session.execute(sql_delete(arquivos).where(arquivos.c.id == id))
+        result = self.session.execute(
+            self.escopo(sql_delete(arquivos).where(arquivos.c.id == id), arquivos)
+        )
         return result.rowcount > 0

@@ -17,27 +17,31 @@ class RoteiroRepository(BaseRepository):
         super().__init__()
 
     def get_all(self) -> list[Roteiro]:
-        stmt = select(documentos_roteiro).order_by(documentos_roteiro.c.area_direito.asc())
+        stmt = self.escopo(select(documentos_roteiro), documentos_roteiro).order_by(documentos_roteiro.c.area_direito.asc())
         results = self.session.execute(stmt).all()
         return [from_dict(Roteiro, dict(row._mapping)) for row in results]
 
     def find_by_area(self, area_direito: str) -> Roteiro | None:
-        stmt = select(documentos_roteiro).where(
-            documentos_roteiro.c.area_direito == area_direito
+        stmt = self.escopo(
+            select(documentos_roteiro).where(
+                documentos_roteiro.c.area_direito == area_direito
+            ),
+            documentos_roteiro,
         )
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Roteiro, dict(result._mapping)) if result else None
 
     def create(self, data: dict[str, Any]) -> int:
-        stmt = insert(documentos_roteiro).values(**data)
+        stmt = insert(documentos_roteiro).values(**self.valores(data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, data: dict[str, Any]) -> None:
         stmt = (
-            sql_update(documentos_roteiro)
-            .where(documentos_roteiro.c.id == id)
-            .values(**data)
+            self.escopo(
+                sql_update(documentos_roteiro).where(documentos_roteiro.c.id == id),
+                documentos_roteiro,
+            ).values(**data)
         )
         self.session.execute(stmt)

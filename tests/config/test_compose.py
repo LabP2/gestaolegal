@@ -37,7 +37,7 @@ def render(tmp_path):
 def test_implantacao_usa_imagens_volumes_externos_e_migracao(render):
     model = render('docker-compose.yml', '--profile', '*')
     services = model['services']
-    for name in ('api', 'web', 'migrate'):
+    for name in ('api', 'web', 'migrate', 'djen-worker', 'djen-ml-worker'):
         assert services[name]['image'].endswith(':a1ce0cf')
         assert 'build' not in services[name]
     assert services['api']['environment']['DB_HOST'] == 'db'
@@ -57,8 +57,8 @@ def test_implantacao_usa_imagens_volumes_externos_e_migracao(render):
 def test_desenvolvimento_independente_com_mailpit_e_fontes(render):
     model = render('docker-compose.dev.yml')
     services = model['services']
-    assert set(services) == {'api', 'web', 'migrate', 'db', 'mailpit'}
-    for name in ('api', 'web', 'migrate'):
+    assert set(services) == {'api', 'web', 'migrate', 'db', 'mailpit', 'djen-worker', 'djen-ml-worker'}
+    for name in ('api', 'web', 'migrate', 'djen-worker', 'djen-ml-worker'):
         assert services[name]['build']['target'] == 'dev'
     assert services['api']['environment']['FLASK_ENV'] == 'development'
     assert services['api']['environment']['MAIL_SERVER'] == 'mailpit'
@@ -66,3 +66,16 @@ def test_desenvolvimento_independente_com_mailpit_e_fontes(render):
     assert 'mailpit' in services['api']['depends_on']
     assert any(v['target'] == '/code/migrations' for v in services['migrate']['volumes'])
     assert all(not v.get('external') for v in model['volumes'].values())
+    worker = services['djen-worker']
+    assert worker['command'] == ['python', 'scripts/agendar_djen.py']
+    assert worker['depends_on']['migrate']['condition'] == 'service_completed_successfully'
+    assert worker['environment']['DB_HOST'] == 'db'
+    assert any(v['target'] == '/code/scripts' and v['read_only'] for v in worker['volumes'])
+
+
+def test_worker_modelos_em_ambos_composes(render):
+    for arquivo in ('docker-compose.dev.yml', 'docker-compose.yml'):
+        worker = render(arquivo)['services']['djen-ml-worker']
+        assert worker['command'] == ['python', '-m', 'scripts.processar_djen_modelos']
+        assert worker['depends_on']['migrate']['condition'] == 'service_completed_successfully'
+        assert worker['environment']['DB_HOST'] == 'db'

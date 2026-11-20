@@ -14,23 +14,25 @@ class EnderecoRepository(BaseRepository):
         super().__init__()
 
     def find_by_id(self, id: int) -> Endereco | None:
-        stmt = select(enderecos).where(enderecos.c.id == id)
+        stmt = self.escopo(select(enderecos).where(enderecos.c.id == id), enderecos)
         result = self.session.execute(stmt).one_or_none()
         return from_dict(Endereco, dict(result._mapping)) if result else None
 
     def get_by_ids(self, ids: list[int]) -> list[Endereco]:
         if not ids:
             return []
-        stmt = select(enderecos).where(enderecos.c.id.in_(ids))
+        stmt = self.escopo(select(enderecos).where(enderecos.c.id.in_(ids)), enderecos)
         results = self.session.execute(stmt).all()
         return [from_dict(Endereco, dict(row._mapping)) for row in results]
 
     def create(self, endereco_data: dict[str, Any]) -> int:
-        stmt = insert(enderecos).values(**endereco_data)
+        stmt = insert(enderecos).values(**self.valores(endereco_data))
         result = self.session.execute(stmt)
         self.session.flush()
         return result.lastrowid
 
     def update(self, id: int, endereco_data: dict[str, Any]) -> None:
-        stmt = sql_update(enderecos).where(enderecos.c.id == id).values(**endereco_data)
+        stmt = self.escopo(
+            sql_update(enderecos).where(enderecos.c.id == id), enderecos
+        ).values(**endereco_data)
         self.session.execute(stmt)

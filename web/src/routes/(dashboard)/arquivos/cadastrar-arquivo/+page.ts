@@ -1,4 +1,4 @@
-import { ARQUIVO_PAPEIS_EDITAM } from '$lib/types';
+import { ARQUIVO_PAPEIS_EDITAM } from '#lib/types/index.ts';
 import { error } from '@sveltejs/kit';
 
 export const load = async ({ parent }) => {

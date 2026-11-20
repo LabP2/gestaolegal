@@ -9,12 +9,18 @@ from gestaolegal.exceptions import ValidationException
 from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.password_reset_repository import PasswordResetRepository
 from gestaolegal.repositories.user_repository import UserRepository
+from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.mail_service import enviar_link_recuperacao
+from gestaolegal.utils.request_context import RequestContext, sem_tenant
 
 logger = logging.getLogger(__name__)
 
 MSG_LINK_INVALIDO = "Link inválido ou expirado. Peça um novo link para redefinir a sua senha."
+
+# Validade do link de primeiro acesso do admin de um NPJ novo. É maior que a do
+# "esqueci a senha" porque o link é repassado à mão pela plataforma (D10).
+PRIMEIRO_ACESSO_TTL = timedelta(days=3)
 
 
 def _hash(token: str) -> str:
@@ -41,6 +47,12 @@ class PasswordResetService:
         mesmo caminho: registra em log e não faz nada. Quem chamou responde a
         mesma mensagem em todos os casos.
         """
+        # Quem pede a recuperação ainda não tem NPJ: ele sai do e-mail.
+        tenant_id = self.usuario_service.tenant_por_email(email)
+        if tenant_id is None:
+            logger.info(f"Recuperação de senha pedida para e-mail sem conta: {email}")
+            return
+        RequestContext.set_tenant(tenant_id)
         usuario = self.user_repository.find_by_email(email)
         if not usuario or not usuario.id:
             logger.info(f"Recuperação de senha pedida para e-mail sem conta: {email}")
@@ -73,8 +85,33 @@ class PasswordResetService:
         url = f"{Config.FRONTEND_URL}/redefinir-senha/{token}"
         enviar_link_recuperacao(usuario.email, usuario.nome, url)
 
+    def emitir_primeiro_acesso(self, usuario_id: int) -> str:
+        """Link de definição de senha para uma conta recém-criada.
+
+        Usa o tenant ativo e a mesma tabela do "esqueci a senha", então a tela
+        `/redefinir-senha` serve aos dois casos. Não envia e-mail: quem chama
+        mostra o link (plano §6.3).
+        """
+        token = secrets.token_urlsafe(32)
+        self.repository.invalidate_for_user(usuario_id)
+        self.repository.create(
+            usuario_id, _hash(token), datetime.now() + PRIMEIRO_ACESSO_TTL
+        )
+        return f"{Config.FRONTEND_URL}/redefinir-senha/{token}"
+
+    def _registro_valido(self, token: str):
+        """Token válido, com o NPJ dele já ativo. None se o link não vale."""
+        with sem_tenant("recuperação de senha: localizar o token"):
+            registro = self.repository.find_valid_by_hash(_hash(token))
+            if registro is not None and not TenantRepository().ativo(registro.tenant_id):
+                return None
+        if registro is None or registro.tenant_id is None:
+            return None
+        RequestContext.set_tenant(registro.tenant_id)
+        return registro
+
     def validar(self, token: str) -> UserInfo:
-        registro = self.repository.find_valid_by_hash(_hash(token))
+        registro = self._registro_valido(token)
         if not registro:
             raise ValidationException(MSG_LINK_INVALIDO)
         usuario = self.usuario_service.find_by_id(registro.usuario_id)
@@ -89,7 +126,7 @@ class PasswordResetService:
                 field="password",
             )
 
-        registro = self.repository.find_valid_by_hash(_hash(token))
+        registro = self._registro_valido(token)
         if not registro or not registro.id:
             raise ValidationException(MSG_LINK_INVALIDO)
 
