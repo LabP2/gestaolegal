@@ -332,12 +332,17 @@ def exportar_exemplos():
 @djen_habilitado
 def listar_acervo():
     filtros = {
-        k: _texto(k) for k in ("rotulo", "origem", "situacao", "fonte", "sugestao")
+        k: _texto(k) for k in ("rotulo", "origem", "situacao", "situacao_operacional", "fonte", "sugestao")
     }
     filtros.update(inicio=_data("inicio"), fim=_data("fim"), nome_parte=_texto("nome_parte", 150), numero_processo=_texto("numero_processo", 30), oab=_texto("oab", 30))
     filtros['polo'] = _texto('polo', 12)
     filtros['tribunal'] = _tribunais()
     filtros['contexto_id'] = request.args.get('contexto_id', type=int)
+    filtros['texto_integral'] = request.args.get('texto_integral') == '1'
+    nomes = [nome.strip() for nome in request.args.getlist('nomes') if nome.strip()]
+    if len(nomes) + bool(filtros.get('nome_parte')) > 20 or any(not 3 <= len(nome) <= 150 for nome in nomes):
+        raise ValidationException('Informe até 20 nomes; variações devem ter de 3 a 150 caracteres', field='nomes')
+    filtros['nomes'] = nomes
     dados = DJENService().acervo.listar(
         RequestContext.get_unidade_ativa(),
         filtros,
@@ -444,6 +449,15 @@ def classificar_contexto(cid):
         RequestContext.get_unidade_ativa(), RequestContext.get_current_user().id))
 
 
+@djen_controller.route('/djen/contextos/<int:cid>/desfazer', methods=['POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def desfazer_classificacao_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().desfazer(cid, _corpo(),
+        RequestContext.get_unidade_ativa(), RequestContext.get_current_user().id))
+
+
 @djen_controller.route('/djen/contextos/<int:cid>/treinar', methods=['POST'])
 @authorized(*PAPEIS_GESTAO)
 @djen_habilitado
@@ -466,6 +480,14 @@ def previa_novo_contexto():
 def editar_contexto(cid):
     from gestaolegal.services.djen_contexto_service import DjenContextoService
     return success_response(data=DjenContextoService().editar(cid, _corpo(), RequestContext.get_unidade_ativa()))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>', methods=['DELETE'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def excluir_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().excluir(cid, RequestContext.get_unidade_ativa()))
 
 
 @djen_controller.route('/djen/contextos/<int:cid>/previa', methods=['POST'])

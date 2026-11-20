@@ -487,3 +487,48 @@ def test_filtros_identificacao_acervo(client, auth_headers, djen, transporte, fi
     assert r.status_code==200,r.json
     assert sorted(item['id_djen'] for item in r.json['data']['items'])==ids
     assert r.json['data']['total']==len(ids)
+
+
+def test_acervo_texto_integral_opcional_e_partes_sem_advogados(client, auth_headers, lote):
+    from sqlalchemy import update
+    from gestaolegal.database.session import get_session
+
+    texto = 'Texto completo da publicação.\n' * 40 + 'Último parágrafo.'
+    with contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        session.execute(update(djen_publicacoes).where(
+            djen_publicacoes.c.tenant_id == TENANT_DAJ
+        ).values(texto_plano=texto))
+        session.commit()
+    resposta = client.get('/api/djen/acervo?texto_integral=1&per_page=1', headers=auth_headers)
+    assert resposta.status_code == 200
+    dados = get_success_data(resposta)
+    assert dados['total'] == 2
+    assert len(dados['items']) == 1
+    item = dados['items'][0]
+    assert item['texto_plano'] == texto
+    assert item['partes'] == ['Fulana de Tal Fictícia', 'Empresa Imaginária Ltda']
+    assert item['partes_com_polo'] == [{'nome': 'Fulana de Tal Fictícia', 'polo': 'A'}, {'nome': 'Empresa Imaginária Ltda', 'polo': 'P'}]
+    assert 'Advogada Fictícia' not in item['partes']
+    assert 'texto_html' not in item
+    resumo = get_success_data(client.get('/api/djen/acervo', headers=auth_headers))
+    assert all('texto_plano' not in i for i in resumo['items'])
+
+
+def test_situacao_operacional_separa_pendente_de_nao_importada(client, auth_headers, lote):
+    from sqlalchemy import insert
+    from gestaolegal.database.session import get_session
+    from .conftest import UNIDADE_BH
+
+    pid = next(p['id'] for p in _linhas(djen_publicacoes) if p['id_djen'] == 91001)
+    with contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        session.execute(insert(djen_comunicacoes).values(
+            id_publicacao=pid, tenant_id=TENANT_DAJ, unidade_id=UNIDADE_BH, situacao='pendente'
+        ))
+        session.commit()
+    for situacao, ids in [('pendente', [91001]), ('nao_importada', [91002]), ('vinculada', [])]:
+        dados = get_success_data(client.get('/api/djen/acervo', headers=auth_headers, query_string={'situacao_operacional': situacao}))
+        assert [i['id_djen'] for i in dados['items']] == ids
+    # A revisão operacional não altera avaliações de relevância.
+    assert rotulos() == {91001: 'nao_classificado', 91002: 'nao_classificado'}

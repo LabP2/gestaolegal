@@ -225,6 +225,7 @@ export interface ResumoExemplos {
 export const BUSCA_PARTE_MAX_DIAS = 30;
 
 export interface AcervoItem {
+	partes_com_polo?: DestinatarioPublicacao[];
 	partes?: string[];
 	atendidos_sugeridos?: { id: number; nome: string }[];
 	contextos?: ClassificacaoContexto[];
@@ -235,6 +236,7 @@ export interface AcervoItem {
 	sigla_tribunal: string | null;
 	nome_orgao: string | null;
 	resumo: string | null;
+	texto_plano?: string | null;
 	rotulo: RotuloExemplo;
 	origem: string;
 	situacao: string;
@@ -296,6 +298,12 @@ export interface AcervoDetalhe extends Omit<Partial<Publicacao>, 'situacao'> {
 		id_rotulado_por: number | null;
 		rotulado_em: string;
 	}[];
+}
+
+/** `historico` traz, por ID DJEN, a mudança gravada; só ela pode ser desfeita. */
+export interface ClassificacaoContextoResposta {
+	classificadas: number;
+	historico?: Record<number, number>;
 }
 
 export type Monitoramento = {

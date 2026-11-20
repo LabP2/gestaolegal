@@ -5,7 +5,12 @@ import pytest
 from sqlalchemy import func, select
 
 from gestaolegal.database.session import get_session
-from gestaolegal.database.tables import djen_comunicacoes, djen_publicacoes
+from gestaolegal.database.tables import (
+    djen_comunicacoes,
+    djen_contexto_historico,
+    djen_publicacao_contextos,
+    djen_publicacoes,
+)
 from gestaolegal.utils.request_context import contexto_tenant
 
 from .conftest import TENANT_DAJ, UNIDADE_BH, get_success_data
@@ -109,10 +114,14 @@ def test_contexto_ids_malformado(client, auth_headers, lote, contexto_ids):
     assert resp.status_code == 400, resp.json
 
 
-def test_limpeza_manual_resiste_a_importacao(client, auth_headers, lote):
+# Decisão de 20/11/2026: "Não analisado" retira a avaliação e devolve a publicação a
+# pendência comum. Antes, a limpeza manual resistia à operação; os dois testes abaixo
+# afirmavam o contrário e foram reescritos por decisão explícita.
+def test_limpeza_manual_volta_a_aceitar_importacao(client, auth_headers, lote):
     a = criar(client, auth_headers)
     assert rotular(client, auth_headers, a, "relevante").status_code == 200
     assert rotular(client, auth_headers, a, "nao_classificado").status_code == 200
+    assert relacao_de(client, auth_headers, a) == ("nao_classificado", "captura")
     resp = client.post(
         "/api/djen/busca-parte/importar",
         headers=auth_headers,
@@ -120,15 +129,153 @@ def test_limpeza_manual_resiste_a_importacao(client, auth_headers, lote):
     )
     assert resp.status_code == 200, resp.json
     assert buscar(client, auth_headers).status_code == 200
-    assert rotulo_de(client, auth_headers, a) == "nao_classificado"
+    assert rotulo_de(client, auth_headers, a) == "relevante"
+    assert relacao_de(client, auth_headers, a)[1] != "classificacao"
 
 
-def test_limpeza_manual_resiste_a_vinculo_automatico(client, auth_headers, lote):
+def test_limpeza_manual_volta_a_aceitar_vinculo_automatico(client, auth_headers, lote):
     a = criar(client, auth_headers)
+    assert rotular(client, auth_headers, a, "irrelevante").status_code == 200
     assert rotular(client, auth_headers, a, "nao_classificado").status_code == 200
     # O processo da 91001 está cadastrado: a reconsulta vincula automaticamente.
     assert buscar(client, auth_headers).status_code == 200
-    assert rotulo_de(client, auth_headers, a) == "nao_classificado"
+    assert rotulo_de(client, auth_headers, a) == "relevante"
+
+
+def test_limpeza_de_rotulo_operacional_volta_a_captura(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    descartar(client, auth_headers, a)
+    assert relacao_de(client, auth_headers, a, 91002) == ("irrelevante", "descarte")
+    assert rotular(client, auth_headers, a, "nao_classificado", [91002]).status_code == 200
+    assert relacao_de(client, auth_headers, a, 91002) == ("nao_classificado", "captura")
+
+
+def relacao_de(client, headers, cid, id_djen=91001):
+    item = next(x for x in listar(client, headers, cid)["items"] if x["id_djen"] == id_djen)
+    return item["contextos"][0]["rotulo"], item["contextos"][0]["origem"]
+
+
+def descartar(client, headers, cid, id_djen=91002):
+    resp = client.post(
+        "/api/djen/acervo/descartar",
+        headers=headers,
+        json={"ids": [id_djen], "contexto_ids": [cid]},
+    )
+    assert resp.status_code == 200, resp.json
+
+
+def classificar_e_obter_historico(client, headers, cid, rotulo, id_djen=91002):
+    resp = rotular(client, headers, cid, rotulo, [id_djen])
+    assert resp.status_code == 200, resp.json
+    return get_success_data(resp)["historico"][str(id_djen)]
+
+
+def desfazer(client, headers, cid, historico_id):
+    return client.post(
+        f"/api/djen/contextos/{cid}/desfazer",
+        headers=headers,
+        json={"historico_id": historico_id},
+    )
+
+
+def historico_de(client, headers, id_djen=91002):
+    pid = _linhas(djen_publicacoes, id_djen=id_djen)[0]["id"]
+    detalhe = get_success_data(client.get(f"/api/djen/acervo/{pid}", headers=headers))
+    return [h for h in detalhe["historico"] if h["contexto_nome"] != "Legado (sem contexto)"]
+
+
+def test_desfazer_devolve_captura_e_operacao_volta_a_rotular(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    hid = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+    resp = desfazer(client, auth_headers, a, hid)
+    assert resp.status_code == 200, resp.json
+    assert relacao_de(client, auth_headers, a, 91002) == ("nao_classificado", "captura")
+    descartar(client, auth_headers, a)
+    assert relacao_de(client, auth_headers, a, 91002) == ("irrelevante", "descarte")
+
+
+def test_desfazer_restaura_origem_autor_e_data_operacionais(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    descartar(client, auth_headers, a)
+    antes = _linhas(djen_publicacao_contextos, contexto_id=a, rotulo="irrelevante")[0]
+    hid = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    assert desfazer(client, auth_headers, a, hid).status_code == 200
+    depois = _linhas(djen_publicacao_contextos, id=antes["id"])[0]
+    for campo in ("rotulo", "origem", "id_rotulado_por", "rotulado_em"):
+        assert depois[campo] == antes[campo], campo
+    assert depois["origem"] == "descarte"
+    # O histórico registra a reversão sem apagar a decisão desfeita.
+    assert [
+        (h["rotulo_anterior"], h["rotulo"], h["origem"]) for h in historico_de(client, auth_headers)
+    ] == [
+        ("relevante", "irrelevante", "reversao"),
+        ("irrelevante", "relevante", "classificacao"),
+        ("nao_classificado", "irrelevante", "descarte"),
+    ]
+    assert historico_de(client, auth_headers)[0]["id_rotulado_por"]
+
+
+def test_desfazer_recusa_duas_vezes_e_mudanca_posterior(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    primeiro = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    segundo = classificar_e_obter_historico(client, auth_headers, a, "irrelevante")
+    # A aba desatualizada tenta desfazer a primeira decisão: não é mais a última.
+    assert desfazer(client, auth_headers, a, primeiro).status_code == 400
+    assert relacao_de(client, auth_headers, a, 91002) == ("irrelevante", "classificacao")
+    assert desfazer(client, auth_headers, a, segundo).status_code == 200
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+    # A reversão não é, ela mesma, reversível; e não se repete.
+    assert desfazer(client, auth_headers, a, segundo).status_code == 400
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+
+
+def test_desfazer_recusa_decisao_de_outra_pessoa(
+    client, auth_headers, prof_auth_headers, lote
+):
+    a = criar(client, auth_headers)
+    hid = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    assert desfazer(client, prof_auth_headers, a, hid).status_code == 400
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+
+
+def test_desfazer_recusa_outro_contexto_outra_unidade_e_corpo_invalido(
+    client, auth_headers, auth_headers_nl, estagiario_auth_headers, lote
+):
+    a = criar(client, auth_headers)
+    b = criar(client, auth_headers, "Outro contexto")
+    hid = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    assert desfazer(client, auth_headers, b, hid).status_code == 400
+    assert desfazer(client, auth_headers_nl, a, hid).status_code == 404
+    assert desfazer(client, estagiario_auth_headers, a, hid).status_code == 403
+    for invalido in (None, "1", True, 999999):
+        assert desfazer(client, auth_headers, a, invalido).status_code == 400
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+
+
+def test_desfazer_recusa_historico_anterior_a_migration(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    hid = classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    with client.application.test_request_context(), contexto_tenant(TENANT_DAJ):
+        session = get_session()
+        session.execute(
+            djen_contexto_historico.update()
+            .where(
+                djen_contexto_historico.c.tenant_id == TENANT_DAJ,
+                djen_contexto_historico.c.id == hid,
+            )
+            .values(origem_anterior=None)
+        )
+        session.commit()
+    assert desfazer(client, auth_headers, a, hid).status_code == 400
+    assert relacao_de(client, auth_headers, a, 91002) == ("relevante", "classificacao")
+
+
+def test_classificar_repetido_nao_oferece_reversao(client, auth_headers, lote):
+    a = criar(client, auth_headers)
+    classificar_e_obter_historico(client, auth_headers, a, "relevante")
+    resp = rotular(client, auth_headers, a, "relevante", [91002])
+    assert get_success_data(resp)["historico"] == {}
 
 
 def test_descarte_pela_rota_individual_nao_avalia_contextos(client, auth_headers, lote):

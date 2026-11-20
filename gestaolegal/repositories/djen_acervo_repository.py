@@ -3,7 +3,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import insert, select, update, func, exists
+from sqlalchemy import insert, select, update, func, exists, or_
 
 from gestaolegal.database.tables import (
     djen_publicacoes as p,
@@ -217,15 +217,20 @@ class DjenAcervoRepository(BaseRepository):
                         )
                     )
                 )
+        nomes = list(dict.fromkeys([n for n in [filtros.get("nome_parte"), *(filtros.get("nomes") or [])] if n]))
+        dialect = self.session.get_bind().dialect.name
         stmt = filtrar_identificacao(
-            stmt,
-            p,
-            self.session.get_bind().dialect.name,
-            filtros.get("nome_parte"),
-            filtros.get("numero_processo"),
-            filtros.get("oab"),
-            filtros.get("polo"),
+            stmt, p, dialect,
+            numero_processo=filtros.get("numero_processo"),
+            oab=filtros.get("oab"),
+            polo=filtros.get("polo") if not nomes else None,
         )
+        if nomes:
+            # Cada variação deve corresponder a uma parte no polo escolhido.
+            stmt = stmt.where(or_(*[
+                filtrar_identificacao(select(p.c.id), p, dialect, nome_parte=nome, polo=filtros.get("polo")).whereclause
+                for nome in nomes
+            ]))
         tribunais = filtros.get("tribunal")
         if tribunais:
             stmt = stmt.where(p.c.sigla_tribunal.in_(
@@ -241,13 +246,17 @@ class DjenAcervoRepository(BaseRepository):
             stmt = stmt.where(p.c.data_disponibilizacao >= filtros["inicio"])
         if filtros.get("fim"):
             stmt = stmt.where(p.c.data_disponibilizacao <= filtros["fim"])
-        if filtros.get("situacao"):
-            op = self.escopo(select(o.c.id).where(o.c.id_publicacao == p.c.id), o)
-            stmt = stmt.where(
-                (~exists(op) | exists(op.where(o.c.situacao == "pendente")))
-                if filtros["situacao"] == "nao_importada"
-                else exists(op.where(o.c.situacao == filtros["situacao"]))
-            )
+        situacao = filtros.get("situacao_operacional") or filtros.get("situacao")
+        if situacao:
+            op = self.escopo(select(o.c.id).where(o.c.id_publicacao == p.c.id, o.c.unidade_id == unidade), o)
+            if situacao == "nao_importada":
+                predicado = ~exists(op)
+                if not filtros.get("situacao_operacional"):
+                    predicado = predicado | exists(op.where(o.c.situacao == "pendente"))
+            else:
+                predicado = exists(op.where(o.c.situacao == situacao))
+            stmt = stmt.where(predicado)
+
         if filtros.get("fonte"):
             fonte = self.escopo(
                 select(acesso.c.id).where(
@@ -292,7 +301,7 @@ class DjenAcervoRepository(BaseRepository):
         total = self.session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
-        # Listas não transportam o texto integral.
+        # O treino solicita o texto integral apenas para a página exibida.
         stmt = stmt.with_only_columns(
             p.c.id,
             p.c.id_djen,
@@ -305,6 +314,8 @@ class DjenAcervoRepository(BaseRepository):
             c.c.origem,
             func.substr(p.c.texto_plano, 1, 240).label("resumo"),
         )
+        if filtros.get("texto_integral"):
+            stmt = stmt.add_columns(p.c.texto_plano)
         itens = [
             dict(x)
             for x in self.session.execute(
@@ -329,6 +340,10 @@ class DjenAcervoRepository(BaseRepository):
         nomes = [d.get("nome", "") for item in itens for d in (item["destinatarios"] or [])]
         sugestoes = AtendidoRepository().sugerir_por_nomes(nomes, unidade)
         for item in itens:
+            item["partes_com_polo"] = [
+                {"nome": d.get("nome"), "polo": d.get("polo")}
+                for d in (item["destinatarios"] or []) if d.get("nome")
+            ]
             item["partes"] = list(dict.fromkeys(d.get("nome") for d in (item.pop("destinatarios") or []) if d.get("nome")))
             candidatos = {a["id"]: a for nome in item["partes"] for a in sugestoes.get(nome, [])}
             item["atendidos_sugeridos"] = list(candidatos.values())

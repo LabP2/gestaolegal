@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import { page } from '$app/state';
 	import { api } from '#lib/api-client.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -8,13 +9,26 @@
 	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	let {
 		contexto = null,
-		salvar
-	}: { contexto?: ContextoDjen | null; salvar: (contexto: ContextoDjen) => Promise<void> } =
-		$props();
+		salvar,
+		excluido
+	}: {
+		contexto?: ContextoDjen | null;
+		salvar: (contexto: ContextoDjen) => Promise<void>;
+		excluido?: () => Promise<void>;
+	} = $props();
 	function filtrosAtuais(): CriteriosContexto {
 		const p = page.url.searchParams;
 		return {
 			nome_parte: p.get('nome_parte') || '',
+			...(p.getAll('nomes').length
+				? {
+						nomes: [
+							...new Set(
+								[p.get('nome_parte'), ...p.getAll('nomes')].filter((n): n is string => !!n)
+							)
+						]
+					}
+				: {}),
 			polo: p.get('polo') || '',
 			numero_processo: p.get('numero_processo') || '',
 			oab: p.get('oab') || '',
@@ -26,6 +40,22 @@
 			fim: p.get('fim') || '',
 			fonte: p.get('fonte') || ''
 		};
+	}
+	let confirmarExclusao = $state(false);
+	let erroExclusao = $state('');
+	async function excluirContexto() {
+		if (!contexto || ocupado) return;
+		ocupado = true;
+		erroExclusao = '';
+		try {
+			await api.delete(`djen/contextos/${contexto.id}`);
+			confirmarExclusao = false;
+			await excluido?.();
+		} catch (e) {
+			erroExclusao = mensagemDeErro(e, 'Não foi possível excluir o contexto.');
+		} finally {
+			ocupado = false;
+		}
 	}
 	let nome = $state('');
 	let descricao = $state('');
@@ -134,7 +164,9 @@
 			variant="outline"
 			onclick={() => {
 				criterios = filtrosAtuais();
-				nomes = criterios.nome_parte ?? '';
+				nomes = (criterios.nomes ?? (criterios.nome_parte ? [criterios.nome_parte] : [])).join(
+					'; '
+				);
 				tribunais = criterios.tribunal ?? [];
 			}}
 		>
@@ -193,3 +225,34 @@
 		</Button>
 	</fieldset>
 </form>
+
+{#if contexto}
+	<AlertDialog.Root bind:open={confirmarExclusao}>
+		<AlertDialog.Trigger
+			disabled={ocupado ||
+				contexto.treino_status === 'na_fila' ||
+				contexto.treino_status === 'executando'}
+			class="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+			onclick={() => (erroExclusao = '')}
+		>
+			Excluir contexto
+		</AlertDialog.Trigger>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Excluir o contexto “{contexto.nome}”?</AlertDialog.Title>
+				<AlertDialog.Description>
+					Cuidado: esta operação não pode ser desfeita. Serão excluídos o contexto, seus vínculos
+					com as publicações, avaliações, histórico, modelos e registros de treinamento. As
+					publicações, processos, casos e os demais contextos serão preservados.
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+			{#if erroExclusao}<p role="alert" class="text-sm text-destructive">{erroExclusao}</p>{/if}
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel disabled={ocupado}>Cancelar</AlertDialog.Cancel>
+				<Button variant="destructive" disabled={ocupado} onclick={excluirContexto}>
+					{ocupado ? 'Excluindo…' : 'Excluir definitivamente'}
+				</Button>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
+{/if}

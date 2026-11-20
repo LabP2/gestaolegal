@@ -1055,6 +1055,10 @@ djen_contexto_historico = Table(
     Column('rotulado_em', DateTime, nullable=False),
     Column('modelo_id', Integer, nullable=True),
     Column('sugestao', String(20), nullable=True),
+    # Estado da relação antes da mudança; permite reverter sem inferir a origem.
+    Column('origem_anterior', String(30), nullable=True),
+    Column('id_rotulado_por_anterior', Integer, nullable=True),
+    Column('rotulado_em_anterior', DateTime, nullable=True),
     coluna_tenant(),
     fk_tenant('djen_contexto_historico', 'relacao_id', 'djen_publicacao_contextos'),
     fk_tenant('djen_contexto_historico', 'id_rotulado_por', 'usuarios'),

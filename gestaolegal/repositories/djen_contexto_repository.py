@@ -2,7 +2,7 @@
 
 from datetime import datetime
 import unicodedata
-from sqlalchemy import select, insert, update, func, exists
+from sqlalchemy import select, insert, update, delete, func, exists
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.database.tables import (
     djen_contextos as c,
@@ -145,7 +145,12 @@ class DjenContextoRepository(BaseRepository):
         for ctx in self.session.execute(self.escopo(select(c), c)).mappings().all():
             self.sincronizar(dict(ctx), pid)
 
-    def rotular(self, pid, cid, rotulo, origem, usuario, inicial=False):
+    def rotular(self, pid, cid, rotulo, origem, usuario, inicial=False, manual=False):
+        """Devolve o id da linha de histórico gravada, ou None se nada mudou.
+
+        `manual` identifica a ação direta de uma pessoa na tela de treino: ela
+        substitui uma avaliação manual mesmo quando grava outra origem.
+        """
         atual = (
             self.session.execute(
                 self.escopo(
@@ -159,7 +164,7 @@ class DjenContextoRepository(BaseRepository):
             raise ValidationException("Publicação não pertence ao contexto")
         if inicial and atual["origem"] != "captura":
             return
-        if origem != "classificacao" and atual["origem"] == "classificacao":
+        if not manual and origem != "classificacao" and atual["origem"] == "classificacao":
             return
         if atual["rotulo"] == rotulo and atual["origem"] == origem:
             return
@@ -169,23 +174,37 @@ class DjenContextoRepository(BaseRepository):
             id_rotulado_por=usuario,
             rotulado_em=datetime.now(),
         )
-        self.session.execute(
+        return self._gravar_mudanca(atual, cid, valores)
+
+    def _gravar_mudanca(self, atual, cid, valores, historico=None):
+        """Grava histórico com o estado anterior e aplica `valores` à relação.
+
+        `historico` sobrepõe campos só na linha de histórico: na reversão a relação
+        recebe autor e origem restaurados, e o histórico registra quem reverteu.
+        """
+        # O histórico sempre data a ação; a relação pode receber a data restaurada.
+        registro = dict(valores, rotulado_em=datetime.now(), **(historico or {}))
+        hid = self.session.execute(
             insert(h).values(
                 **self.valores(
                     dict(
                         relacao_id=atual["id"],
                         rotulo_anterior=atual["rotulo"],
+                        origem_anterior=atual["origem"],
+                        id_rotulado_por_anterior=atual["id_rotulado_por"],
+                        rotulado_em_anterior=atual["rotulado_em"],
                         modelo_id=atual["modelo_id"],
                         sugestao=atual["sugestao"],
-                        **valores,
+                        **registro,
                     )
                 )
             )
-        )
+        ).lastrowid
         self.session.execute(
             self.escopo(update(r).where(r.c.id == atual["id"]), r).values(**valores)
         )
         self.session.execute(self.escopo(update(c).where(c.c.id == cid), c).values(avaliacoes_versao=c.c.avaliacoes_versao + 1))
+        return hid
 
     def relacoes(self, pids, unidade, contexto=None):
         stmt = self.escopo(
@@ -298,14 +317,75 @@ class DjenContextoRepository(BaseRepository):
         pubs = DjenAcervoRepository().selecionadas(ids, unidade)
         if len(pubs) != len(ids):
             raise ValidationException("Publicação não encontrada")
+        # "Não analisado" retira a avaliação: a relação volta a ser pendência comum
+        # e aceita de novo rótulos vindos de vínculo ou descarte.
+        origem = "captura" if rotulo == "nao_classificado" else "classificacao"
+        historico = {}
         try:
             for pub in pubs:
-                self.rotular(pub["id"], cid, rotulo, "classificacao", usuario)
+                hid = self.rotular(pub["id"], cid, rotulo, origem, usuario, manual=True)
+                if hid is not None:
+                    historico[pub["id_djen"]] = hid
             self.session.commit()
         except Exception:
             self.session.rollback()
             raise
-        return {"classificadas": len(pubs)}
+        return {"classificadas": len(pubs), "historico": historico}
+
+    def desfazer(self, cid, corpo, unidade, usuario):
+        """Reverte a própria última classificação manual, restaurando rótulo e origem."""
+        self.obter(cid, unidade)
+        hid = corpo.get("historico_id")
+        if type(hid) is not int:
+            raise ValidationException("Informe a classificação a desfazer")
+        recusa = ValidationException(
+            "A avaliação foi alterada depois da sua classificação. Recarregue a lista."
+        )
+        try:
+            linha = self.session.execute(
+                self.escopo(select(h).where(h.c.id == hid), h)
+            ).mappings().first()
+            if not linha:
+                raise recusa
+            atual = self.session.execute(
+                self.escopo(
+                    select(r).where(
+                        r.c.id == linha["relacao_id"],
+                        r.c.contexto_id == cid,
+                        r.c.ativo.is_(True),
+                    ),
+                    r,
+                ).with_for_update()
+            ).mappings().first()
+            if not atual:
+                raise recusa
+            ultima = self.session.execute(
+                self.escopo(select(func.max(h.c.id)).where(h.c.relacao_id == atual["id"]), h)
+            ).scalar_one()
+            if (
+                ultima != hid
+                or linha["origem"] != "classificacao"
+                or linha["id_rotulado_por"] != usuario
+                or linha["origem_anterior"] is None
+                or (atual["rotulo"], atual["origem"]) != (linha["rotulo"], linha["origem"])
+            ):
+                raise recusa
+            self._gravar_mudanca(
+                atual,
+                cid,
+                dict(
+                    rotulo=linha["rotulo_anterior"],
+                    origem=linha["origem_anterior"],
+                    id_rotulado_por=linha["id_rotulado_por_anterior"],
+                    rotulado_em=linha["rotulado_em_anterior"],
+                ),
+                historico=dict(origem="reversao", id_rotulado_por=usuario),
+            )
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        return {"rotulo": linha["rotulo_anterior"], "origem": linha["origem_anterior"]}
 
     def amostras(self, cid):
         rows = (
@@ -605,6 +685,26 @@ class DjenContextoRepository(BaseRepository):
         self.session.execute(self.escopo(update(r).where(r.c.contexto_id == cid), r).values(modelo_id=None, sugestao=None, probabilidade=None))
         self.session.commit()
         return self.obter(cid, unidade)
+
+    def excluir(self, cid, unidade):
+        try:
+            atual = self.session.execute(self.escopo(
+                select(c).where(c.c.id == cid, c.c.unidade_id == unidade), c
+            ).with_for_update()).mappings().first()
+            if atual is None:
+                raise NotFoundException("Contexto", cid)
+            if atual['treino_status'] in ('na_fila', 'executando'):
+                raise ValidationException('Aguarde o treinamento terminar antes de excluir o contexto')
+            relacoes = self.escopo(select(r.c.id).where(r.c.contexto_id == cid), r)
+            self.session.execute(self.escopo(delete(h).where(h.c.relacao_id.in_(relacoes)), h))
+            for tabela in (r, t, m):
+                self.session.execute(self.escopo(delete(tabela).where(tabela.c.contexto_id == cid), tabela))
+            self.session.execute(self.escopo(delete(c).where(c.c.id == cid, c.c.unidade_id == unidade), c))
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        return {"excluido": True}
 
     @staticmethod
     def metricas_publicas(metricas):

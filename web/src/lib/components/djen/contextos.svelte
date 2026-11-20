@@ -14,7 +14,7 @@
 		treino,
 		ocupadoExterno = false
 	}: { contextos: ContextoDjen[]; treino: boolean; ocupadoExterno?: boolean } = $props();
-	let editor = $state<'novo' | 'editar' | null>(null);
+	let editor = $state<'editar' | null>(null);
 	let atualizado = $state<ContextoDjen[] | null>(null);
 	let ocupado = $state(false);
 	$effect(() => {
@@ -52,11 +52,19 @@
 	});
 	async function selecionar(id: string) {
 		editor = null;
-		const p = new URLSearchParams(page.url.search);
+		// No treino, entrar num contexto abre a fila limpa: filtros do contexto anterior,
+		// somados ao novo, costumam produzir lista vazia. Sair do contexto (ou excluí-lo)
+		// mantém os filtros da tela.
+		const limpar = treino && !!id;
+		const p = new URLSearchParams(limpar ? '' : page.url.search);
+		const porPagina = page.url.searchParams.get('per_page');
+		if (limpar && porPagina) p.set('per_page', porPagina);
 		p.delete('page');
 		p.delete('rotulo');
-		if (id) p.set('contexto_id', id);
-		else p.delete('contexto_id');
+		if (id) {
+			p.set('contexto_id', id);
+			if (treino) p.set('rotulo', 'nao_classificado');
+		} else p.delete('contexto_id');
 		await goto(`?${p}`);
 	}
 	async function salvo(ctx: ContextoDjen) {
@@ -64,6 +72,12 @@
 		await selecionar(String(ctx.id));
 		await refreshAll();
 		toast.success('Contexto salvo.');
+	}
+	async function excluido() {
+		editor = null;
+		await selecionar('');
+		await refreshAll();
+		toast.success('Contexto excluído. As publicações foram preservadas.');
 	}
 	async function treinar() {
 		if (!selecionado || ocupado) return;
@@ -102,13 +116,6 @@
 				</Select.Content>
 			</Select.Root>
 		</div>
-		{#if treino}<Button
-				variant="outline"
-				disabled={ocupado || ocupadoExterno}
-				onclick={() => (editor = editor === 'novo' ? null : 'novo')}
-			>
-				{editor === 'novo' ? 'Cancelar criação' : 'Novo contexto'}
-			</Button>{/if}
 		{#if treino && selecionado}<Button
 				variant="outline"
 				disabled={ocupado || ocupadoExterno || emTreino}
@@ -120,6 +127,7 @@
 	{#if editor}{#key `${editor}-${selecionado?.id ?? 0}`}<ContextoEditor
 				contexto={editor === 'editar' ? selecionado : null}
 				salvar={salvo}
+				{excluido}
 			/>{/key}{/if}
 	{#if selecionado}
 		<p class="text-sm">{selecionado.descricao || 'Objetivo não informado.'}</p>
