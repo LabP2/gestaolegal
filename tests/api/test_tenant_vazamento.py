@@ -303,6 +303,7 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("GET", "/api/atendido/<int:id>"): Rota("id", {"id": "atendido"}),
     ("PUT", "/api/atendido/<int:id>"): Rota("id", {"id": "atendido"}, json=lambda _: {"nome": "Alterado"}),
     ("DELETE", "/api/atendido/<int:id>"): Rota("id", {"id": "atendido"}),
+    ("POST", "/api/atendido/<int:id>/reativar"): Rota("id", {"id": "atendido"}),
     ("PUT", "/api/atendido/<int:id>/assistido"): Rota("id", {"id": "assistido_atendido"}, json=_assistido),
     ("GET", "/api/atendido/<int:id>/casos"): Rota("id", {"id": "atendido"}),
     ("GET", "/api/atendido/<int:id>/orientacoes"): Rota("id", {"id": "atendido"}),

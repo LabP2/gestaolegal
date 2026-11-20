@@ -771,7 +771,7 @@ test('DJEN: sugestões por contexto divergem e operação recebe escolha explíc
  await expect(page.getByText('Sugestões divergentes',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Revisar',exact:true}).first().click();
  await expect(page.getByText(/Sugestão: Irrelevante · modelo #2/)).toBeVisible();
- await page.getByRole('button',{name:'Sugestão do modelo',exact:true}).click();
+ await page.getByRole('combobox',{name:'Sugestão do modelo',exact:true}).click();
  await page.getByRole('option',{name:'Irrelevante',exact:true}).click();
  await page.getByRole('button',{name:'Filtrar',exact:true}).click();
  await expect(page).toHaveURL(/sugestao=irrelevante/);
