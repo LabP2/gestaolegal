@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as Dialog from '$lib/components/ui/dialog';
-	import ProcessoForm from '$lib/forms/processo-form.svelte';
-	import type { Processo } from '$lib/types';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import ProcessoForm from '#lib/forms/processo-form.svelte';
+	import type { Processo } from '#lib/types/index.ts';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import type { ProcessoCreateFormSchema } from '$lib/forms/schemas/processo-schema';
-	import { toISODateInput } from '$lib/utils/date';
+	import type { ProcessoCreateFormSchema } from '#lib/forms/schemas/processo-schema.ts';
+	import { toISODateInput } from '#lib/utils/date.ts';
 
 	let {
 		casoId,
@@ -28,6 +28,8 @@
 		processo
 			? {
 					...formData,
+					// Não reutilizar o ID do formulário vazio retornado pelo layout.
+					id: `processo-modal-editar-${processo.id}`,
 					data: {
 						...formData.data,
 						especie: processo.especie,

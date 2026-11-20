@@ -131,6 +131,13 @@ def delete(id: int):
     return success_response(message="Atendido desativado com sucesso")
 
 
+@atendido_controller.route("/<int:id>/reativar", methods=["POST"])
+@authorized("admin")
+def reactivate(id: int):
+    AtendidoService().reactivate(id)
+    return success_response(message="Atendido reativado com sucesso")
+
+
 @atendido_controller.route("/<int:id>/tornar-assistido", methods=["POST"])
 @authenticated
 def tornar_assistido(id: int):

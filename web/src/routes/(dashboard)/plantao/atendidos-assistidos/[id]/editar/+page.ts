@@ -1,13 +1,13 @@
-import { superValidate } from 'sveltekit-superforms';
+import { superValidate, type Infer } from 'sveltekit-superforms';
 import { error } from '@sveltejs/kit';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { atendidoUpdateFormSchema, legacyEditSchema } from '$lib/forms/schemas/atendido-schema';
-import { assistidoUpdateFormSchema } from '$lib/forms/schemas/assistido-schema';
+import { atendidoUpdateFormSchema, legacyEditSchema } from '#lib/forms/schemas/atendido-schema.ts';
+import { assistidoUpdateFormSchema } from '#lib/forms/schemas/assistido-schema.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import type { Atendido } from '$lib/types';
-import { toISODateInput } from '$lib/utils/date';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import type { Atendido } from '#lib/types/index.ts';
+import { toISODateInput } from '#lib/utils/date.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {
@@ -23,9 +23,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			// The API serializes dates as GMT strings; the form's date picker needs
 			// ISO "YYYY-MM-DD" or the update request fails backend validation.
 			data_nascimento: toISODateInput(atendidoRest.data_nascimento),
-			nascimento_repres_legal: toISODateInput(
-				(atendidoRest as { nascimento_repres_legal?: string }).nascimento_repres_legal
-			),
+			nascimento_repres_legal: toISODateInput(atendidoRest.nascimento_repres_legal),
 			logradouro: endereco?.logradouro,
 			numero: endereco?.numero,
 			complemento: endereco?.complemento,

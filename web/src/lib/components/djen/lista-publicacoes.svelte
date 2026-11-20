@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import FiltroTribunais from './filtro-tribunais.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import * as Select from '$lib/components/ui/select';
+	import DataTable from '#lib/components/data-table.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import StatusSincronizacao from './status-sincronizacao.svelte';
 	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
-	import { usePaginatedFilters } from '$lib';
+	import { usePaginatedFilters } from '#lib';
 	import {
 		DJEN_PAPEIS_GESTAO,
 		SITUACAO_PUBLICACAO_LABEL,
 		type Paginated,
 		type PublicacaoListItem,
 		type StatusDjen
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 
@@ -75,7 +75,7 @@
 	const semTodos = (v: string) => (v === TODOS ? '' : v);
 
 	const { filters, applyFilters, setFilters } = usePaginatedFilters<Filtros>({
-		initialFilters: filtrosDaUrl(page.url),
+		initialFilters: filtrosDaUrl(new URL(page.url.href)),
 		buildParams: (f) => ({
 			per_page: f.per_page,
 			q: f.q.trim(),
@@ -93,7 +93,7 @@
 
 	// Voltar/avançar no navegador ou clicar no menu: os filtros seguem a URL.
 	afterNavigate((nav) => {
-		if (nav.type !== 'goto') setFilters(filtrosDaUrl(page.url));
+		if (nav.type !== 'goto') setFilters(filtrosDaUrl(new URL(page.url.href)));
 	});
 
 	const situacoes = $derived([
@@ -146,8 +146,9 @@
 				/>
 			</div>
 			<div>
-				<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">Nome da parte</label
-				><Input
+				<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">
+					Nome da parte
+				</label><Input
 					id="djen-nome_parte"
 					bind:value={filters.nome_parte}
 					ondebounceinput={() => applyFilters()}
@@ -158,23 +159,20 @@
 			<div class="w-full sm:w-40">
 				<span class="mb-1 block text-sm font-medium">Polo da parte</span>
 				<Select.Root type="single" bind:value={filters.polo} onValueChange={() => applyFilters()}>
-					<Select.Trigger class="w-full" aria-label="Polo da parte"
-						>{filters.polo === 'A'
-							? 'Ativo'
-							: filters.polo === 'P'
-								? 'Passivo'
-								: 'Todos'}</Select.Trigger
-					>
-					<Select.Content
-						><Select.Item value={TODOS}>Todos</Select.Item><Select.Item value="A">Ativo</Select.Item
-						><Select.Item value="P">Passivo</Select.Item></Select.Content
-					>
+					<Select.Trigger class="w-full" aria-label="Polo da parte">
+						{filters.polo === 'A' ? 'Ativo' : filters.polo === 'P' ? 'Passivo' : 'Todos'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value={TODOS}>Todos</Select.Item><Select.Item value="A">
+							Ativo
+						</Select.Item><Select.Item value="P">Passivo</Select.Item>
+					</Select.Content>
 				</Select.Root>
 			</div>
 			<div>
-				<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
-					>Número do processo</label
-				><Input
+				<label for="djen-numero_processo" class="mb-1 block text-sm font-medium">
+					Número do processo
+				</label><Input
 					id="djen-numero_processo"
 					bind:value={filters.numero_processo}
 					ondebounceinput={() => applyFilters()}
@@ -247,10 +245,15 @@
 			variant="ghost"
 			class="mb-4"
 			onclick={() => {
-				setFilters({ ...filtrosDaUrl(new URL('/djen', page.url)), per_page: filters.per_page });
+				setFilters({
+					...filtrosDaUrl(new URL('/djen', page.url.href)),
+					per_page: filters.per_page
+				});
 				applyFilters();
-			}}>Limpar filtros</Button
+			}}
 		>
+			Limpar filtros
+		</Button>
 		<DataTable
 			tamanhosPagina
 			onPageSizeChange={(n) => {

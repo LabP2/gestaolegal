@@ -797,3 +797,33 @@ def test_edicao_legado_preserva_pendencias_e_valida_correcao(client, auth_header
         for value in ['', None]:
             assert client.put(url, json={field: value}, headers=auth_headers).status_code == 400
     assert get_success_data(client.get(url, headers=auth_headers))['cpf'] == '529.982.247-25'
+
+
+def test_reativar_atendido_preserva_dados_e_retorna_a_busca(
+    client, auth_headers, sample_atendido_data,
+):
+    created = client.post('/api/atendido/', json=sample_atendido_data, headers=auth_headers)
+    atendido = get_success_data(created)
+    url = f'/api/atendido/{atendido["id"]}'
+    assert client.delete(url, headers=auth_headers).status_code == 200
+    for _ in range(2):  # Reativação idempotente.
+        assert client.post(url + '/reativar', headers=auth_headers).status_code == 200
+    saved = get_success_data(client.get(url, headers=auth_headers))
+    assert saved['status'] == 1
+    for field in ('nome', 'cpf', 'email', 'endereco'):
+        assert saved[field] == atendido[field]
+    found = get_success_data(client.get('/api/atendido/', query_string={'search': atendido['cpf']}, headers=auth_headers))
+    assert atendido['id'] in [item['id'] for item in found['items']]
+
+
+def test_reativar_atendido_exige_admin_e_unidade_correta(
+    client, auth_headers, estagiario_auth_headers, auth_headers_nl, sample_atendido_data,
+):
+    created = client.post('/api/atendido/', json=sample_atendido_data, headers=auth_headers)
+    url = f'/api/atendido/{get_success_data(created)["id"]}'
+    assert client.delete(url, headers=auth_headers).status_code == 200
+    assert client.post(url + '/reativar').status_code == 401
+    assert client.post(url + '/reativar', headers=estagiario_auth_headers).status_code == 403
+    assert client.post(url + '/reativar', headers=auth_headers_nl).status_code == 404
+    assert client.post('/api/atendido/9999999/reativar', headers=auth_headers).status_code == 404
+    assert get_success_data(client.get(url, headers=auth_headers))['status'] == 0

@@ -1,18 +1,18 @@
 <script lang="ts">
-	import ProgressoBusca from '$lib/components/djen/progresso-busca.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import AtendidoSelectorDialog from '$lib/components/atendido-selector-dialog.svelte';
-	import FiltrosBusca from '$lib/components/djen/filtros-busca.svelte';
-	import { unidadeAtiva } from '$lib/stores/unidade';
-	import { api } from '$lib/api-client';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { formatDateOnly } from '$lib/utils/date';
-	import { MAX_TRIBUNAIS } from '$lib/utils/tribunais-djen';
+	import ProgressoBusca from '#lib/components/djen/progresso-busca.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import AtendidoSelectorDialog from '#lib/components/atendido-selector-dialog.svelte';
+	import FiltrosBusca from '#lib/components/djen/filtros-busca.svelte';
+	import { unidadeAtiva } from '#lib/stores/unidade.ts';
+	import { api } from '#lib/api-client.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { formatDateOnly } from '#lib/utils/date.ts';
+	import { MAX_TRIBUNAIS } from '#lib/utils/tribunais-djen.ts';
 	import { toast } from 'svelte-sonner';
 	import {
 		BUSCA_PARTE_MAX_DIAS,
@@ -21,13 +21,13 @@
 		type AtendidoNome,
 		type ImportacaoBuscaParte,
 		type ResultadoBuscaParte
-	} from '$lib/types';
+	} from '#lib/types/index.ts';
 	import X from '@lucide/svelte/icons/x';
 	import Search from '@lucide/svelte/icons/search';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import type { Me } from '$lib/types';
-	import { invalidateAll } from '$app/navigation';
+	import type { Me } from '#lib/types/index.ts';
+	import { refreshAll } from '$app/navigation';
 
 	let {
 		data,
@@ -94,7 +94,7 @@
 			for (const nome of nomes)
 				await api.post('djen/monitoramentos', { tipo: 'parte', valor: nome, tribunais });
 			toast.success('Nomes adicionados ao monitoramento');
-			await invalidateAll();
+			await refreshAll();
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível adicionar todos os nomes'));
 		} finally {
@@ -419,8 +419,10 @@
 						type="button"
 						variant="outline"
 						disabled={ocupadoExterno || cadastrando || buscando}
-						onclick={monitorarNomes}>Adicionar nomes ao monitoramento</Button
-					>{/if}
+						onclick={monitorarNomes}
+					>
+						Adicionar nomes ao monitoramento
+					</Button>{/if}
 				<Button type="submit" disabled={buscando || ocupadoExterno}>
 					<Search class="mr-2 h-4 w-4" />
 					{buscando ? 'Consultando…' : monitoramento ? 'Buscar agora' : 'Buscar no DJEN'}
@@ -430,8 +432,10 @@
 						type="button"
 						variant="outline"
 						disabled={buscando || cadastrando || ocupadoExterno || semItensAtivos}
-						onclick={buscarTodos}>Buscar todos</Button
+						onclick={buscarTodos}
 					>
+						Buscar todos
+					</Button>
 				{/if}
 			</div>
 			<p class="text-xs text-muted-foreground">

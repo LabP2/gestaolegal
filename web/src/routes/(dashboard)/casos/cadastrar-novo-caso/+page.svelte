@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CasoForm from '$lib/forms/caso-form.svelte';
+	import CasoForm from '#lib/forms/caso-form.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

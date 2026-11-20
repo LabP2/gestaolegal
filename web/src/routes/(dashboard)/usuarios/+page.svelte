@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import DataTable from '$lib/components/data-table.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import DataTable from '#lib/components/data-table.svelte';
 	import type { PageProps } from './$types';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Edit from '@lucide/svelte/icons/edit';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { USER_ROLE_OPTIONS, USER_ROLE_BADGE_MAP } from '$lib/constants';
-	import { api } from '$lib/api-client';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { USER_ROLE_OPTIONS, USER_ROLE_BADGE_MAP } from '#lib/constants/index.ts';
+	import { api } from '#lib/api-client.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
 	import { page } from '$app/state';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { usePaginatedFilters } from '$lib';
-	import type { UserSearchFilters } from '$lib/forms/schemas/user-schema';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { usePaginatedFilters } from '#lib';
+	import type { UserSearchFilters } from '#lib/forms/schemas/user-schema.ts';
 
 	let { data }: PageProps = $props();
 	const { users, me } = $derived(data);

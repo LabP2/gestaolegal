@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
+	import * as Card from '#lib/components/ui/card/index.ts';
 
 	// Texto herdado da página "Termos de uso" da versão 2.0 do Gestão Legal.
 	const dadosTratados = [
@@ -53,8 +53,10 @@
 					href="https://gestaolegal.direito.ufmg.br/"
 					class="underline"
 					target="_blank"
-					rel="noopener">https://gestaolegal.direito.ufmg.br/</a
-				>) (“Gestão Legal”). Estes Termos estabelecem os termos e condições sob os quais você,
+					rel="noopener"
+				>
+					https://gestaolegal.direito.ufmg.br/
+				</a>) (“Gestão Legal”). Estes Termos estabelecem os termos e condições sob os quais você,
 				estagiário, orientador ou professor, deve utilizar a plataforma. Esta plataforma oferece aos
 				usuários informações sobre o plantão de atendimento jurídico, casos jurídicos acompanhados
 				pela DAJ e relatórios associados a dados pessoais de atendidos, assistidos, estagiários,
@@ -144,9 +146,9 @@
 				pessoal publicamente ou com terceiros, exceto quando exigido por lei.
 			</p>
 			<p>
-				Você poderá, através do e-mail <a href="mailto:dajlgpd@gmail.com" class="underline"
-					>dajlgpd@gmail.com</a
-				>, exercer todos os direitos que lhe são garantidos pela Lei 13.709/2018, tais como:
+				Você poderá, através do e-mail <a href="mailto:dajlgpd@gmail.com" class="underline">
+					dajlgpd@gmail.com
+				</a>, exercer todos os direitos que lhe são garantidos pela Lei 13.709/2018, tais como:
 			</p>
 			<ul class="list-disc space-y-1 pl-6">
 				{#each direitos as item}

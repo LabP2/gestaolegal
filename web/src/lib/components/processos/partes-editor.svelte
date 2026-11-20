@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { PoloParte } from '$lib/types';
+	import type { PoloParte } from '#lib/types/index.ts';
 
 	/** Parte escolhida no formulário do processo sem caso. */
 	export type ParteEditavel = {
@@ -11,16 +11,20 @@
 </script>
 
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Select from '$lib/components/ui/select';
-	import AtendidoSelectorDialog from '$lib/components/atendido-selector-dialog.svelte';
-	import { api } from '$lib/api-client';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import AtendidoSelectorDialog from '#lib/components/atendido-selector-dialog.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { toast } from 'svelte-sonner';
-	import { POLO_PARTE_LABEL, type Atendido, type AtendidoSimplificadoInput } from '$lib/types';
+	import {
+		POLO_PARTE_LABEL,
+		type Atendido,
+		type AtendidoSimplificadoInput
+	} from '#lib/types/index.ts';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 

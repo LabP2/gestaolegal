@@ -1,19 +1,19 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import {
 		assistenciaJudiciariaCreateFormSchema,
 		type AssistenciaJudiciariaCreateFormSchema
 	} from './schemas/assistencia-judiciaria-schema';
-	import { SimpleInput, SimpleSelect, MaskedInput } from '$lib/components/forms';
-	import MultipleSelect from '$lib/components/forms/multiple-select.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import type { AssistenciaJudiciaria } from '$lib/types';
-	import { AREA_DIREITO_OPTIONS, REGION_OPTIONS } from '$lib/constants';
+	import { SimpleInput, SimpleSelect, MaskedInput } from '#lib/components/forms/index.ts';
+	import MultipleSelect from '#lib/components/forms/multiple-select.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import type { AssistenciaJudiciaria } from '#lib/types/index.ts';
+	import { AREA_DIREITO_OPTIONS, REGION_OPTIONS } from '#lib/constants/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
 
 	let {

@@ -1,8 +1,13 @@
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import type { AcervoPagina } from '$lib/types/djen';
-import { ApiException, type Paginated, type PublicacaoListItem, type StatusDjen } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import type { AcervoPagina } from '#lib/types/djen.ts';
+import {
+	ApiException,
+	type Paginated,
+	type PublicacaoListItem,
+	type StatusDjen
+} from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ url, fetch, parent }) => {
 	const { me } = await parent();

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import ProcessoForm from '$lib/forms/processo-form.svelte';
-	import PartesEditor, { type ParteEditavel } from '$lib/components/processos/partes-editor.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { api } from '$lib/api-client';
+	import ProcessoForm from '#lib/forms/processo-form.svelte';
+	import PartesEditor, { type ParteEditavel } from '#lib/components/processos/partes-editor.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
-	import { ApiException, type Processo } from '$lib/types';
+	import { ApiException, type Processo } from '#lib/types/index.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

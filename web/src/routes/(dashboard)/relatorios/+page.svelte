@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Card from '$lib/components/ui/card';
-	import * as Select from '$lib/components/ui/select';
-	import { ApiException } from '$lib/types';
-	import * as Table from '$lib/components/ui/table';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { AREA_DIREITO_OPTIONS } from '$lib/constants';
-	import { SITUACAO_DEFERIMENTO_OPTIONS } from '$lib/constants/situacao-deferimento';
-	import { api } from '$lib/api-client';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { ApiException } from '#lib/types/index.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { AREA_DIREITO_OPTIONS } from '#lib/constants/index.ts';
+	import { SITUACAO_DEFERIMENTO_OPTIONS } from '#lib/constants/situacao-deferimento.ts';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
 	import Download from '@lucide/svelte/icons/download';
 
-	import { getUserRoleLabel } from '$lib/constants/user-roles';
+	import { getUserRoleLabel } from '#lib/constants/user-roles.ts';
 
 	type ReportRow = {
 		area_direito?: string;

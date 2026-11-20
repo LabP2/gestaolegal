@@ -1,17 +1,22 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Form from '$lib/components/ui/form/index.js';
-	import { Button } from '$lib/components/ui/button';
-	import { FormSection, SimpleInput, SimpleSelect, SimpleTextArea } from '$lib/components/forms';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Form from '#lib/components/ui/form/index.js';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import {
+		FormSection,
+		SimpleInput,
+		SimpleSelect,
+		SimpleTextArea
+	} from '#lib/components/forms/index.ts';
 	import { processoCreateFormSchema } from './schemas/processo-schema';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
-	import SimpleCurrencyInput from '$lib/components/forms/simple-currency-input.svelte';
+	import SimpleCurrencyInput from '#lib/components/forms/simple-currency-input.svelte';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
-	import type { Caso } from '$lib/types';
+	import type { Caso } from '#lib/types/index.ts';
 	import type { Snippet } from 'svelte';
 
 	let {

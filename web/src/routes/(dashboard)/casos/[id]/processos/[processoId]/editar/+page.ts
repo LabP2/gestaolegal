@@ -1,12 +1,12 @@
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { processoCreateFormSchema } from '$lib/forms/schemas/processo-schema';
+import { processoCreateFormSchema } from '#lib/forms/schemas/processo-schema.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { toISODateInput } from '$lib/utils/date';
-import { ApiException } from '$lib/types';
-import type { Processo } from '$lib/types';
+import { toISODateInput } from '#lib/utils/date.ts';
+import { ApiException } from '#lib/types/index.ts';
+import type { Processo } from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {

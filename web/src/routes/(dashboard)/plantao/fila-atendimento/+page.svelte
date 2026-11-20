@@ -1,14 +1,14 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { api } from '$lib/api-client';
-	import { invalidateAll } from '$app/navigation';
-	import { ApiException, FilaStatus, type FilaItem, type Atendido } from '$lib/types';
-	import { getPrioridadeRowClass } from '$lib/constants/fila-atendimento';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Table from '$lib/components/ui/table';
-	import BaseSelectorDialog from '$lib/components/base-selector-dialog.svelte';
-	import SenhaModal from '$lib/components/senha-modal.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { refreshAll } from '$app/navigation';
+	import { ApiException, FilaStatus, type FilaItem, type Atendido } from '#lib/types/index.ts';
+	import { getPrioridadeRowClass } from '#lib/constants/fila-atendimento.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
+	import BaseSelectorDialog from '#lib/components/base-selector-dialog.svelte';
+	import SenhaModal from '#lib/components/senha-modal.svelte';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
@@ -42,7 +42,7 @@
 
 	async function refresh() {
 		try {
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			if (err instanceof ApiException) toast.error(err.message);
 		}

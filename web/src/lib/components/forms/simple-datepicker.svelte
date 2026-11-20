@@ -6,8 +6,8 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import DatePicker from '$lib/components/date-picker.svelte';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import DatePicker from '#lib/components/date-picker.svelte';
 	import type { FieldProps } from 'formsnap';
 
 	let {

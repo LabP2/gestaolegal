@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Table from '$lib/components/ui/table';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Table from '#lib/components/ui/table/index.ts';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,7 +22,7 @@
 		const params = new URLSearchParams();
 		if (q.trim()) params.set('q', q.trim());
 		if (ativo) params.set('ativo', ativo);
-		goto(`/plataforma${params.size ? `?${params}` : ''}`, { keepFocus: true });
+		goto(`/plataforma${params.size ? `?${params}` : ''}`, { reset: false });
 	}
 </script>
 

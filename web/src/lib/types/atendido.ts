@@ -46,6 +46,7 @@ export interface Atendido {
 	contato_repres_legal?: string | null;
 	rg_repres_legal?: string | null;
 	nascimento_repres_legal?: string | null;
+	pretende_constituir_pj?: string | null;
 	status?: number;
 	/** Parte cadastrada sem triagem (processo sem caso): conta como assistido. */
 	sem_triagem?: boolean;

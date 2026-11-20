@@ -2,22 +2,22 @@
 	import Contextos from './contextos.svelte';
 	import FiltroTribunais from './filtro-tribunais.svelte';
 	import PublicacoesTabela from './publicacoes-tabela.svelte';
-	import Paginacao from '$lib/components/paginacao.svelte';
+	import Paginacao from '#lib/components/paginacao.svelte';
 	import { onDestroy, tick } from 'svelte';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api } from '$lib/api-client';
-	import { Input } from '$lib/components/ui/input';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
+	import { api } from '#lib/api-client.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import ImportarPublicacao from './importar-publicacao.svelte';
 	import ImportarLote from './importar-lote.svelte';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { formatDateOnly } from '$lib/utils/date';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { formatDateOnly } from '#lib/utils/date.ts';
 	import { toast } from 'svelte-sonner';
-	import type { AcervoPagina, RotuloExemplo } from '$lib/types/djen';
+	import type { AcervoPagina, RotuloExemplo } from '#lib/types/djen.ts';
 	let { dados, treino = false }: { dados: AcervoPagina; treino?: boolean } = $props();
 	let selecionados = $state<number[]>([]);
 	let tribunais = $state<string[]>([]);
@@ -112,7 +112,7 @@
 				...(acao === 'importar' ? { sem_parte: atendido === null } : {})
 			});
 			selecionados = [];
-			await invalidateAll();
+			await refreshAll();
 			toast.success('Alterações salvas.');
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Não foi possível salvar.'));
@@ -121,7 +121,7 @@
 		}
 	}
 	async function limparContexto() {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new URLSearchParams(page.url.search);
 		params.delete('contexto_id');
 		params.delete('page');
 		await goto(`?${params}`);
@@ -136,7 +136,7 @@
 		for (const [chave, valor] of new FormData(formulario))
 			if (String(valor).trim()) params.set(chave, String(valor).trim());
 		params.set('per_page', page.url.searchParams.get('per_page') || '20');
-		await goto(`?${params}`, { keepFocus: true, noScroll: true, replaceState: true });
+		await goto(`?${params}`, { reset: false, replaceState: true });
 	}
 	function agendarFiltro(atraso = 500) {
 		clearTimeout(timer);
@@ -147,7 +147,7 @@
 	}
 	async function limparFiltros() {
 		clearTimeout(timer);
-		await goto(`?per_page=${dados.per_page}`, { keepFocus: true, noScroll: true });
+		await goto(`?per_page=${dados.per_page}`, { reset: false });
 	}
 </script>
 
@@ -176,8 +176,9 @@
 		>
 			<fieldset disabled={ocupado} class="contents">
 				<div class="w-full sm:w-64">
-					<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">Nome da parte</label
-					><Input
+					<label for="djen-nome_parte" class="mb-1 block text-sm font-medium">
+						Nome da parte
+					</label><Input
 						id="djen-nome_parte"
 						name="nome_parte"
 						value={page.url.searchParams.get('nome_parte') ?? ''}
@@ -193,24 +194,20 @@
 						disabled={ocupado}
 						onValueChange={() => agendarFiltro(0)}
 					>
-						<Select.Trigger class="w-full" aria-label="Polo da parte"
-							>{filtroPolo === 'A'
-								? 'Ativo'
-								: filtroPolo === 'P'
-									? 'Passivo'
-									: 'Todos'}</Select.Trigger
-						>
-						<Select.Content
-							><Select.Item value="todos">Todos</Select.Item><Select.Item value="A"
-								>Ativo</Select.Item
-							><Select.Item value="P">Passivo</Select.Item></Select.Content
-						>
+						<Select.Trigger class="w-full" aria-label="Polo da parte">
+							{filtroPolo === 'A' ? 'Ativo' : filtroPolo === 'P' ? 'Passivo' : 'Todos'}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="todos">Todos</Select.Item><Select.Item value="A">
+								Ativo
+							</Select.Item><Select.Item value="P">Passivo</Select.Item>
+						</Select.Content>
 					</Select.Root>
 				</div>
 				<div class="w-full sm:w-64">
-					<label for="djen-numero_processo" class="mb-1 block text-sm font-medium"
-						>Número do processo</label
-					><Input
+					<label for="djen-numero_processo" class="mb-1 block text-sm font-medium">
+						Número do processo
+					</label><Input
 						id="djen-numero_processo"
 						name="numero_processo"
 						value={page.url.searchParams.get('numero_processo') ?? ''}
@@ -238,14 +235,16 @@
 						bind:value={filtroSituacao}
 						onValueChange={() => agendarFiltro(0)}
 					>
-						<Select.Trigger class="w-full data-[placeholder]:text-foreground" aria-label="Situação"
-							>{situacoes[filtroSituacao] ?? 'Todas'}</Select.Trigger
-						>
+						<Select.Trigger class="w-full data-[placeholder]:text-foreground" aria-label="Situação">
+							{situacoes[filtroSituacao] ?? 'Todas'}
+						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="todos">Todas</Select.Item>
 							{#each Object.entries(situacoes).filter(([k]) => k !== 'pendente') as [valor, nome]}<Select.Item
-									value={valor}>{nome}</Select.Item
-								>{/each}
+									value={valor}
+								>
+									{nome}
+								</Select.Item>{/each}
 						</Select.Content>
 					</Select.Root>
 				</div>
@@ -259,13 +258,15 @@
 					>
 						<Select.Trigger
 							class="w-full data-[placeholder]:text-foreground"
-							aria-label="Origem da consulta">{fontes[filtroFonte] ?? 'Todas'}</Select.Trigger
+							aria-label="Origem da consulta"
 						>
+							{fontes[filtroFonte] ?? 'Todas'}
+						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="todos">Todas</Select.Item>
-							{#each Object.entries(fontes) as [valor, nome]}<Select.Item value={valor}
-									>{nome}</Select.Item
-								>{/each}
+							{#each Object.entries(fontes) as [valor, nome]}<Select.Item value={valor}>
+									{nome}
+								</Select.Item>{/each}
 						</Select.Content>
 					</Select.Root>
 				</div>
@@ -303,9 +304,9 @@
 					<summary class="cursor-pointer text-sm text-muted-foreground">Filtros avançados</summary>
 					<div class="mt-3 flex flex-wrap items-end gap-3">
 						<div class="w-full sm:w-64">
-							<label for="contexto-operacional" class="mb-1 block text-sm font-medium"
-								>Contexto de classificação</label
-							>
+							<label for="contexto-operacional" class="mb-1 block text-sm font-medium">
+								Contexto de classificação
+							</label>
 							<input
 								type="hidden"
 								name="contexto_id"
@@ -321,23 +322,24 @@
 									id="contexto-operacional"
 									class="w-full"
 									aria-label="Contexto de classificação"
-									><span class="truncate"
-										>{dados.contextos?.find((c) => String(c.id) === filtroContexto)?.nome ??
-											'Todos os contextos'}</span
-									></Select.Trigger
 								>
+									<span class="truncate">
+										{dados.contextos?.find((c) => String(c.id) === filtroContexto)?.nome ??
+											'Todos os contextos'}
+									</span>
+								</Select.Trigger>
 								<Select.Content>
 									<Select.Item value="todos">Todos os contextos</Select.Item>
-									{#each dados.contextos ?? [] as ctx}<Select.Item value={String(ctx.id)}
-											>{ctx.nome}</Select.Item
-										>{/each}
+									{#each dados.contextos ?? [] as ctx}<Select.Item value={String(ctx.id)}>
+											{ctx.nome}
+										</Select.Item>{/each}
 								</Select.Content>
 							</Select.Root>
 						</div>
 						<div class="w-full sm:w-52">
-							<label for="sugestao-djen" class="mb-1 block text-sm font-medium"
-								>Sugestão do modelo</label
-							>
+							<label for="sugestao-djen" class="mb-1 block text-sm font-medium">
+								Sugestão do modelo
+							</label>
 							<input
 								type="hidden"
 								name="sugestao"
@@ -348,45 +350,46 @@
 								bind:value={filtroSugestao}
 								onValueChange={() => agendarFiltro(0)}
 							>
-								<Select.Trigger id="sugestao-djen" class="w-full" aria-label="Sugestão do modelo"
-									>{filtroSugestao === 'todos'
+								<Select.Trigger id="sugestao-djen" class="w-full" aria-label="Sugestão do modelo">
+									{filtroSugestao === 'todos'
 										? 'Todas'
 										: filtroSugestao === 'sem_sugestao'
 											? 'Sem sugestão'
-											: rotulos[filtroSugestao as RotuloExemplo]}</Select.Trigger
-								>
-								<Select.Content
-									><Select.Item value="todos">Todas</Select.Item><Select.Item value="relevante"
-										>Relevante</Select.Item
-									><Select.Item value="irrelevante">Irrelevante</Select.Item><Select.Item
-										value="sem_sugestao">Sem sugestão</Select.Item
-									></Select.Content
-								>
+											: rotulos[filtroSugestao as RotuloExemplo]}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="todos">Todas</Select.Item><Select.Item value="relevante">
+										Relevante
+									</Select.Item><Select.Item value="irrelevante">
+										Irrelevante
+									</Select.Item><Select.Item value="sem_sugestao">Sem sugestão</Select.Item>
+								</Select.Content>
 							</Select.Root>
 						</div>
 					</div>
 				</details>
 				<Button type="submit" disabled={ocupado}>Filtrar</Button>
-				<Button type="button" variant="ghost" disabled={ocupado} onclick={limparFiltros}
-					>Limpar filtros</Button
-				>
+				<Button type="button" variant="ghost" disabled={ocupado} onclick={limparFiltros}>
+					Limpar filtros
+				</Button>
 			</fieldset>
 		</form>
 	{/if}
 	{#if !treino && contextoId}
 		<div class="flex flex-wrap items-center gap-2 text-sm">
 			<Badge variant="secondary" class="max-w-full gap-2 rounded-full px-3 py-1">
-				<span class="break-words"
-					>Contexto: {dados.contextos?.find((c) => String(c.id) === contextoId)?.nome ??
-						contextoId}</span
-				>
+				<span class="break-words">
+					Contexto: {dados.contextos?.find((c) => String(c.id) === contextoId)?.nome ?? contextoId}
+				</span>
 				<button
 					type="button"
 					class="shrink-0 rounded px-1 hover:bg-muted"
 					aria-label="Limpar contexto de classificação"
 					onclick={limparContexto}
-					disabled={ocupado}>×</button
+					disabled={ocupado}
 				>
+					×
+				</button>
 			</Badge>
 		</div>
 	{/if}
@@ -398,15 +401,17 @@
 		<div
 			class={`flex flex-wrap items-end gap-3 ${treino ? 'py-2' : 'rounded-lg border bg-card p-3'}`}
 		>
-			<span class="text-sm text-muted-foreground"
-				>{selecionados.length ? `${selecionados.length} selecionadas` : 'Nenhuma selecionada'}</span
-			>
+			<span class="text-sm text-muted-foreground">
+				{selecionados.length ? `${selecionados.length} selecionadas` : 'Nenhuma selecionada'}
+			</span>
 			{#if treino}
 				{#each Object.entries(rotulos) as [rotulo, nome]}<Button
 						variant="outline"
 						disabled={ocupado || !selecionados.length || !contextoId}
-						onclick={() => agir('classificar', rotulo as RotuloExemplo)}>{nome}</Button
-					>{/each}
+						onclick={() => agir('classificar', rotulo as RotuloExemplo)}
+					>
+						{nome}
+					</Button>{/each}
 			{:else}
 				<ImportarLote
 					itens={dados.items}
@@ -418,15 +423,17 @@
 				<Button
 					variant="outline"
 					disabled={ocupado || !selecionados.length}
-					onclick={() => agir('descartar')}>Descartar</Button
+					onclick={() => agir('descartar')}
 				>
+					Descartar
+				</Button>
 				{#if !contextoId && dados.contextos?.length}
 					<details class="w-full text-sm">
-						<summary class="cursor-pointer text-muted-foreground"
-							>Avaliar contextos ao importar ou descartar{contextosAvaliados.length
+						<summary class="cursor-pointer text-muted-foreground">
+							Avaliar contextos ao importar ou descartar{contextosAvaliados.length
 								? ` (${contextosAvaliados.length} selecionado(s))`
-								: ''}</summary
-						>
+								: ''}
+						</summary>
 						<fieldset class="mt-3 space-y-2 rounded-md border p-3">
 							<legend class="text-sm">Aplicar avaliação também aos contextos selecionados</legend>
 							<p class="text-xs text-muted-foreground">
@@ -435,12 +442,9 @@
 							</p>
 							{#each dados.contextos as ctx}<label
 									class="mr-4 inline-flex items-center gap-2 text-sm"
-									><input
-										type="checkbox"
-										value={ctx.id}
-										bind:group={contextosAvaliados}
-									/>{ctx.nome}</label
-								>{/each}
+								>
+									<input type="checkbox" value={ctx.id} bind:group={contextosAvaliados} />{ctx.nome}
+								</label>{/each}
 						</fieldset>
 					</details>
 				{/if}
@@ -449,16 +453,16 @@
 		<p class="text-sm text-muted-foreground">
 			{dados.total} publicações encontradas.
 		</p>
-		<label class="flex items-center gap-2 text-sm"
-			><Checkbox
+		<label class="flex items-center gap-2 text-sm">
+			<Checkbox
 				disabled={ocupado || !dados.items.length}
 				checked={dados.items.length > 0 &&
 					dados.items.every((i) => selecionados.includes(i.id_djen))}
 				onCheckedChange={(checked) => {
 					selecionados = checked === true ? dados.items.map((i) => i.id_djen) : [];
 				}}
-			/>Selecionar esta página</label
-		>
+			/>Selecionar esta página
+		</label>
 		{#if !treino}
 			<PublicacoesTabela
 				itens={dados.items}
@@ -482,9 +486,9 @@
 						/>
 						<div class="min-w-0 flex-1 space-y-2">
 							<div class="flex flex-wrap gap-3 text-sm">
-								<strong>{item.numero_processo}</strong><span
-									>{formatDateOnly(item.data_disponibilizacao)}</span
-								><span>{item.sigla_tribunal}</span>
+								<strong>{item.numero_processo}</strong><span>
+									{formatDateOnly(item.data_disponibilizacao)}
+								</span><span>{item.sigla_tribunal}</span>
 							</div>
 							<div class="flex flex-wrap gap-2">
 								{#if treino && contextoId}
@@ -501,15 +505,18 @@
 									<Badge
 										variant="outline"
 										class={`rounded-full px-3 py-1 ${estilosSituacao[item.situacao] ?? ''}`}
-										title="Situação da importação">{situacoes[item.situacao]}</Badge
+										title="Situação da importação"
 									>
+										{situacoes[item.situacao]}
+									</Badge>
 								{/if}
 							</div>
 							{#if !treino}
 								{#if new Set((item.contextos ?? [])
 										.map((c) => c.sugestao)
-										.filter(Boolean)).size > 1}<Badge variant="outline">Sugestões divergentes</Badge
-									>{/if}
+										.filter(Boolean)).size > 1}<Badge variant="outline">
+										Sugestões divergentes
+									</Badge>{/if}
 								{#each item.contextos ?? [] as ctx}<p class="text-sm">
 										<strong>{ctx.nome}:</strong>
 										{ctx.sugestao
@@ -537,16 +544,21 @@
 								<a
 									class="underline"
 									href={`/djen/acervo/${item.id}?voltar=${encodeURIComponent(page.url.pathname + page.url.search)}`}
-									>Ler publicação e histórico</a
-								>{#if item.comunicacao_id}<a
+								>
+									Ler publicação e histórico
+								</a>{#if item.comunicacao_id}<a
 										class="underline"
-										href={`/djen/publicacoes/${item.comunicacao_id}`}>Abrir operação</a
-									>{/if}{#if item.id_processo}<a
+										href={`/djen/publicacoes/${item.comunicacao_id}`}
+									>
+										Abrir operação
+									</a>{/if}{#if item.id_processo}<a
 										class="underline"
-										href={`/processos/${item.id_processo}`}>Processo #{item.id_processo}</a
-									>{/if}{#if item.id_caso}<a class="underline" href={`/casos/${item.id_caso}`}
-										>Caso #{item.id_caso}</a
-									>{/if}
+										href={`/processos/${item.id_processo}`}
+									>
+										Processo #{item.id_processo}
+									</a>{/if}{#if item.id_caso}<a class="underline" href={`/casos/${item.id_caso}`}>
+										Caso #{item.id_caso}
+									</a>{/if}
 							</div>
 						</div>
 					</li>

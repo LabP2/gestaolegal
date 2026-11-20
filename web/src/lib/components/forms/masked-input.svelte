@@ -3,8 +3,8 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import { Input } from '$lib/components/ui/input';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FullAutoFill, HTMLInputTypeAttribute } from 'svelte/elements';
 

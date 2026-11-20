@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Acervo from '$lib/components/djen/acervo.svelte';
-	import ListaPublicacoes from '$lib/components/djen/lista-publicacoes.svelte';
+	import Acervo from '#lib/components/djen/acervo.svelte';
+	import ListaPublicacoes from '#lib/components/djen/lista-publicacoes.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

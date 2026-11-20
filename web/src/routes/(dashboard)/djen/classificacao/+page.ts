@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import type { AcervoPagina, ContextoDjen } from '$lib/types/djen';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import type { AcervoPagina, ContextoDjen } from '#lib/types/djen.ts';
 export const load: PageLoad = async ({ url, fetch }) => {
 	const p = new URLSearchParams();
 	for (const campo of ['contexto_id', 'rotulo', 'numero_processo', 'inicio', 'fim', 'page']) {

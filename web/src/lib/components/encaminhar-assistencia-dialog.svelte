@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Badge } from '$lib/components/ui/badge';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Send from '@lucide/svelte/icons/send';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
-	import type { ListAssistenciaJudiciaria, Paginated } from '$lib/types';
+	import type { ListAssistenciaJudiciaria, Paginated } from '#lib/types/index.ts';
 
 	let {
 		orientacaoId,

@@ -1,10 +1,10 @@
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import {
 	ApiException,
 	FILTROS_ARQUIVADAS,
 	type FiltroArquivadas,
 	type Notificacao
-} from '$lib/types';
+} from '#lib/types/index.ts';
 
 /** Formato paginado devolvido pela API (campos no nível raiz). */
 type PaginaNotificacoes = {

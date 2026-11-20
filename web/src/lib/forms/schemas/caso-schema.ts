@@ -5,11 +5,11 @@ import {
 	SUB_AREA_DIREITO_CIVEL_VALUES,
 	type SubAreaDireitoAdministrativo,
 	type SubAreaDireitoCivel
-} from '$lib/constants/area_direito';
+} from '#lib/constants/area_direito.ts';
 import {
 	SITUACAO_DEFERIMENTO,
 	SITUACAO_DEFERIMENTO_VALUES
-} from '$lib/constants/situacao-deferimento';
+} from '#lib/constants/situacao-deferimento.ts';
 import { z } from 'zod/v4';
 
 export const casoCreateFormSchema = z
@@ -58,8 +58,6 @@ export const casoCreateFormSchema = z
 		}
 	);
 
-export const casoUpdateFormSchema = casoCreateFormSchema.partial();
-
 export const casoSearchSchema = z.object({
 	search: z.string().optional(),
 	show_inactive: z.boolean().optional().default(false),
@@ -67,5 +65,4 @@ export const casoSearchSchema = z.object({
 });
 
 export type CasoCreateFormSchema = typeof casoCreateFormSchema;
-export type CasoUpdateFormSchema = typeof casoUpdateFormSchema;
 export type CasoSearchFormSchema = typeof casoSearchSchema;

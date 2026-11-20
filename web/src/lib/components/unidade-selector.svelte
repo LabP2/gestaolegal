@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as Select from '$lib/components/ui/select';
-	import { goto, invalidateAll } from '$app/navigation';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { goto, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { definirUnidadeAtiva, unidadeAtiva } from '$lib/stores/unidade';
-	import type { Unidade } from '$lib/types';
+	import { definirUnidadeAtiva, unidadeAtiva } from '#lib/stores/unidade.ts';
+	import type { Unidade } from '#lib/types/index.ts';
 
 	let { unidades = [] }: { unidades?: Unidade[] } = $props();
 	let trocando = $state(false);
@@ -20,7 +20,7 @@
 		try {
 			definirUnidadeAtiva(id);
 			if (['/plantao/escala', '/plantao/configurar-abertura'].includes(page.url.pathname)) {
-				await goto('/plantao/escalas', { invalidateAll: true });
+				await goto('/plantao/escalas', { refreshAll: true });
 				return;
 			}
 			const detalhe = page.url.pathname.match(
@@ -29,9 +29,9 @@
 			if (detalhe) {
 				// Sai também das telas dependentes e de edição. Invalidar antes
 				// de sair tentaria buscar o registro antigo na nova unidade.
-				await goto(detalhe[1], { invalidateAll: true });
+				await goto(detalhe[1], { refreshAll: true });
 			} else {
-				await invalidateAll();
+				await refreshAll();
 			}
 		} finally {
 			trocando = false;

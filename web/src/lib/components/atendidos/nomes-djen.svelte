@@ -1,13 +1,13 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
-	import { api } from '$lib/api-client';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { api } from '#lib/api-client.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
-	import { PROCESSO_PAPEIS_SEM_CASO, type AtendidoNome } from '$lib/types';
+	import { PROCESSO_PAPEIS_SEM_CASO, type AtendidoNome } from '#lib/types/index.ts';
 	import X from '@lucide/svelte/icons/x';
 
 	/**

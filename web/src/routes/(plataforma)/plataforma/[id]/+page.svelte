@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Card from '$lib/components/ui/card';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import { plataforma } from '$lib/plataforma-client';
-	import { ApiException, type Tenant } from '$lib/types';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import { plataforma } from '#lib/plataforma-client.ts';
+	import { ApiException, type Tenant } from '#lib/types/index.ts';
 	import { toast } from 'svelte-sonner';
 	import type { PageData } from './$types';
 

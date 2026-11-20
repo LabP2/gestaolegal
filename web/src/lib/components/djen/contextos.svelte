@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api } from '$lib/api-client';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
+	import { api } from '#lib/api-client.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { TRIBUNAIS_DJEN } from '$lib/utils/tribunais-djen';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import type { ContextoDjen } from '$lib/types/djen';
+	import { TRIBUNAIS_DJEN } from '#lib/utils/tribunais-djen.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import type { ContextoDjen } from '#lib/types/djen.ts';
 	let {
 		contextos,
 		treino,
@@ -65,7 +65,7 @@
 		};
 	});
 	async function selecionar(id: string) {
-		const p = treino ? new URLSearchParams() : new URLSearchParams(page.url.searchParams);
+		const p = treino ? new URLSearchParams() : new URLSearchParams(page.url.search);
 		p.delete('page');
 		p.delete('rotulo');
 		if (id) p.set('contexto_id', id);
@@ -88,7 +88,7 @@
 			tribunais = [];
 			criando = false;
 			await selecionar(String(c.id));
-			await invalidateAll();
+			await refreshAll();
 			toast.success('Contexto criado.');
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível criar o contexto'));
@@ -101,7 +101,7 @@
 		ocupado = true;
 		try {
 			await api.post(`djen/contextos/${selecionado.id}/treinar`, {});
-			await invalidateAll();
+			await refreshAll();
 			toast.success('Treino solicitado. Você pode continuar usando a aplicação.');
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível treinar'));
@@ -121,16 +121,14 @@
 				onValueChange={(id) => selecionar(id === 'todos' ? '' : id)}
 				disabled={ocupado || ocupadoExterno}
 			>
-				<Select.Trigger id="contexto-djen" class="w-full" aria-label="Contexto de classificação"
-					>{selecionado?.nome ??
-						(treino
-							? 'Selecione um contexto para classificar'
-							: 'Todos os contextos')}</Select.Trigger
-				>
-				<Select.Content
-					><Select.Item value="todos"
-						>{treino ? 'Selecione um contexto para classificar' : 'Todos os contextos'}</Select.Item
-					>
+				<Select.Trigger id="contexto-djen" class="w-full" aria-label="Contexto de classificação">
+					{selecionado?.nome ??
+						(treino ? 'Selecione um contexto para classificar' : 'Todos os contextos')}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="todos">
+						{treino ? 'Selecione um contexto para classificar' : 'Todos os contextos'}
+					</Select.Item>
 					{#each contextos as c}<Select.Item value={String(c.id)}>{c.nome}</Select.Item>{/each}
 				</Select.Content>
 			</Select.Root>
@@ -141,27 +139,28 @@
 				aria-expanded={criando}
 				onclick={() => (criando = !criando)}
 				disabled={ocupado || ocupadoExterno}
-				>{criando ? 'Cancelar criação' : 'Novo contexto'}</Button
-			>{/if}
+			>
+				{criando ? 'Cancelar criação' : 'Novo contexto'}
+			</Button>{/if}
 	</div>
 	{#if treino && criando}
 		<form class="mt-3 space-y-3" onsubmit={criar}>
-			<label class="block text-sm"
-				>Nome do contexto<Input
+			<label class="block text-sm">
+				Nome do contexto<Input
 					bind:value={nome}
 					required
 					minlength={3}
 					maxlength={150}
 					placeholder="UFMG — TRF6"
-				/></label
-			>
-			<label class="block text-sm"
-				>Nomes da parte (separe variações por ponto e vírgula)<Input
+				/>
+			</label>
+			<label class="block text-sm">
+				Nomes da parte (separe variações por ponto e vírgula)<Input
 					bind:value={nomes}
 					required
 					placeholder="UFMG; Universidade Federal de Minas Gerais"
-				/></label
-			>
+				/>
+			</label>
 			<div class="space-y-2">
 				<label for="contexto-tribunais" class="block text-sm">Tribunais</label>
 				<Select.Root type="multiple" bind:value={tribunais} disabled={ocupado || ocupadoExterno}>
@@ -171,16 +170,17 @@
 						aria-label="Tribunais do contexto"
 						aria-describedby="contexto-tribunais-ajuda"
 					>
-						<span class="truncate"
-							>{tribunais.length ? tribunais.join(', ') : 'Todos os tribunais'}</span
-						>
+						<span class="truncate">
+							{tribunais.length ? tribunais.join(', ') : 'Todos os tribunais'}
+						</span>
 					</Select.Trigger>
 					<Select.Content class="max-h-80 w-56">
 						{#each TRIBUNAIS_DJEN as grupo (grupo.grupo)}
-							<Select.Group
-								><Select.GroupHeading>{grupo.grupo}</Select.GroupHeading>
-								{#each grupo.siglas as sigla (sigla)}<Select.Item value={sigla}>{sigla}</Select.Item
-									>{/each}
+							<Select.Group>
+								<Select.GroupHeading>{grupo.grupo}</Select.GroupHeading>
+								{#each grupo.siglas as sigla (sigla)}<Select.Item value={sigla}>
+										{sigla}
+									</Select.Item>{/each}
 							</Select.Group>
 						{/each}
 					</Select.Content>
@@ -193,8 +193,10 @@
 						variant="ghost"
 						size="sm"
 						disabled={ocupado || ocupadoExterno}
-						onclick={() => (tribunais = [])}>Limpar tribunais</Button
-					>{/if}
+						onclick={() => (tribunais = [])}
+					>
+						Limpar tribunais
+					</Button>{/if}
 			</div>
 			<Button type="submit" disabled={ocupado || ocupadoExterno}>Salvar contexto</Button>
 		</form>
@@ -215,15 +217,16 @@
 							value={filtroRotulo === 'todos' ? '' : filtroRotulo}
 						/>
 						<Select.Root type="single" bind:value={filtroRotulo}>
-							<Select.Trigger id="treino-rotulo" class="w-full" aria-label="Classificação"
-								>{rotulos[filtroRotulo as keyof typeof rotulos] ?? 'Todas'}</Select.Trigger
-							>
-							<Select.Content
-								><Select.Item value="todos">Todas</Select.Item
-								>{#each Object.entries(rotulos) as [id, label]}<Select.Item value={id}
-										>{label}</Select.Item
-									>{/each}</Select.Content
-							>
+							<Select.Trigger id="treino-rotulo" class="w-full" aria-label="Classificação">
+								{rotulos[filtroRotulo as keyof typeof rotulos] ?? 'Todas'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="todos">
+									Todas
+								</Select.Item>{#each Object.entries(rotulos) as [id, label]}<Select.Item value={id}>
+										{label}
+									</Select.Item>{/each}
+							</Select.Content>
 						</Select.Root>
 					</div>
 					<Button type="submit" disabled={ocupado || ocupadoExterno}>Filtrar</Button>
@@ -237,27 +240,23 @@
 				>
 					<summary class="cursor-pointer text-sm text-muted-foreground">Filtros adicionais</summary>
 					<div class="mt-3 flex flex-wrap items-end gap-3">
-						<label class="block text-sm"
-							>Número do processo<Input
+						<label class="block text-sm">
+							Número do processo<Input
 								name="numero_processo"
 								value={page.url.searchParams.get('numero_processo') ?? ''}
 								placeholder="Com ou sem máscara"
-							/></label
-						>
-						<label class="block text-sm"
-							>De<Input
+							/>
+						</label>
+						<label class="block text-sm">
+							De<Input
 								name="inicio"
 								type="date"
 								value={page.url.searchParams.get('inicio') ?? ''}
-							/></label
-						>
-						<label class="block text-sm"
-							>Até<Input
-								name="fim"
-								type="date"
-								value={page.url.searchParams.get('fim') ?? ''}
-							/></label
-						>
+							/>
+						</label>
+						<label class="block text-sm">
+							Até<Input name="fim" type="date" value={page.url.searchParams.get('fim') ?? ''} />
+						</label>
 					</div>
 				</details>
 			</form>
@@ -291,13 +290,13 @@
 					>
 						Treino concluído. As sugestões são atualizadas em lotes em segundo plano.
 					</p>{/if}
-				<Button onclick={treinar} disabled={ocupado || emTreino || !selecionado.pode_treinar}
-					>{emTreino
+				<Button onclick={treinar} disabled={ocupado || emTreino || !selecionado.pode_treinar}>
+					{emTreino
 						? 'Treino em andamento…'
 						: ocupado
 							? 'Solicitando…'
-							: 'Treinar modelo experimental'}</Button
-				>
+							: 'Treinar modelo experimental'}
+				</Button>
 				<p class="text-xs text-muted-foreground">
 					Mínimo: 200 rótulos, 50 de cada classe e 10 processos distintos. O modelo apenas sugere;
 					não importa nem descarta.

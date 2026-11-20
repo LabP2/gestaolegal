@@ -1,10 +1,10 @@
 <script lang="ts">
-	import DateRangePicker from '$lib/components/date-range-picker.svelte';
-	import UnidadeSelector from '$lib/components/unidade-selector.svelte';
-	import * as Select from '$lib/components/ui/select';
-	import { Button } from '$lib/components/ui/button';
-	import { TRIBUNAIS_DJEN } from '$lib/utils/tribunais-djen';
-	import { BUSCA_PARTE_MAX_DIAS, type Unidade } from '$lib/types';
+	import DateRangePicker from '#lib/components/date-range-picker.svelte';
+	import UnidadeSelector from '#lib/components/unidade-selector.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { TRIBUNAIS_DJEN } from '#lib/utils/tribunais-djen.ts';
+	import { BUSCA_PARTE_MAX_DIAS, type Unidade } from '#lib/types/index.ts';
 	let {
 		de = $bindable(''),
 		ate = $bindable(''),
@@ -40,22 +40,25 @@
 			aria-label="Tribunais"
 			aria-invalid={erroTribunais || undefined}
 			aria-describedby={exigirTribunalMonitoramento ? `${id}-tribunais-ajuda` : undefined}
-			><span class="truncate"
-				>{tribunais.length === 0
+		>
+			<span class="truncate">
+				{tribunais.length === 0
 					? exigirTribunalMonitoramento
 						? 'Todos (busca manual)'
 						: 'Todos'
 					: tribunais.length <= 3
 						? tribunais.join(', ')
-						: `${tribunais.length} tribunais`}</span
-			></Select.Trigger
-		>
+						: `${tribunais.length} tribunais`}
+			</span>
+		</Select.Trigger>
 		<Select.Content class="max-h-80">
-			{#each TRIBUNAIS_DJEN as grupo (grupo.grupo)}<Select.Group
-					><Select.GroupHeading>{grupo.grupo}</Select.GroupHeading
-					>{#each grupo.siglas as sigla (sigla)}<Select.Item value={sigla}>{sigla}</Select.Item
-						>{/each}</Select.Group
-				>{/each}
+			{#each TRIBUNAIS_DJEN as grupo (grupo.grupo)}<Select.Group>
+					<Select.GroupHeading>
+						{grupo.grupo}
+					</Select.GroupHeading>{#each grupo.siglas as sigla (sigla)}<Select.Item value={sigla}>
+							{sigla}
+						</Select.Item>{/each}
+				</Select.Group>{/each}
 		</Select.Content>
 	</Select.Root>
 	{#if exigirTribunalMonitoramento}
@@ -72,5 +75,7 @@
 		type="button"
 		variant="ghost"
 		size="sm"
-		onclick={() => (tribunais = [])}>Limpar tribunais</Button
-	>{/if}
+		onclick={() => (tribunais = [])}
+	>
+		Limpar tribunais
+	</Button>{/if}

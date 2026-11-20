@@ -1,6 +1,6 @@
 <script lang="ts">
-	import DetalhePublicacao from '$lib/components/djen/detalhe-publicacao.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import DetalhePublicacao from '#lib/components/djen/detalhe-publicacao.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	const publicacao = $derived(data.publicacao);
@@ -14,9 +14,9 @@
 >
 	{#snippet acoes()}
 		{#if publicacao.comunicacao_id}
-			<Button variant="outline" href={`/djen/publicacoes/${publicacao.comunicacao_id}`}
-				>Abrir operação</Button
-			>
+			<Button variant="outline" href={`/djen/publicacoes/${publicacao.comunicacao_id}`}>
+				Abrir operação
+			</Button>
 		{/if}
 	{/snippet}
 </DetalhePublicacao>

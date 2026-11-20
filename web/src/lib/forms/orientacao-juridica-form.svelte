@@ -1,26 +1,26 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import {
 		orientacaoJuridicaCreateFormSchema,
 		type OrientacaoJuridicaCreateFormSchema
 	} from './schemas/orientacao-juridica-schema';
-	import { SimpleSelect, SimpleTextArea } from '$lib/components/forms';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import AtendidoSelectorDialog from '$lib/components/atendido-selector-dialog.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { Atendido, OrientacaoJuridica } from '$lib/types';
+	import { SimpleSelect, SimpleTextArea } from '#lib/components/forms/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import AtendidoSelectorDialog from '#lib/components/atendido-selector-dialog.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import type { Atendido, OrientacaoJuridica } from '#lib/types/index.ts';
 	import X from '@lucide/svelte/icons/x';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import {
 		AREA_DIREITO_OPTIONS,
 		SUB_AREA_DIREITO_ADMINISTRATIVO_OPTIONS,
 		SUB_AREA_DIREITO_CIVEL_OPTIONS
-	} from '$lib/constants';
+	} from '#lib/constants/index.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
 
@@ -73,7 +73,7 @@
 
 				// After creating or editing, land on the record's detail page so the
 				// user can review what they just saved (issue: redirect to view).
-				await goto(`/plantao/orientacoes-juridicas/${response.id}`, { invalidateAll: true });
+				await goto(`/plantao/orientacoes-juridicas/${response.id}`, { refreshAll: true });
 			} catch (error) {
 				console.error('Orientacao juridica form error:', error);
 				toast.error(

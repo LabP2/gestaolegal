@@ -1,4 +1,4 @@
-import { passwordChangeSchema } from '$lib/forms/schemas/password-schema';
+import { passwordChangeSchema } from '#lib/forms/schemas/password-schema.ts';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import type { PageLoad } from './$types';

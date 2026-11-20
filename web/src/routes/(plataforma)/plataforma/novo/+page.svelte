@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Card from '$lib/components/ui/card';
-	import { plataforma } from '$lib/plataforma-client';
-	import { ApiException, type TenantCriacaoInput, type TenantCriado } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { plataforma } from '#lib/plataforma-client.ts';
+	import { ApiException, type TenantCriacaoInput, type TenantCriado } from '#lib/types/index.ts';
 	import { toast } from 'svelte-sonner';
 
 	type Campo = keyof TenantCriacaoInput;
@@ -185,9 +185,9 @@
 			{#if erroGeral}
 				<p role="alert" class="text-sm text-destructive">{erroGeral}</p>
 			{/if}
-			<Button type="submit" disabled={enviando || slugInvalido}
-				>{enviando ? 'Criando…' : 'Criar NPJ'}</Button
-			>
+			<Button type="submit" disabled={enviando || slugInvalido}>
+				{enviando ? 'Criando…' : 'Criar NPJ'}
+			</Button>
 		</form>
 	{/if}
 </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { SimpleInput, SimpleSelect } from '$lib/components/forms';
-	import * as Card from '$lib/components/ui/card';
+	import { SimpleInput, SimpleSelect } from '#lib/components/forms/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import type { AssistidoCreateFormData } from './schemas/assistido-schema';
 	import type { SuperForm } from 'sveltekit-superforms';
 
@@ -71,9 +71,9 @@
 		{/if}
 		{#if dados.enquadramento && dados.enquadramento !== 'mei'}
 			<div class="space-y-2">
-				<label for="quantidade-socios" class="text-sm font-medium"
-					>Quantos sócios tem a Pessoa Jurídica?</label
-				>
+				<label for="quantidade-socios" class="text-sm font-medium">
+					Quantos sócios tem a Pessoa Jurídica?
+				</label>
 				<input
 					id="quantidade-socios"
 					type="number"

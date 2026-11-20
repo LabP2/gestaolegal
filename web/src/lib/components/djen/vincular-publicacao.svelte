@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { api } from '$lib/api-client';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import type { ListProcesso, Paginated, Publicacao } from '$lib/types';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { api } from '#lib/api-client.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import type { ListProcesso, Paginated, Publicacao } from '#lib/types/index.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import Link from '@lucide/svelte/icons/link';
 	import { toast } from 'svelte-sonner';
 

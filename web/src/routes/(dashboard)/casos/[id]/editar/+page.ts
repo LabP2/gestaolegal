@@ -1,12 +1,12 @@
-import { superValidate } from 'sveltekit-superforms';
+import { superValidate, type Infer } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { casoCreateFormSchema } from '$lib/forms/schemas/caso-schema';
-import { normalizarSituacaoDeferimento } from '$lib/constants/situacao-deferimento';
+import { casoCreateFormSchema } from '#lib/forms/schemas/caso-schema.ts';
+import { normalizarSituacaoDeferimento } from '#lib/constants/situacao-deferimento.ts';
 import type { PageLoad } from './$types';
-import { api } from '$lib/api-client';
+import { api } from '#lib/api-client.ts';
 import { error } from '@sveltejs/kit';
-import { ApiException } from '$lib/types';
-import type { Caso, UserOption } from '$lib/types';
+import { ApiException } from '#lib/types/index.ts';
+import type { Caso, UserOption } from '#lib/types/index.ts';
 
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {
@@ -31,7 +31,10 @@ export const load: PageLoad = async ({ params, fetch }) => {
 			ids_clientes: caso.clientes?.map((cliente: { id: number }) => cliente.id) ?? []
 		};
 
-		const form = await superValidate(casoData, zod4(casoCreateFormSchema));
+		const form = await superValidate<Infer<typeof casoCreateFormSchema>, unknown, typeof casoData>(
+			casoData,
+			zod4(casoCreateFormSchema)
+		);
 		const usuarios = usersData.items ?? [];
 		const casoAssistidos = caso.clientes ?? [];
 

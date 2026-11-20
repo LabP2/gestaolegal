@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import DataTable from '$lib/components/data-table.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import * as Select from '$lib/components/ui/select';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import DataTable from '#lib/components/data-table.svelte';
+	import Input from '#lib/components/ui/input/input.svelte';
+	import * as Select from '#lib/components/ui/select/index.ts';
 	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
-	import { usePaginatedFilters } from '$lib';
-	import { PROCESSO_PAPEIS_SEM_CASO, type Paginated } from '$lib/types';
+	import { usePaginatedFilters } from '#lib';
+	import { PROCESSO_PAPEIS_SEM_CASO, type Paginated } from '#lib/types/index.ts';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -49,7 +49,7 @@
 	}
 
 	const { filters, applyFilters, setFilters } = usePaginatedFilters<Filtros>({
-		initialFilters: filtrosDaUrl(page.url),
+		initialFilters: filtrosDaUrl(new URL(page.url.href)),
 		buildParams: (f) => ({
 			parte: f.parte.trim(),
 			numero: f.numero.trim(),
@@ -62,7 +62,7 @@
 
 	// Voltar/avançar no navegador ou clicar no menu: os filtros seguem a URL.
 	afterNavigate((nav) => {
-		if (nav.type !== 'goto') setFilters(filtrosDaUrl(page.url));
+		if (nav.type !== 'goto') setFilters(filtrosDaUrl(new URL(page.url.href)));
 	});
 
 	const linhas = $derived.by(() => {

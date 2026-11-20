@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import type { Publicacao, AcervoDetalhe, RotuloExemplo } from '$lib/types/djen';
-	import { SITUACAO_PUBLICACAO_LABEL } from '$lib/types';
-	import { formatDateOnly, formatDateTime } from '$lib/utils/date';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import type { Publicacao, AcervoDetalhe, RotuloExemplo } from '#lib/types/djen.ts';
+	import { SITUACAO_PUBLICACAO_LABEL } from '#lib/types/index.ts';
+	import { formatDateOnly, formatDateTime } from '#lib/utils/date.ts';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	let {
 		publicacao,
@@ -90,8 +90,10 @@
 			{/if}
 			{#if publicacao.id_processo}<Button
 					variant="outline"
-					href={`/processos/${publicacao.id_processo}`}>Abrir processo</Button
-				>{/if}
+					href={`/processos/${publicacao.id_processo}`}
+				>
+					Abrir processo
+				</Button>{/if}
 			{@render acoes?.()}
 		</div>
 	</div>
@@ -206,9 +208,9 @@
 	</div>
 	{#if historico}
 		<Card.Root>
-			<Card.Header
-				><Card.Title class="text-base">Histórico da classificação</Card.Title></Card.Header
-			>
+			<Card.Header>
+				<Card.Title class="text-base">Histórico da classificação</Card.Title>
+			</Card.Header>
 			<Card.Content>
 				<ul class="space-y-2 text-sm">
 					{#each historico as h}<li>

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import type { PageProps } from './$types';
-	import * as Card from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import { AREA_DIREITO_OPTIONS } from '$lib/constants';
-	import { api } from '$lib/api-client';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import { AREA_DIREITO_OPTIONS } from '#lib/constants/index.ts';
+	import { api } from '#lib/api-client.ts';
 	import { toast } from 'svelte-sonner';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 
 	let { data }: PageProps = $props();
 
@@ -30,7 +30,7 @@
 		try {
 			await api.put('roteiro', { area_direito: area, link: links[area] || null });
 			toast.success('Roteiro atualizado');
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Erro ao salvar roteiro'));
 		} finally {

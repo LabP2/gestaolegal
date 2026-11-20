@@ -6,8 +6,8 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
-	import * as Form from '$lib/components/ui/form';
-	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+	import * as Form from '#lib/components/ui/form/index.ts';
+	import Textarea from '#lib/components/ui/textarea/textarea.svelte';
 	import type { FieldProps } from 'formsnap';
 
 	let {

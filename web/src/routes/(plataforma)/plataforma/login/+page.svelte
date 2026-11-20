@@ -2,12 +2,12 @@
 	import Eye from '@lucide/svelte/icons/eye';
 	import EyeOff from '@lucide/svelte/icons/eye-off';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Card from '$lib/components/ui/card';
-	import { guardarTokenPlataforma, plataforma } from '$lib/plataforma-client';
-	import { ApiException, type PlataformaAdmin } from '$lib/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { guardarTokenPlataforma, plataforma } from '#lib/plataforma-client.ts';
+	import { ApiException, type PlataformaAdmin } from '#lib/types/index.ts';
 
 	let email = $state('');
 	let password = $state('');

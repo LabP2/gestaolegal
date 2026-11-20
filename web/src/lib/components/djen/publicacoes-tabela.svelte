@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import Eye from '@lucide/svelte/icons/eye';
 	import FileCheck2 from '@lucide/svelte/icons/file-check-2';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
 	import ImportarPublicacao from './importar-publicacao.svelte';
-	import { formatDateOnly } from '$lib/utils/date';
-	import type { AcervoItem } from '$lib/types/djen';
+	import { formatDateOnly } from '#lib/utils/date.ts';
+	import type { AcervoItem } from '#lib/types/djen.ts';
 	let {
 		itens,
 		selecionados,
@@ -44,14 +44,15 @@
 
 <div class="min-w-0 lg:overflow-x-auto lg:rounded-md lg:border">
 	<table class="block w-full text-sm lg:table lg:min-w-[950px]" aria-label="Publicações">
-		<thead class="hidden bg-muted/50 text-left lg:table-header-group"
-			><tr>
-				<th class="p-3"><span class="sr-only">Seleção</span></th><th class="p-3">Data / Tribunal</th
-				><th class="p-3">Processo</th><th class="p-3">Partes</th><th class="p-3"
-					>Atendido sugerido</th
-				><th class="p-3">Situação</th><th class="p-3">Ações</th>
-			</tr></thead
-		>
+		<thead class="hidden bg-muted/50 text-left lg:table-header-group">
+			<tr>
+				<th class="p-3"><span class="sr-only">Seleção</span></th><th class="p-3">
+					Data / Tribunal
+				</th><th class="p-3">Processo</th><th class="p-3">Partes</th><th class="p-3">
+					Atendido sugerido
+				</th><th class="p-3">Situação</th><th class="p-3">Ações</th>
+			</tr>
+		</thead>
 		<tbody class="block space-y-3 lg:table-row-group lg:space-y-0">
 			{#each itens as item (item.id)}
 				{@const sugestoes = item.atendidos_sugeridos ?? []}
@@ -64,40 +65,49 @@
 				<tr
 					class="grid grid-cols-2 items-start gap-3 rounded-md border bg-card p-4 lg:table-row lg:border-x-0 lg:border-t-0 lg:p-0"
 				>
-					<td class="lg:p-3"
-						><Checkbox
+					<td class="lg:p-3">
+						<Checkbox
 							aria-label={`Selecionar publicação ${item.id_djen}`}
 							disabled={ocupado}
 							checked={selecionados.includes(item.id_djen)}
 							onCheckedChange={(v) => selecionar(item.id_djen, v === true)}
-						/></td
-					>
-					<td class="text-right lg:p-3 lg:text-left"
-						><span class="whitespace-nowrap">{formatDateOnly(item.data_disponibilizacao)}</span
-						><span class="block text-muted-foreground">{item.sigla_tribunal}</span></td
-					>
-					<td class="col-span-2 lg:max-w-64 lg:p-3"
-						><span class="font-mono">{item.numero_processo}</span><span
-							class="block truncate text-xs text-muted-foreground"
-							title={item.nome_orgao}>{item.nome_orgao}</span
+						/>
+					</td>
+					<td class="text-right lg:p-3 lg:text-left">
+						<span class="whitespace-nowrap">{formatDateOnly(item.data_disponibilizacao)}</span><span
+							class="block text-muted-foreground"
 						>
+							{item.sigla_tribunal}
+						</span>
+					</td>
+					<td class="col-span-2 lg:max-w-64 lg:p-3">
+						<span class="font-mono">{item.numero_processo}</span><span
+							class="block truncate text-xs text-muted-foreground"
+							title={item.nome_orgao}
+						>
+							{item.nome_orgao}
+						</span>
 						{#if item.id_processo}<a
 								class="block text-primary underline"
-								href={`/processos/${item.id_processo}`}>Processo #{item.id_processo}</a
-							>{/if}
+								href={`/processos/${item.id_processo}`}
+							>
+								Processo #{item.id_processo}
+							</a>{/if}
 					</td>
-					<td class="col-span-2 lg:max-w-64 lg:p-3"
-						><span class="font-medium lg:hidden">Partes: </span><span
+					<td class="col-span-2 lg:max-w-64 lg:p-3">
+						<span class="font-medium lg:hidden">Partes: </span><span
 							class="line-clamp-2"
 							title={(item.partes ?? []).join(' · ')}
-							>{(item.partes ?? []).join(' · ') || 'Não informadas pelo DJEN'}</span
-						></td
-					>
-					<td class="order-5 min-w-0 lg:max-w-56 lg:p-3"
-						>{#if new Set((item.contextos ?? [])
+						>
+							{(item.partes ?? []).join(' · ') || 'Não informadas pelo DJEN'}
+						</span>
+					</td>
+					<td class="order-5 min-w-0 lg:max-w-56 lg:p-3">
+						{#if new Set((item.contextos ?? [])
 								.map((c) => c.sugestao)
-								.filter(Boolean)).size > 1}<Badge variant="outline">Sugestões divergentes</Badge
-							>{/if}
+								.filter(Boolean)).size > 1}<Badge variant="outline">
+								Sugestões divergentes
+							</Badge>{/if}
 
 						<Button
 							variant="ghost"
@@ -108,22 +118,22 @@
 							disabled={ocupado}
 							onclick={() => (confirmacao = item)}
 						>
-							<span class="truncate"
-								>{sugestoes.length
-									? sugestoes.map((a) => a.nome).join(' · ')
-									: 'Sem sugestão'}</span
-							>
+							<span class="truncate">
+								{sugestoes.length ? sugestoes.map((a) => a.nome).join(' · ') : 'Sem sugestão'}
+							</span>
 						</Button>
 					</td>
-					<td class="order-4 col-span-2 lg:p-3"
-						><Badge
+					<td class="order-4 col-span-2 lg:p-3">
+						<Badge
 							variant={item.situacao === 'vinculada'
 								? 'default'
 								: item.situacao === 'descartada'
 									? 'secondary'
-									: 'outline'}>{situacoes[item.situacao] ?? item.situacao}</Badge
-						></td
-					>
+									: 'outline'}
+						>
+							{situacoes[item.situacao] ?? item.situacao}
+						</Badge>
+					</td>
 					<td class="order-6 text-right lg:p-3">
 						<div class="flex items-center justify-end gap-1">
 							<Button
@@ -133,8 +143,9 @@
 								title="Ler publicação"
 								aria-label="Ler publicação"
 								href={`/djen/acervo/${item.id}?voltar=${encodeURIComponent(page.url.pathname + page.url.search)}`}
-								><Eye class="size-4" /></Button
 							>
+								<Eye class="size-4" />
+							</Button>
 							{#if item.situacao !== 'vinculada'}
 								<Button
 									variant="ghost"
@@ -143,8 +154,10 @@
 									title="Confirmar parte e importar publicação"
 									aria-label="Importar publicação"
 									disabled={ocupado}
-									onclick={() => (confirmacao = item)}><FileCheck2 class="size-4" /></Button
+									onclick={() => (confirmacao = item)}
 								>
+									<FileCheck2 class="size-4" />
+								</Button>
 							{/if}
 							<Button
 								variant="ghost"
@@ -165,8 +178,8 @@
 					</td>
 				</tr>
 				{#if expandidos.includes(item.id)}
-					<tr class="block lg:table-row"
-						><td colspan="7" class="block rounded-md border bg-muted/30 p-4 lg:table-cell">
+					<tr class="block lg:table-row">
+						<td colspan="7" class="block rounded-md border bg-muted/30 p-4 lg:table-cell">
 							<div id={`publicacao-detalhe-${item.id}`} class="space-y-3">
 								<p>{item.resumo}</p>
 								{#each item.contextos ?? [] as ctx}<p class="text-muted-foreground">
@@ -182,22 +195,23 @@
 								<div class="flex flex-wrap gap-4 text-primary underline">
 									<a
 										href={`/djen/acervo/${item.id}?voltar=${encodeURIComponent(page.url.pathname + page.url.search)}`}
-										>Ler publicação e histórico</a
 									>
-									{#if item.comunicacao_id}<a href={`/djen/publicacoes/${item.comunicacao_id}`}
-											>Abrir operação</a
-										>{/if}
+										Ler publicação e histórico
+									</a>
+									{#if item.comunicacao_id}<a href={`/djen/publicacoes/${item.comunicacao_id}`}>
+											Abrir operação
+										</a>{/if}
 									{#if item.id_caso}<a href={`/casos/${item.id_caso}`}>Caso #{item.id_caso}</a>{/if}
 								</div>
 							</div>
-						</td></tr
-					>
+						</td>
+					</tr>
 				{/if}
-			{:else}<tr class="block lg:table-row"
-					><td colspan="7" class="block p-8 text-center text-muted-foreground lg:table-cell"
-						>Nenhuma publicação neste filtro.</td
-					></tr
-				>{/each}
+			{:else}<tr class="block lg:table-row">
+					<td colspan="7" class="block p-8 text-center text-muted-foreground lg:table-cell">
+						Nenhuma publicação neste filtro.
+					</td>
+				</tr>{/each}
 		</tbody>
 	</table>
 </div>
@@ -219,9 +233,9 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title>Revisar parte sugerida</Dialog.Title>
-			<Dialog.Description
-				>Confira a parte antes de confirmar a importação desta publicação.</Dialog.Description
-			>
+			<Dialog.Description>
+				Confira a parte antes de confirmar a importação desta publicação.
+			</Dialog.Description>
 		</Dialog.Header>
 		{#if confirmacao}
 			<p class="font-mono text-sm">{confirmacao.numero_processo}</p>

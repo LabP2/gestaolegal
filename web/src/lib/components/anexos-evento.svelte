@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { api, apiFetch } from '$lib/api-client';
-	import type { ArquivoEvento } from '$lib/types/evento';
-	import { Button } from '$lib/components/ui/button';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api, apiFetch } from '#lib/api-client.ts';
+	import type { ArquivoEvento } from '#lib/types/evento.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
 	import { toast } from 'svelte-sonner';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 
 	let {
 		casoId,
@@ -62,8 +62,10 @@
 					variant="outline"
 					size="sm"
 					disabled={arquivo.indisponivel_origem}
-					onclick={() => baixar(arquivo)}>Baixar</Button
+					onclick={() => baixar(arquivo)}
 				>
+					Baixar
+				</Button>
 				{#if podeExcluir}
 					<ConfirmAction
 						title="Excluir anexo?"

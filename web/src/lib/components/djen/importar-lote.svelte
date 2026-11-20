@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { beforeNavigate, invalidateAll } from '$app/navigation';
+	import { beforeNavigate, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api } from '$lib/api-client';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import type { AcervoItem, AcervoPagina } from '$lib/types/djen';
+	import { api } from '#lib/api-client.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import type { AcervoItem, AcervoPagina } from '#lib/types/djen.ts';
 	import { toast } from 'svelte-sonner';
 
 	let {
@@ -64,7 +64,7 @@
 			let lista = amostra;
 			if (todas) {
 				lista = [];
-				const params = new URLSearchParams(page.url.searchParams);
+				const params = new URLSearchParams(page.url.search);
 				params.set('per_page', '100');
 				for (let pagina = 1; ; pagina++) {
 					params.set('page', String(pagina));
@@ -138,7 +138,7 @@
 			erro = mensagemDeErro(e, 'A importação foi interrompida.');
 		} finally {
 			try {
-				await invalidateAll();
+				await refreshAll();
 			} catch {
 				toast.error('Não foi possível atualizar a lista. Os lotes concluídos estão salvos.');
 			} finally {
@@ -185,8 +185,8 @@
 			class="space-y-2 rounded-md border p-3 text-sm"
 		>
 			<legend class="px-1 font-medium">Publicações para importar</legend>
-			<label class="flex items-center gap-2"
-				><input
+			<label class="flex items-center gap-2">
+				<input
 					type="radio"
 					name="alcance-importacao"
 					checked={!todas}
@@ -195,10 +195,10 @@
 						todas = false;
 						preparar();
 					}}
-				/>Selecionadas ({amostra.length})</label
-			>
-			<label class="flex items-center gap-2"
-				><input
+				/>Selecionadas ({amostra.length})
+			</label>
+			<label class="flex items-center gap-2">
+				<input
 					type="radio"
 					name="alcance-importacao"
 					checked={todas}
@@ -206,14 +206,14 @@
 						todas = true;
 						preparar();
 					}}
-				/>Todas do filtro ({total})</label
-			>
+				/>Todas do filtro ({total})
+			</label>
 		</fieldset>
 		{#if !processadas}
 			<details class="text-sm">
 				<summary class="cursor-pointer text-muted-foreground">Opções de importação</summary>
-				<label class="mt-3 flex items-center gap-2"
-					><input
+				<label class="mt-3 flex items-center gap-2">
+					<input
 						type="checkbox"
 						checked={semParte}
 						disabled={preparando || importando}
@@ -221,8 +221,8 @@
 							semParte = e.currentTarget.checked;
 							preparar();
 						}}
-					/>Importar sem associar parte</label
-				>
+					/>Importar sem associar parte
+				</label>
 				<p class="mt-2 text-xs text-muted-foreground">
 					Por padrão, usamos as partes sugeridas. Processos existentes mantêm suas partes.
 				</p>
@@ -250,9 +250,13 @@
 		{/if}
 		{#if erro}<p role="alert" class="text-destructive">{erro}</p>{/if}
 		<Dialog.Footer>
-			<Button variant="outline" disabled={preparando || importando} onclick={() => (aberto = false)}
-				>Fechar</Button
+			<Button
+				variant="outline"
+				disabled={preparando || importando}
+				onclick={() => (aberto = false)}
 			>
+				Fechar
+			</Button>
 			<Button disabled={preparando || importando || !pendentes} onclick={confirmar}>
 				{processadas ? 'Continuar importação' : `Confirmar importação (${pendentes})`}
 			</Button>

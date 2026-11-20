@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import InfoCard from '$lib/components/ui/info-card.svelte';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import VincularProcessoCaso from '$lib/components/djen/vincular-processo-caso.svelte';
-	import PublicacoesProcesso from '$lib/components/djen/publicacoes-processo.svelte';
-	import { api } from '$lib/api-client';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import InfoCard from '#lib/components/ui/info-card.svelte';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import VincularProcessoCaso from '#lib/components/djen/vincular-processo-caso.svelte';
+	import PublicacoesProcesso from '#lib/components/djen/publicacoes-processo.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { goto, refreshAll } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { mensagemDeErro } from '$lib/utils/erros';
-	import { POLO_PARTE_LABEL, PROCESSO_PAPEIS_SEM_CASO } from '$lib/types';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
+	import { POLO_PARTE_LABEL, PROCESSO_PAPEIS_SEM_CASO } from '#lib/types/index.ts';
 	import Edit from '@lucide/svelte/icons/edit';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import type { PageProps } from './$types';
@@ -64,7 +64,7 @@
 		try {
 			await api.delete(`processos/${processo.id}`);
 			toast.success('Processo inativado');
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Não foi possível inativar o processo.'));
 		}
@@ -135,9 +135,9 @@
 			<Card.Header>
 				<Card.Title>Partes</Card.Title>
 				{#if !semCaso}
-					<Card.Description
-						>Partes do processo e atendidos do caso #{processo.id_caso}.</Card.Description
-					>
+					<Card.Description>
+						Partes do processo e atendidos do caso #{processo.id_caso}.
+					</Card.Description>
 				{/if}
 			</Card.Header>
 			<Card.Content>

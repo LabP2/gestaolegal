@@ -4,8 +4,8 @@ import {
 	GENDER_VALUES,
 	MARITAL_STATUS_VALUES,
 	YES_NO_VALUES
-} from '$lib/constants';
-import { validateCPF } from '$lib/utils/cpf-validator';
+} from '#lib/constants/index.ts';
+import { validateCPF } from '#lib/utils/cpf-validator.ts';
 
 const baseUserFormSchema = z
 	.object({

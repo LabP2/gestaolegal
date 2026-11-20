@@ -1,11 +1,11 @@
 <script lang="ts">
-	import VincularPublicacao from '$lib/components/djen/vincular-publicacao.svelte';
-	import { invalidateAll } from '$app/navigation';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import { api } from '$lib/api-client';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import VincularPublicacao from '#lib/components/djen/vincular-publicacao.svelte';
+	import { refreshAll } from '$app/navigation';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { toast } from 'svelte-sonner';
-	import DetalhePublicacao from '$lib/components/djen/detalhe-publicacao.svelte';
+	import DetalhePublicacao from '#lib/components/djen/detalhe-publicacao.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -15,7 +15,7 @@
 		try {
 			await api.post(`djen/publicacoes/${publicacao.id}/descartar`);
 			toast.success('Publicação descartada');
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(mensagemDeErro(err, 'Não foi possível descartar a publicação.'));
 		}
@@ -30,7 +30,7 @@
 >
 	{#snippet acoes()}
 		{#if publicacao.pode_vincular && publicacao.situacao !== 'vinculada'}
-			<VincularPublicacao {publicacao} onVinculada={() => invalidateAll()} />
+			<VincularPublicacao {publicacao} onVinculada={() => refreshAll()} />
 		{/if}
 		{#if publicacao.pode_vincular && publicacao.situacao === 'pendente'}
 			<ConfirmAction

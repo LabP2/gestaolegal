@@ -1,19 +1,19 @@
 <script lang="ts">
-	import ProgressoBusca from '$lib/components/djen/progresso-busca.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	import ProgressoBusca from '#lib/components/djen/progresso-busca.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Eye from '@lucide/svelte/icons/eye';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import {
 		ApiException,
 		DJEN_PAPEIS_GESTAO,
 		type BuscaProcessoDjen,
 		type Me,
 		type PublicacaoListItem
-	} from '$lib/types';
-	import { formatDateOnly, formatDateTime } from '$lib/utils/date';
+	} from '#lib/types/index.ts';
+	import { formatDateOnly, formatDateTime } from '#lib/utils/date.ts';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import NavMain from './nav-main.svelte';
 	import NavUser from './nav-user.svelte';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import type { ComponentProps } from 'svelte';
 	import CompanyLogo from './company-logo.svelte';
-	import type { Me } from '$lib/types';
-	import { podeVer, type ItemComPapeis } from '$lib/utils/permissoes';
+	import type { Me } from '#lib/types/index.ts';
+	import { podeVer, type ItemComPapeis } from '#lib/utils/permissoes.ts';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -15,7 +15,7 @@
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
 	import NewspaperIcon from '@lucide/svelte/icons/newspaper';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import { PROCESSO_PAPEIS_SEM_CASO } from '$lib/types';
+	import { PROCESSO_PAPEIS_SEM_CASO } from '#lib/types/index.ts';
 
 	type NavItem = ItemComPapeis & {
 		title: string;

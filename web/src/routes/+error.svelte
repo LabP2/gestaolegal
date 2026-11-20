@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { page } from '$app/state';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 	import { AlertTriangle, Home, RefreshCw } from '@lucide/svelte';
 
-	const status = $derived($page.status);
+	let { error }: { error: App.Error } = $props();
+	const status = $derived(page.status);
 	// Sem mensagem da API, o texto segue o status: um 404 não é "erro inesperado".
 	const fallback = $derived(
 		status === 404
@@ -13,7 +14,7 @@
 				? 'Você não tem permissão para acessar esta página.'
 				: 'Ocorreu um erro inesperado'
 	);
-	const errorMessage = $derived($page.error?.message || fallback);
+	const errorMessage = $derived(error?.message || fallback);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
@@ -54,8 +55,7 @@
 				{/if}
 
 				<Button onclick={() => (window.location.href = '/')} variant="ghost" class="w-full">
-					<Home class="mr-2 h-4 w-4" />
-					Página Inicial
+					<Home class="mr-2 h-4 w-4" /> Página Inicial
 				</Button>
 			</div>
 		</CardContent>

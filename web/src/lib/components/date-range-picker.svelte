@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { RangeCalendar } from 'bits-ui';
-	import * as Popover from '$lib/components/ui/popover';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
-	import { cn } from '$lib/utils.js';
+	import * as Popover from '#lib/components/ui/popover/index.ts';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { cn } from '#lib/utils.js';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';

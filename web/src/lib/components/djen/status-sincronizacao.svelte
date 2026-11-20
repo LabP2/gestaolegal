@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { api } from '$lib/api-client';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import { ApiException, type SincronizacaoDjen, type StatusDjen } from '$lib/types';
-	import { formatDateTime } from '$lib/utils/date';
+	import { refreshAll } from '$app/navigation';
+	import { api } from '#lib/api-client.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
+	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { ApiException, type SincronizacaoDjen, type StatusDjen } from '#lib/types/index.ts';
+	import { formatDateTime } from '#lib/utils/date.ts';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { toast } from 'svelte-sonner';
@@ -25,7 +25,7 @@
 			const resumo = `${r.novas} nova(s), ${r.vinculadas} vinculada(s), ${r.atualizadas} atualizada(s).`;
 			if (r.status === 'ok') toast.success(`Rotina concluída: ${resumo}`);
 			else toast.warning(`Rotina ${r.status === 'parcial' ? 'parcial' : 'com erro'}: ${resumo}`);
-			await invalidateAll();
+			await refreshAll();
 		} catch (err) {
 			toast.error(err instanceof ApiException ? err.message : 'Erro ao rodar a rotina do DJEN.');
 		} finally {

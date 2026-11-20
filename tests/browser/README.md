@@ -62,3 +62,30 @@ apenas os módulos de ambiente do SvelteKit e a seleção da unidade.
 
 O resultado dessa suíte comprova o comportamento do frontend com os contratos
 simulados; não substitui o ensaio de integração com o banco restaurado e DJEN.
+
+
+## Login, paginação, formulários e arquivos
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/gestaolegal-browser/node_modules/playwright \
+GL_BASE_URL=http://localhost:5401 node tests/browser/front-check.cjs
+```
+
+Intercepta toda a API com dados sintéticos. Verifica login recusado e aceito,
+paginação no contrato `PaginatedResult.to_dict()` (`items`, `total`, `page` e `per_page` no mesmo nível), navegação de volta, edição de
+atendido/caso/orientação/assistência judiciária, upload multipart e download.
+Não acessa banco real. Também pode ser executado contra a imagem Nginx de produção
+alterando `GL_BASE_URL` para a porta onde o contêiner está publicado.
+
+## Regressões da auditoria de navegação e CRUD
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/gestaolegal-browser/node_modules/playwright \
+GL_BASE_URL=http://localhost:5402 node tests/browser/audit-regressions.cjs
+```
+
+Usa API sintética. Verifica que o diálogo de processo carrega e preserva os dados,
+que alternar entre edição e criação não mistura registros, que processos inativos
+não reaparecem após recarregar, que o administrador pode reativar atendidos e que
+o breadcrumb de Plantão aponta para uma página existente. A busca real por e-mail
+e a autorização/isolamento da reativação são cobertos pelos testes de API.

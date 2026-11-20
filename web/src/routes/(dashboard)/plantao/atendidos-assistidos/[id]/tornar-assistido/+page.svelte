@@ -1,9 +1,9 @@
 <script lang="ts">
-	import AssistidoForm from '$lib/forms/assistido-form.svelte';
+	import AssistidoForm from '#lib/forms/assistido-form.svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
 
 	let { data }: { data: PageData } = $props();
 

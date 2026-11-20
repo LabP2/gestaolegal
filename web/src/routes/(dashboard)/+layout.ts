@@ -1,9 +1,9 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { Me } from '$lib/types';
+import type { Me } from '#lib/types/index.ts';
 import type { LayoutLoad } from './$types';
-import { api } from '$lib/api-client';
-import { ApiException } from '$lib/types';
-import { sincronizarUnidades } from '$lib/stores/unidade';
+import { api } from '#lib/api-client.ts';
+import { ApiException } from '#lib/types/index.ts';
+import { sincronizarUnidades } from '#lib/stores/unidade.ts';
 
 export const load: LayoutLoad = async ({ url, fetch }) => {
 	try {

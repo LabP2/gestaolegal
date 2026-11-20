@@ -1,26 +1,26 @@
 <script lang="ts">
-	import AnexosEvento from '$lib/components/anexos-evento.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
+	import AnexosEvento from '#lib/components/anexos-evento.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import type { PageProps } from './$types';
-	import { TIPO_EVENTO_OPTIONS } from '$lib/constants/tipo_evento';
+	import { TIPO_EVENTO_OPTIONS } from '#lib/constants/tipo_evento.ts';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { eventoUpdateFormSchema } from '$lib/forms/schemas/evento-schema';
+	import { eventoUpdateFormSchema } from '#lib/forms/schemas/evento-schema.ts';
 	import {
 		SimpleDatePicker,
 		SimpleInput,
 		SimpleSelect,
 		SimpleTextArea
-	} from '$lib/components/forms';
+	} from '#lib/components/forms/index.ts';
 	import { filesProxy } from 'sveltekit-superforms';
 	import { toast } from 'svelte-sonner';
-	import UsuarioSelectorDialog from '$lib/components/usuario-selector-dialog.svelte';
-	import type { User } from '$lib/types';
+	import UsuarioSelectorDialog from '#lib/components/usuario-selector-dialog.svelte';
+	import type { User } from '#lib/types/index.ts';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import X from '@lucide/svelte/icons/x';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
 	import { goto } from '$app/navigation';
 
 	let { data }: PageProps = $props();
@@ -75,7 +75,7 @@
 				});
 
 				toast.success('Evento atualizado com sucesso!');
-				await goto(`/casos/${caso.id}/eventos/${evento.id}`, { invalidateAll: true });
+				await goto(`/casos/${caso.id}/eventos/${evento.id}`, { refreshAll: true });
 			} catch (err) {
 				if (err instanceof ApiException) {
 					toast.error(err.message);

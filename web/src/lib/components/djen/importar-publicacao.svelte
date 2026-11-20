@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select';
-	import BaseSelectorDialog from '$lib/components/base-selector-dialog.svelte';
-	import type { AcervoItem } from '$lib/types/djen';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import BaseSelectorDialog from '#lib/components/base-selector-dialog.svelte';
+	import type { AcervoItem } from '#lib/types/djen.ts';
 	let {
 		item,
 		ocupado,
@@ -39,15 +39,15 @@
 				disabled={ocupado}
 			>
 				<Select.Trigger class="w-full sm:w-72" aria-label={`Parte da publicação ${item.id_djen}`}>
-					<span class="truncate"
-						>{opcoes.find((a) => String(a.id) === selecionado)?.nome ??
-							'Sem parte selecionada'}</span
-					>
+					<span class="truncate">
+						{opcoes.find((a) => String(a.id) === selecionado)?.nome ?? 'Sem parte selecionada'}
+					</span>
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="sem_parte">Sem parte</Select.Item>
-					{#each opcoes as a}<Select.Item value={String(a.id)}>{a.nome} · #{a.id}</Select.Item
-						>{/each}
+					{#each opcoes as a}<Select.Item value={String(a.id)}>
+							{a.nome} · #{a.id}
+						</Select.Item>{/each}
 				</Select.Content>
 			</Select.Root>
 			{#if !ocupado}

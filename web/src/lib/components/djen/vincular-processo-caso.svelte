@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { api } from '$lib/api-client';
-	import { invalidateAll } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import type { ListCaso, Paginated } from '$lib/types';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { api } from '#lib/api-client.ts';
+	import { refreshAll } from '$app/navigation';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import { Label } from '#lib/components/ui/label/index.ts';
+	import type { ListCaso, Paginated } from '#lib/types/index.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { toast } from 'svelte-sonner';
 
 	let { processoId }: { processoId: number } = $props();
@@ -50,7 +50,7 @@
 				`Processo vinculado. ${resultado.eventos_criados} evento(s) criado(s) no caso.`
 			);
 			open = false;
-			await invalidateAll();
+			await refreshAll();
 		} catch (e) {
 			erro = mensagemDeErro(e, 'Não foi possível vincular o processo.');
 		} finally {
@@ -68,8 +68,10 @@
 		selecionado = null;
 		erro = '';
 		consultou = false;
-	}}>Vincular a caso</Button
+	}}
 >
+	Vincular a caso
+</Button>
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-xl">
 		<Dialog.Header>
@@ -96,16 +98,16 @@
 					placeholder="Ex.: 1234"
 				/>
 			</div>
-			<Button type="submit" variant="secondary" disabled={buscando || salvando}
-				>{buscando ? 'Buscando...' : 'Buscar'}</Button
-			>
+			<Button type="submit" variant="secondary" disabled={buscando || salvando}>
+				{buscando ? 'Buscando...' : 'Buscar'}
+			</Button>
 		</form>
 		{#if erro}<p role="alert" class="text-sm text-destructive">{erro}</p>{/if}
 		{#if casos.length}
 			<fieldset class="max-h-64 space-y-2 overflow-y-auto" disabled={salvando || buscando}>
-				<legend class="mb-2 text-sm font-medium"
-					>Selecione o caso (até 50 resultados; refine a busca)</legend
-				>
+				<legend class="mb-2 text-sm font-medium">
+					Selecione o caso (até 50 resultados; refine a busca)
+				</legend>
 				{#each casos as caso (caso.id)}
 					<label class="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm">
 						<input
@@ -115,11 +117,13 @@
 							bind:group={selecionado}
 							class="mt-1"
 						/>
-						<span
-							><strong>Caso #{caso.id} · {caso.area_direito}</strong><span
-								class="block text-muted-foreground">{caso.descricao || 'Sem descrição'}</span
-							></span
-						>
+						<span>
+							<strong>Caso #{caso.id} · {caso.area_direito}</strong><span
+								class="block text-muted-foreground"
+							>
+								{caso.descricao || 'Sem descrição'}
+							</span>
+						</span>
 					</label>
 				{/each}
 			</fieldset>
@@ -130,9 +134,9 @@
 		{/if}
 		<Dialog.Footer>
 			<Button variant="outline" disabled={salvando} onclick={() => (open = false)}>Cancelar</Button>
-			<Button disabled={selecionado === null || salvando || buscando} onclick={vincular}
-				>{salvando ? 'Vinculando...' : 'Confirmar vínculo'}</Button
-			>
+			<Button disabled={selecionado === null || salvando || buscando} onclick={vincular}>
+				{salvando ? 'Vinculando...' : 'Confirmar vínculo'}
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

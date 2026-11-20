@@ -180,7 +180,7 @@ for (const s of scenarios)
     await expect(field).toBeVisible();
     if (s.key === "caso")
       await expect(
-        page.getByRole("button", { name: "Situação do Deferimento" }),
+        page.getByRole("combobox", { name: "Situação do Deferimento" }),
       ).toBeVisible();
     if (s.key === "atendido")
       await expect(page.locator("[name=data_nascimento]")).toHaveValue(
@@ -267,16 +267,16 @@ test("API: JSON, multipart e exceções com ou sem captureStackTrace", async ({
           build.onResolve(
             {
               filter:
-                /^\$app\/environment$|^\$env\/dynamic\/public$|^\.\/stores\/unidade$/,
+                /^\$app\/env(?:\/public)?$|^\.\/stores\/unidade$/,
             },
             (args) => ({ path: args.path, namespace: "teste" }),
           );
           build.onLoad({ filter: /.*/, namespace: "teste" }, (args) => ({
             contents:
-              args.path === "$app/environment"
+              args.path === "$app/env"
                 ? "export const dev = false;"
-                : args.path === "$env/dynamic/public"
-                  ? "export const env = {};"
+                : args.path === "$app/env/public"
+                  ? "export const PUBLIC_API_URL = undefined;"
                   : "export const unidadeAtivaId = () => 1;",
           }));
         },

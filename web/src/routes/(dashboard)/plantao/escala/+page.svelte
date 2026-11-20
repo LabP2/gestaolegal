@@ -1,18 +1,18 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { api } from '$lib/api-client';
-	import { ApiException } from '$lib/types';
-	import { situacaoEscala } from '$lib/constants/escalas';
-	import { invalidateAll } from '$app/navigation';
-	import { unidadeAtiva } from '$lib/stores/unidade';
-	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
-	import * as CalendarUI from '$lib/components/ui/calendar/index.js';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
-	import ConfirmAction from '$lib/components/confirm-action.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException } from '#lib/types/index.ts';
+	import { situacaoEscala } from '#lib/constants/escalas.ts';
+	import { refreshAll } from '$app/navigation';
+	import { unidadeAtiva } from '#lib/stores/unidade.ts';
+	import Calendar from '#lib/components/ui/calendar/calendar.svelte';
+	import * as CalendarUI from '#lib/components/ui/calendar/index.js';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import ConfirmAction from '#lib/components/confirm-action.svelte';
 	import { CalendarDate, type DateValue } from '@internationalized/date';
-	import { cn } from '$lib/utils';
+	import { cn } from '#lib/utils.ts';
 	import { toast } from 'svelte-sonner';
 
 	let { data }: { data: PageData } = $props();
@@ -96,7 +96,7 @@
 			await api.post(`plantao/marcacoes?escala_id=${pagina.plantao.id}`, {
 				data: dataSelecionadaISO
 			});
-			await invalidateAll();
+			await refreshAll();
 			toast.success('Data de plantão cadastrada!');
 		} catch (err) {
 			if (err instanceof ApiException) toast.error(err.message);
@@ -109,7 +109,7 @@
 	async function limpar() {
 		try {
 			await api.delete(`plantao/marcacoes?escala_id=${pagina.plantao.id}`);
-			await invalidateAll();
+			await refreshAll();
 			toast.success('Registro apagado. Selecione novamente os dias do seu plantão.');
 		} catch (err) {
 			if (err instanceof ApiException) toast.error(err.message);
@@ -131,8 +131,10 @@
 				{#if podeConfigurar && !pagina.plantao.legado && !pagina.plantao.cancelado}
 					<Button
 						href={`/plantao/configurar-abertura?escala_id=${pagina.plantao.id}`}
-						variant="outline">Configurar escala</Button
+						variant="outline"
 					>
+						Configurar escala
+					</Button>
 					<ConfirmAction
 						title="Cancelar esta escala?"
 						description="As inscrições serão bloqueadas. Dias, marcações e confirmações permanecerão no histórico."
@@ -141,7 +143,7 @@
 						onConfirm={async () => {
 							try {
 								await api.post(`plantao/escalas/${pagina.plantao.id}/cancelar`);
-								await invalidateAll();
+								await refreshAll();
 								toast.success('Escala cancelada');
 							} catch (err) {
 								toast.error(err instanceof ApiException ? err.message : 'Erro ao cancelar escala');
@@ -291,19 +293,24 @@
 	</p>
 	<div class="overflow-x-auto rounded-lg border">
 		<table class="w-full text-left text-sm">
-			<thead
-				><tr
-					><th class="p-3">Data</th><th class="p-3">Usuário</th><th class="p-3">Confirmação</th><th
-						class="p-3">Registro original</th
-					></tr
-				></thead
-			><tbody>
-				{#each pagina.escala as item (item.id)}<tr class="border-t"
-						><td class="p-3">{formatData(item.data)}</td><td class="p-3">{item.nome}</td><td
-							class="p-3">{item.confirmacao}</td
-						><td class="p-3">{item.ativo ? 'Ativo' : 'Inativo'}</td></tr
-					>{:else}<tr><td colspan="4" class="p-4">Nenhuma marcação no legado desta escala.</td></tr
-					>{/each}
+			<thead>
+				<tr>
+					<th class="p-3">Data</th><th class="p-3">Usuário</th><th class="p-3">Confirmação</th><th
+						class="p-3"
+					>
+						Registro original
+					</th>
+				</tr>
+			</thead><tbody>
+				{#each pagina.escala as item (item.id)}<tr class="border-t">
+						<td class="p-3">{formatData(item.data)}</td><td class="p-3">{item.nome}</td><td
+							class="p-3"
+						>
+							{item.confirmacao}
+						</td><td class="p-3">{item.ativo ? 'Ativo' : 'Inativo'}</td>
+					</tr>{:else}<tr>
+						<td colspan="4" class="p-4">Nenhuma marcação no legado desta escala.</td>
+					</tr>{/each}
 			</tbody>
 		</table>
 	</div>

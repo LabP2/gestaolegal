@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import InfoCard from '$lib/components/ui/info-card.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import InfoCard from '#lib/components/ui/info-card.svelte';
 	import type { PageProps } from './$types';
 	import Edit from '@lucide/svelte/icons/edit';
-	import { Badge } from '$lib/components/ui/badge';
-	import PublicacoesProcesso from '$lib/components/djen/publicacoes-processo.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import PublicacoesProcesso from '#lib/components/djen/publicacoes-processo.svelte';
 
 	let { data }: PageProps = $props();
 	// svelte-ignore state_referenced_locally

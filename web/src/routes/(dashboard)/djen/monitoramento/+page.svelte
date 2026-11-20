@@ -1,20 +1,20 @@
 <script lang="ts">
-	import ProgressoBusca from '$lib/components/djen/progresso-busca.svelte';
-	import { api } from '$lib/api-client';
-	import { definirUnidadeAtiva } from '$lib/stores/unidade';
-	import { goto, invalidateAll } from '$app/navigation';
+	import ProgressoBusca from '#lib/components/djen/progresso-busca.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { definirUnidadeAtiva } from '#lib/stores/unidade.ts';
+	import { goto, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Select from '$lib/components/ui/select';
-	import FiltrosBusca from '$lib/components/djen/filtros-busca.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import FiltrosBusca from '#lib/components/djen/filtros-busca.svelte';
 	import Search from '@lucide/svelte/icons/search';
-	import { BUSCA_PARTE_MAX_DIAS } from '$lib/types';
-	import BuscaParte from '$lib/components/djen/busca-parte.svelte';
-	import { MAX_TRIBUNAIS } from '$lib/utils/tribunais-djen';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { BUSCA_PARTE_MAX_DIAS } from '#lib/types/index.ts';
+	import BuscaParte from '#lib/components/djen/busca-parte.svelte';
+	import { MAX_TRIBUNAIS } from '#lib/utils/tribunais-djen.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { toast } from 'svelte-sonner';
-	import type { Monitoramento, LogsMonitoramento } from '$lib/types/djen';
+	import type { Monitoramento, LogsMonitoramento } from '#lib/types/djen.ts';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	const abas = [
@@ -66,7 +66,7 @@
 			await api.post('djen/monitoramentos', corpo());
 			toast.success('Item adicionado ao monitoramento');
 			valor = '';
-			await invalidateAll();
+			await refreshAll();
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível cadastrar'));
 		} finally {
@@ -104,10 +104,10 @@
 			if (tipoConsultado === 'processo' && resultado.every((r) => r.status === 'ok')) {
 				if (item) definirUnidadeAtiva(item.unidade_id);
 				await goto(`/djen?numero_processo=${encodeURIComponent(numeroConsultado)}`, {
-					invalidateAll: true
+					refreshAll: true
 				});
 			} else {
-				await invalidateAll();
+				await refreshAll();
 			}
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível consultar'));
@@ -144,7 +144,7 @@
 					`${resumo} ${falhas} item(ns) com falha ou consulta incompleta. Consulte os logs e tente novamente.`
 				);
 			else toast.success(resumo);
-			await invalidateAll();
+			await refreshAll();
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível atualizar a lista após a busca'));
 		} finally {
@@ -161,7 +161,7 @@
 			toast.success(
 				remover ? 'Monitoramento removido; publicações preservadas' : 'Monitoramento atualizado'
 			);
-			await invalidateAll();
+			await refreshAll();
 		} catch (e) {
 			toast.error(mensagemDeErro(e, 'Não foi possível atualizar'));
 		} finally {
@@ -219,8 +219,10 @@
 	<nav aria-label="Tipos de monitoramento" class="flex flex-wrap gap-2 border-b pb-3">
 		{#each abas as item}<Button
 				variant={aba === item.id ? 'default' : 'outline'}
-				href={`/djen/monitoramento?aba=${item.id}`}>{item.nome}</Button
-			>{/each}
+				href={`/djen/monitoramento?aba=${item.id}`}
+			>
+				{item.nome}
+			</Button>{/each}
 	</nav>
 	{#if aba !== 'logs'}
 		{#if aba === 'parte'}<BuscaParte
@@ -252,9 +254,9 @@
 				>
 					<div class="flex flex-wrap items-end gap-3">
 						<div class="w-full min-w-0 flex-1 sm:min-w-72">
-							<label for="monitoramento-item" class="mb-1 block text-sm font-medium"
-								>{aba === 'oab' ? 'OAB (número/UF)' : 'Número CNJ'}</label
-							>
+							<label for="monitoramento-item" class="mb-1 block text-sm font-medium">
+								{aba === 'oab' ? 'OAB (número/UF)' : 'Número CNJ'}
+							</label>
 							<Input
 								id="monitoramento-item"
 								bind:value={valor}
@@ -268,27 +270,31 @@
 							type="button"
 							variant="outline"
 							disabled={bloqueado || !valor.trim()}
-							onclick={cadastrar}>Adicionar ao monitoramento</Button
+							onclick={cadastrar}
 						>
-						<Button type="submit" disabled={bloqueado || !valor.trim()}
-							><Search class="mr-2 h-4 w-4" />{buscaEmAndamento
-								? 'Consultando…'
-								: 'Buscar agora'}</Button
-						>
+							Adicionar ao monitoramento
+						</Button>
+						<Button type="submit" disabled={bloqueado || !valor.trim()}>
+							<Search class="mr-2 h-4 w-4" />{buscaEmAndamento ? 'Consultando…' : 'Buscar agora'}
+						</Button>
 						{#if aba === 'processo'}
 							<Button
 								type="button"
 								variant="outline"
 								disabled={bloqueado || !valor.trim()}
-								onclick={() => buscar(undefined, true)}>Buscar todas as publicações</Button
+								onclick={() => buscar(undefined, true)}
 							>
+								Buscar todas as publicações
+							</Button>
 						{/if}
 						<Button
 							type="button"
 							variant="outline"
 							disabled={bloqueado || !ativos.length}
-							onclick={buscarTodos}>Buscar todos</Button
+							onclick={buscarTodos}
 						>
+							Buscar todos
+						</Button>
 					</div>
 					<p class="text-xs text-muted-foreground">
 						Período de até {BUSCA_PARTE_MAX_DIAS} dias e até {MAX_TRIBUNAIS} tribunais por busca. Sem
@@ -319,8 +325,10 @@
 							<a
 								class="font-semibold text-primary underline-offset-4 hover:underline"
 								href={`/processos/${item.processo_id}`}
-								onclick={() => definirUnidadeAtiva(item.unidade_id)}>{item.valor}</a
+								onclick={() => definirUnidadeAtiva(item.unidade_id)}
 							>
+								{item.valor}
+							</a>
 						{:else}<strong>{item.valor}</strong>{/if}
 						<p class="text-sm text-muted-foreground">
 							{unidadeNome(item.unidade_id)} · {item.ativo ? 'Ativo' : 'Pausado'}{item.automatico
@@ -338,19 +346,28 @@
 								size="sm"
 								variant="outline"
 								disabled={bloqueado}
-								onclick={() => buscar(item, true)}>Buscar todas as publicações</Button
+								onclick={() => buscar(item, true)}
 							>
+								Buscar todas as publicações
+							</Button>
 						{/if}
-						<Button size="sm" variant="outline" disabled={bloqueado} onclick={() => buscar(item)}
-							>Buscar agora</Button
-						><Button size="sm" variant="outline" disabled={bloqueado} onclick={() => alterar(item)}
-							>{item.ativo ? 'Pausar' : 'Retomar'}</Button
-						><Button
+						<Button size="sm" variant="outline" disabled={bloqueado} onclick={() => buscar(item)}>
+							Buscar agora
+						</Button><Button
+							size="sm"
+							variant="outline"
+							disabled={bloqueado}
+							onclick={() => alterar(item)}
+						>
+							{item.ativo ? 'Pausar' : 'Retomar'}
+						</Button><Button
 							size="sm"
 							variant="ghost"
 							disabled={bloqueado}
-							onclick={() => alterar(item, true)}>Remover</Button
+							onclick={() => alterar(item, true)}
 						>
+							Remover
+						</Button>
 					</div>
 				</div>{:else}<p class="text-muted-foreground">Nenhum item monitorado nesta aba.</p>{/each}
 		</section>
@@ -361,35 +378,38 @@
 				Histórico mantido por {logs.retencao_dias} dias. Horários de Brasília.
 			</p>
 			<div class="flex flex-wrap items-end gap-3">
-				<label>De<Input type="date" bind:value={logDe} /></label><label
-					>Até<Input type="date" bind:value={logAte} /></label
-				>
-				<Select.Root type="single" bind:value={status}
-					><Select.Trigger aria-label="Status"
-						>{status === 'todos' ? 'Todos os status' : status}</Select.Trigger
-					><Select.Content
-						>{#each ['todos', 'aguardando', 'executando', 'ok', 'parcial', 'erro', 'interrompida'] as v}<Select.Item
-								value={v}>{v}</Select.Item
-							>{/each}</Select.Content
-					></Select.Root
-				>
-				<Select.Root type="single" bind:value={origem}
-					><Select.Trigger aria-label="Tipo"
-						>{origem === 'todos' ? 'Todos os tipos' : origem}</Select.Trigger
-					><Select.Content
-						>{#each ['todos', 'oab', 'parte', 'processo'] as v}<Select.Item value={v}
-								>{v}</Select.Item
-							>{/each}</Select.Content
-					></Select.Root
-				>
-				<Select.Root type="single" bind:value={modo}
-					><Select.Trigger aria-label="Execução"
-						>{modo === 'todos' ? 'Manual e automática' : modo}</Select.Trigger
-					><Select.Content
-						>{#each ['todos', 'manual', 'automatico'] as v}<Select.Item value={v}>{v}</Select.Item
-							>{/each}</Select.Content
-					></Select.Root
-				>
+				<label>De<Input type="date" bind:value={logDe} /></label><label>
+					Até<Input type="date" bind:value={logAte} />
+				</label>
+				<Select.Root type="single" bind:value={status}>
+					<Select.Trigger aria-label="Status">
+						{status === 'todos' ? 'Todos os status' : status}
+					</Select.Trigger><Select.Content>
+						{#each ['todos', 'aguardando', 'executando', 'ok', 'parcial', 'erro', 'interrompida'] as v}<Select.Item
+								value={v}
+							>
+								{v}
+							</Select.Item>{/each}
+					</Select.Content>
+				</Select.Root>
+				<Select.Root type="single" bind:value={origem}>
+					<Select.Trigger aria-label="Tipo">
+						{origem === 'todos' ? 'Todos os tipos' : origem}
+					</Select.Trigger><Select.Content>
+						{#each ['todos', 'oab', 'parte', 'processo'] as v}<Select.Item value={v}>
+								{v}
+							</Select.Item>{/each}
+					</Select.Content>
+				</Select.Root>
+				<Select.Root type="single" bind:value={modo}>
+					<Select.Trigger aria-label="Execução">
+						{modo === 'todos' ? 'Manual e automática' : modo}
+					</Select.Trigger><Select.Content>
+						{#each ['todos', 'manual', 'automatico'] as v}<Select.Item value={v}>
+								{v}
+							</Select.Item>{/each}
+					</Select.Content>
+				</Select.Root>
 				<Input
 					aria-label="ID da unidade"
 					placeholder="ID da unidade"
@@ -400,10 +420,10 @@
 				<Button disabled={bloqueado} onclick={() => filtrarLogs()}>Filtrar / atualizar</Button>
 			</div>
 			{#each logs.items as log}<details class="rounded border p-3">
-					<summary class="cursor-pointer"
-						>{horario(log.inicio)} · {log.origem} · {log.modo} · {log.status} · {log.encontradas} encontradas
-						/ {log.novas} novas</summary
-					>
+					<summary class="cursor-pointer">
+						{horario(log.inicio)} · {log.origem} · {log.modo} · {log.status} · {log.encontradas} encontradas
+						/ {log.novas} novas
+					</summary>
 					<div class="mt-3 space-y-1 text-sm">
 						<p>{unidadeNome(log.unidade_id)} · Execução: {log.execucao_id || 'Avulsa'}</p>
 						<p>
@@ -420,12 +440,16 @@
 				<Button
 					variant="outline"
 					disabled={bloqueado || logs.page <= 1}
-					onclick={() => filtrarLogs(logs.page - 1)}>Anterior</Button
-				><span>{logs.total} consultas · Página {logs.page}</span><Button
+					onclick={() => filtrarLogs(logs.page - 1)}
+				>
+					Anterior
+				</Button><span>{logs.total} consultas · Página {logs.page}</span><Button
 					variant="outline"
 					disabled={bloqueado || logs.page * logs.per_page >= logs.total}
-					onclick={() => filtrarLogs(logs.page + 1)}>Próxima</Button
+					onclick={() => filtrarLogs(logs.page + 1)}
 				>
+					Próxima
+				</Button>
 			</div>
 		</section>
 	{/if}

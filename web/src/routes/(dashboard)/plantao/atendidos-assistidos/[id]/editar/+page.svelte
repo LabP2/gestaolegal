@@ -1,9 +1,9 @@
 <script lang="ts">
-	import AtendidoForm from '$lib/forms/atendido-form.svelte';
-	import AssistidoForm from '$lib/forms/assistido-form.svelte';
+	import AtendidoForm from '#lib/forms/atendido-form.svelte';
+	import AssistidoForm from '#lib/forms/assistido-form.svelte';
 	import { toast } from 'svelte-sonner';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import Button from '#lib/components/ui/button/button.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 
 	let { data }: { data: any } = $props();
 

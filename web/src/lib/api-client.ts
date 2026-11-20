@@ -1,5 +1,5 @@
-import { dev } from '$app/environment';
-import { env } from '$env/dynamic/public';
+import { dev } from '$app/env';
+import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiException, type ApiResponse } from './types/api-response';
 import { unidadeAtivaId } from './stores/unidade';
 
@@ -15,7 +15,7 @@ const isNonEmpty = (value: string | undefined | null) =>
 	value !== undefined && value !== null && value.trim().length > 0;
 
 const resolveConfiguredApiUrl = () => {
-	const configured = env.PUBLIC_API_URL;
+	const configured = PUBLIC_API_URL;
 	return isNonEmpty(configured) ? configured!.trim() : null;
 };
 

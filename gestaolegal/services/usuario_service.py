@@ -77,7 +77,7 @@ class UsuarioService:
         logger.info(
             f"Handling search request with params: page_params={page_params}, search='{search}', role='{role}', show_inactive={show_inactive}, unidade={unidade}"
         )
-        clauses: list[WhereClause] = []
+        clauses: list[WhereClause | ComplexWhereClause] = []
 
         if unidade == "ativa":
             # Filtro OPCIONAL: sem o parâmetro o admin segue vendo todo mundo.
@@ -93,7 +93,13 @@ class UsuarioService:
 
         if search:
             clauses.append(
-                WhereClause(column="nome", operator="ilike", value=f"%{search}%")
+                ComplexWhereClause(
+                    operator="or",
+                    clauses=[
+                        WhereClause(column="nome", operator="ilike", value=f"%{search}%"),
+                        WhereClause(column="email", operator="ilike", value=f"%{search}%"),
+                    ],
+                )
             )
 
         if role != "all":

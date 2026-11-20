@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { plataforma, PLATAFORMA_LOGIN } from '$lib/plataforma-client';
-import { ApiException, type PlataformaAdmin } from '$lib/types';
+import { plataforma, PLATAFORMA_LOGIN } from '#lib/plataforma-client.ts';
+import { ApiException, type PlataformaAdmin } from '#lib/types/index.ts';
 import type { LayoutLoad } from './$types';
 
 // Sessão da plataforma, independente da do NPJ: só o cookie `plataforma_token`.

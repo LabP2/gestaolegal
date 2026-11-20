@@ -1,5 +1,5 @@
-import { api } from '$lib/api-client';
-import { ApiException, type ConfiguracaoPlantao } from '$lib/types';
+import { api } from '#lib/api-client.ts';
+import { ApiException, type ConfiguracaoPlantao } from '#lib/types/index.ts';
 import { error } from '@sveltejs/kit';
 
 const PAPEIS_PERMITIDOS = ['admin', 'colab_proj'];

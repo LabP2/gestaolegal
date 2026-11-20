@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import AppFooter from '$lib/components/app-footer.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Form from '$lib/components/ui/form';
+	import AppFooter from '#lib/components/app-footer.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
+	import * as Form from '#lib/components/ui/form/index.ts';
 	import Eye from '@lucide/svelte/icons/eye';
 	import EyeOff from '@lucide/svelte/icons/eye-off';
-	import SimpleInput from '$lib/components/forms/simple-input.svelte';
-	import { loginSchema, type LoginData } from '$lib/forms/schemas/login-schema';
+	import SimpleInput from '#lib/components/forms/simple-input.svelte';
+	import { loginSchema, type LoginData } from '#lib/forms/schemas/login-schema.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
-	import { ApiException, type User } from '$lib/types';
-	import { sincronizarUnidades } from '$lib/stores/unidade';
+	import { api } from '#lib/api-client.ts';
+	import { ApiException, type User } from '#lib/types/index.ts';
+	import { sincronizarUnidades } from '#lib/stores/unidade.ts';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { superForm } from 'sveltekit-superforms';

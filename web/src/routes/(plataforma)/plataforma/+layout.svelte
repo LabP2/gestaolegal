@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button';
-	import { sairDaPlataforma, PLATAFORMA_LOGIN } from '$lib/plataforma-client';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { sairDaPlataforma, PLATAFORMA_LOGIN } from '#lib/plataforma-client.ts';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();

@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends FormPath<T>">
 	import { Combobox } from 'bits-ui';
-	import * as Form from '$lib/components/ui/form';
+	import * as Form from '#lib/components/ui/form/index.ts';
 	import type { FieldProps } from 'formsnap';
 	import type { FormPath } from 'sveltekit-superforms';
 	import { ChevronDown, X } from '@lucide/svelte';
@@ -80,8 +80,10 @@
 							onclick={() => {
 								value = '';
 								search = '';
-							}}><X class="size-4" /></button
+							}}
 						>
+							<X class="size-4" />
+						</button>
 					{/if}
 				</div>
 				<Combobox.Portal>
@@ -94,8 +96,9 @@
 								value={option.value}
 								label={option.label}
 								class="cursor-pointer rounded-sm px-3 py-2 text-sm data-[highlighted]:bg-accent data-[selected]:font-semibold"
-								>{option.label}</Combobox.Item
 							>
+								{option.label}
+							</Combobox.Item>
 						{:else}
 							<p class="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
 						{/each}

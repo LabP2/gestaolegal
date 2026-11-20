@@ -1,6 +1,6 @@
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { processoCreateFormSchema } from '$lib/forms/schemas/processo-schema';
+import { processoCreateFormSchema } from '#lib/forms/schemas/processo-schema.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async () => {

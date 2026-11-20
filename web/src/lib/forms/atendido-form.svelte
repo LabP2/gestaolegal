@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { atendidoCreateFormSchema, legacyEditSchema } from './schemas/atendido-schema';
@@ -10,15 +10,15 @@
 		SimpleSelect,
 		SimpleTextArea,
 		SimpleDatePicker
-	} from '$lib/components/forms';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { fetchCepData } from '$lib/utils/cep';
+	} from '#lib/components/forms/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { fetchCepData } from '#lib/utils/cep.ts';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$lib/api-client';
+	import { api } from '#lib/api-client.ts';
 	import { goto } from '$app/navigation';
-	import type { Atendido } from '$lib/types';
-	import { siglaNpj } from '$lib/utils/npj';
+	import type { Atendido } from '#lib/types/index.ts';
+	import { siglaNpj } from '#lib/utils/npj.ts';
 
 	let {
 		data,
@@ -79,9 +79,9 @@
 				if (onUpdate) {
 					onUpdate(response);
 				} else {
-					// invalidateAll so the destination view reloads fresh data instead of
+					// refreshAll so the destination view reloads fresh data instead of
 					// showing the pre-edit values from SvelteKit's cached load.
-					await goto(`/plantao/atendidos-assistidos/${response.id}`, { invalidateAll: true });
+					await goto(`/plantao/atendidos-assistidos/${response.id}`, { refreshAll: true });
 				}
 			} catch (error) {
 				console.error('Atendido form error:', error);

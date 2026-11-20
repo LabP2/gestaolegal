@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api-client';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
+	import { api } from '#lib/api-client.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
 	import {
 		ORIGEM_EXEMPLO_LABEL,
 		ROTULO_EXEMPLO_LABEL,
 		type OrigemExemplo,
 		type ResumoExemplos,
 		type RotuloExemplo
-	} from '$lib/types';
-	import { baixarArquivoDaApi } from '$lib/utils/download';
-	import { mensagemDeErro } from '$lib/utils/erros';
+	} from '#lib/types/index.ts';
+	import { baixarArquivoDaApi } from '#lib/utils/download.ts';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import Download from '@lucide/svelte/icons/download';
 	import { toast } from 'svelte-sonner';
 

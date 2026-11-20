@@ -1,17 +1,21 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import DataTable from '$lib/components/data-table.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import DataTable from '#lib/components/data-table.svelte';
 	import type { PageProps } from './$types';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Edit from '@lucide/svelte/icons/edit';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import { refreshAll } from '$app/navigation';
+	import { toast } from 'svelte-sonner';
+	import { mensagemDeErro } from '#lib/utils/erros.ts';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
-	import { api } from '$lib/api-client';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { api } from '#lib/api-client.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
 	import { page } from '$app/state';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { usePaginatedFilters } from '$lib';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { usePaginatedFilters } from '#lib';
 
 	let { data }: PageProps = $props();
 	const { atendidos, me } = $derived(data);
@@ -49,6 +53,16 @@
 		await api.delete(`atendido/${id}`);
 
 		applyFilters();
+	}
+	async function handleReactivate(id: number) {
+		if (!isAdmin) return;
+		try {
+			await api.post(`atendido/${id}/reativar`, {});
+			await refreshAll();
+			toast.success('Atendido reativado com sucesso');
+		} catch (error) {
+			toast.error(mensagemDeErro(error, 'Erro ao reativar atendido'));
+		}
 	}
 </script>
 
@@ -137,6 +151,12 @@
 							href: (a) => `/plantao/atendidos-assistidos/${a.id}/tornar-assistido`,
 							icon: UserPlus,
 							show: (a) => !a.is_assistido
+						},
+						{
+							title: 'Reativar',
+							icon: RotateCcw,
+							show: (a) => !a.status && isAdmin,
+							onClick: (a) => handleReactivate(a.id)
 						},
 						{
 							title: 'Desativar',

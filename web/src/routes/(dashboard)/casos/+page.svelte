@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import DataTable from '$lib/components/data-table.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import DataTable from '#lib/components/data-table.svelte';
 	import type { PageProps } from './$types';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Edit from '@lucide/svelte/icons/edit';
@@ -8,15 +8,15 @@
 	import {
 		SITUACAO_DEFERIMENTO_BADGE_MAP,
 		SITUACAO_DEFERIMENTO_OPTIONS
-	} from '$lib/constants/situacao-deferimento';
-	import { AREA_BADGE_MAP } from '$lib/constants';
-	import { api } from '$lib/api-client';
-	import Input from '$lib/components/ui/input/input.svelte';
+	} from '#lib/constants/situacao-deferimento.ts';
+	import { AREA_BADGE_MAP } from '#lib/constants/index.ts';
+	import { api } from '#lib/api-client.ts';
+	import Input from '#lib/components/ui/input/input.svelte';
 	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
-	import * as Select from '$lib/components/ui/select';
-	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import { usePaginatedFilters } from '$lib';
+	import * as Select from '#lib/components/ui/select/index.ts';
+	import Checkbox from '#lib/components/ui/checkbox/checkbox.svelte';
+	import { usePaginatedFilters } from '#lib';
 
 	let { data }: PageProps = $props();
 	const { data: casos, me } = $derived(data);
@@ -56,7 +56,7 @@
 	}
 
 	const { filters, applyFilters, setFilters } = usePaginatedFilters<CasoFilters>({
-		initialFilters: filtrosDaUrl(page.url),
+		initialFilters: filtrosDaUrl(new URL(page.url.href)),
 		buildParams: (f) => ({
 			per_page: f.per_page,
 			search: f.search,
@@ -72,7 +72,8 @@
 	// mantém o mesmo componente; os filtros precisam seguir a nova URL. As
 	// navegações do próprio applyFilters (goto) já partem dos filtros atuais.
 	afterNavigate((nav) => {
-		if (nav.type !== 'goto') setFilters(filtrosDaUrl(page.url));
+		if (nav.shallow && nav.type === 'goto') return;
+		if (nav.type !== 'goto') setFilters(filtrosDaUrl(new URL(page.url.href)));
 	});
 
 	const isAdmin = $derived(me.urole === 'admin');
@@ -115,9 +116,9 @@
 							/>
 						</div>
 						<div class="w-full min-w-0 flex-1 sm:min-w-80">
-							<label for="busca-casos" class="mb-1 block text-sm font-medium"
-								>Descrição ou parte envolvida</label
-							>
+							<label for="busca-casos" class="mb-1 block text-sm font-medium">
+								Descrição ou parte envolvida
+							</label>
 							<Input
 								id="busca-casos"
 								bind:value={filters.search}
@@ -189,10 +190,15 @@
 				variant="ghost"
 				class="mb-4"
 				onclick={() => {
-					setFilters({ ...filtrosDaUrl(new URL('/casos', page.url)), per_page: filters.per_page });
+					setFilters({
+						...filtrosDaUrl(new URL('/casos', page.url.href)),
+						per_page: filters.per_page
+					});
 					applyFilters();
-				}}>Limpar filtros</Button
+				}}
 			>
+				Limpar filtros
+			</Button>
 
 			<DataTable
 				tamanhosPagina
@@ -211,8 +217,20 @@
 						class: 'w-[200px]',
 						badgeMap: AREA_BADGE_MAP
 					},
-					{ header: 'Estagiário', key: 'estagiario.nome', class: 'w-[200px]' },
-					{ header: 'Assistido', key: 'nomes_assistidos', type: 'array', class: 'w-[220px]' },
+
+					{
+						header: 'Estagiário',
+						key: 'estagiario.nome',
+						class: 'w-[200px]'
+					},
+
+					{
+						header: 'Assistido',
+						key: 'nomes_assistidos',
+						type: 'array',
+						class: 'w-[220px]'
+					},
+
 					{
 						header: 'Deferimento',
 						key: 'situacao_deferimento',
@@ -226,8 +244,18 @@
 				actions={{
 					class: 'w-[180px] text-right',
 					buttons: [
-						{ title: 'Visualizar', href: (c) => `/casos/${c.id}`, icon: Eye },
-						{ title: 'Editar', href: (c) => `/casos/${c.id}/editar`, icon: Edit },
+						{
+							title: 'Visualizar',
+							href: (c) => `/casos/${c.id}`,
+							icon: Eye
+						},
+
+						{
+							title: 'Editar',
+							href: (c) => `/casos/${c.id}/editar`,
+							icon: Edit
+						},
+
 						{
 							title: 'Desativar',
 							icon: Trash2,
