@@ -727,7 +727,7 @@ test('DJEN: monitoramento por nome explica tribunal obrigatório e permite corri
   await page.goto('/djen/monitoramento?aba=parte');
   await page.getByLabel('Nome da parte', { exact: true }).fill('Pessoa de Teste');
   await page.getByRole('button', { name: 'Adicionar nomes ao monitoramento' }).click();
-  const tribunais = page.getByRole('button', { name: 'Tribunais', exact: true });
+  const tribunais = page.getByRole('combobox', { name: 'Tribunais', exact: true });
   await expect(tribunais).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByRole('alert').filter({ hasText: 'Para monitorar por nome' })).toBeVisible();
   expect(actions).toEqual([]);
@@ -762,9 +762,9 @@ test('DJEN: sugestões por contexto divergem e operação recebe escolha explíc
  expect(state.actions[0].body.contexto_ids).toEqual([1]);
  await expect(page.getByText('Nenhuma selecionada',{exact:true})).toBeVisible();
  await expect(page.getByText(/publicações importadas\./)).toBeVisible();
- await expect(page.getByRole('button',{name:'Contexto de classificação',exact:true})).not.toBeVisible();
+ await expect(page.getByRole('combobox',{name:'Contexto de classificação',exact:true})).not.toBeVisible();
  await page.getByText('Filtros avançados',{exact:true}).click();
- await page.getByRole('button',{name:'Contexto de classificação',exact:true}).click();
+ await page.getByRole('combobox',{name:'Contexto de classificação',exact:true}).click();
  await page.getByRole('option',{name:'UFMG — todos',exact:true}).click();
  await page.getByRole('button',{name:'Filtrar',exact:true}).click();
  await expect(page).toHaveURL(/contexto_id=2/);
@@ -805,11 +805,11 @@ test('DJEN: treino exige contexto e permite salvar nome, variações e tribunais
  expect(corpo).toEqual({nome:'UFMG — TRF6',nomes:['UFMG','Universidade Federal de Minas Gerais'],tribunais:['TRF6','TJMG']});
  await expect(page.getByRole('button',{name:'Treinar modelo experimental'})).toBeDisabled();
  const card=page.getByRole('region',{name:'Contextos de classificação'});
- await expect(card.getByRole('button',{name:'Classificação',exact:true})).toBeVisible();
+ await expect(card.getByRole('combobox',{name:'Classificação',exact:true})).toBeVisible();
  await expect(card.getByRole('button',{name:'Treinar modelo experimental'})).toBeVisible();
  await expect(page.getByLabel('OAB',{exact:true})).toHaveCount(0);
- await expect(page.getByRole('button',{name:'Situação',exact:true})).toHaveCount(0);
- await expect(page.getByRole('button',{name:'Origem da consulta',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('combobox',{name:'Situação',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('combobox',{name:'Origem da consulta',exact:true})).toHaveCount(0);
  await expect(page.getByLabel('Número do processo',{exact:true})).toBeHidden();
  await card.getByText('Filtros adicionais',{exact:true}).click();
  await page.getByLabel('Número do processo',{exact:true}).fill('00000000020268130001');
@@ -831,8 +831,8 @@ test('DJEN: card mostra partes, confirma sugestão e lote permite sem parte', as
   await expect(page.getByText('Fulana Fictícia · Empresa Fictícia')).toBeVisible();
   await page.getByRole('button',{name:'Revisar',exact:true}).first().click();
   await page.getByRole('button',{name:'Revisar',exact:true}).first().click();
-  await expect(page.getByRole('button',{name:'Parte da publicação 98001'})).toContainText('Fulana Fictícia');
-  await expect(page.getByRole('button',{name:'Parte da publicação 98002'})).toContainText('Sem parte selecionada');
+  await expect(page.getByRole('combobox',{name:'Parte da publicação 98001'})).toContainText('Fulana Fictícia');
+  await expect(page.getByRole('combobox',{name:'Parte da publicação 98002'})).toContainText('Sem parte selecionada');
   await expect(page.getByRole('button',{name:'Selecionar Atendidos',exact:true})).toHaveCount(0);
   await page.setViewportSize({width:768,height:1024});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -1022,7 +1022,7 @@ test('DJEN: filtro múltiplo de tribunais persiste na paginação e no lote',asy
   return route.fulfill({json:{success:true,data:{items:state.items,total:40,page:n,per_page:t,contextos:[]}}});
  });
  await page.goto('/djen');
- const trigger=page.getByRole('button',{name:'Tribunais',exact:true});
+ const trigger=page.getByRole('combobox',{name:'Tribunais',exact:true});
  await trigger.click();
  await page.getByRole('option',{name:'TJMG',exact:true}).click();
  await page.getByRole('option',{name:'TRT3',exact:true}).click();
@@ -1077,7 +1077,7 @@ test('DJEN: polo da parte acompanha nome, paginação e importação',async({pag
   return route.fulfill({json:{success:true,data:{items:state.items,total:40,page:Number(p.get('page')||1),per_page:Number(p.get('per_page')||20),contextos:[]}}});
  });
  await page.goto('/djen?nome_parte=UFMG');
- const polo=page.getByRole('button',{name:'Polo da parte',exact:true});
+ const polo=page.getByRole('combobox',{name:'Polo da parte',exact:true});
  await polo.click();
  await page.getByRole('option',{name:'Passivo',exact:true}).click();
  await expect.poll(()=>new URL(page.url()).searchParams.get('polo')).toBe('P');
