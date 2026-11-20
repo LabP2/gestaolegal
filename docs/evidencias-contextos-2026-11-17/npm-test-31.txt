@@ -1,0 +1,44 @@
+
+> gestaolegal-front@0.0.1 test
+> playwright test
+
+[WebServer] (node:150181) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 31 tests using 1 worker
+
+(node:150211) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 ../tests/browser/frontend.spec.cjs:176:3 › editar e recarregar caso legado (1.9s)
+  ✓   2 ../tests/browser/frontend.spec.cjs:176:3 › editar e recarregar parceiro (849ms)
+  ✓   3 ../tests/browser/frontend.spec.cjs:176:3 › editar e recarregar atendido (1.3s)
+  ✓   4 ../tests/browser/frontend.spec.cjs:176:3 › editar e recarregar orientação (824ms)
+  ✓   5 ../tests/browser/frontend.spec.cjs:176:3 › editar e recarregar usuário (897ms)
+  ✓   6 ../tests/browser/frontend.spec.cjs:208:1 › parte sem triagem abre sem inventar CPF e exige preenchimento (434ms)
+  ✓   7 ../tests/browser/frontend.spec.cjs:233:1 › usuário mantém rascunho e mostra erro da API (570ms)
+  ✓   8 ../tests/browser/frontend.spec.cjs:245:1 › API: JSON, multipart e exceções com ou sem captureStackTrace (74ms)
+  ✓   9 ../tests/browser/frontend.spec.cjs:349:1 › valor legado fora do enum não é salvo como opção arbitrária (423ms)
+  ✓  10 ../tests/browser/frontend.spec.cjs:364:1 › navegação SPA troca o registro do formulário sem reaproveitar dados antigos (662ms)
+  ✓  11 ../tests/browser/frontend.spec.cjs:397:3 › regressão existente: selector.cjs (7.7s)
+  ✓  12 ../tests/browser/frontend.spec.cjs:397:3 › regressão existente: pessoa-juridica.cjs (3.3s)
+  ✓  13 ../tests/browser/frontend.spec.cjs:415:3 › cadastro legado preserva CPF "" e valida correção (897ms)
+  ✓  14 ../tests/browser/frontend.spec.cjs:415:3 › cadastro legado preserva CPF null e valida correção (928ms)
+  ✓  15 ../tests/browser/frontend.spec.cjs:415:3 › cadastro legado preserva CPF "123.456.789-00" e valida correção (923ms)
+  ✓  16 ../tests/browser/frontend.spec.cjs:448:3 › 403 preserva mensagem: O DJEN não está habilitado para este NPJ. (343ms)
+  ✓  17 ../tests/browser/frontend.spec.cjs:448:3 › 403 preserva mensagem: Você não tem permissão para executar esta ação. (337ms)
+  ✓  18 ../tests/browser/frontend.spec.cjs:491:1 › DJEN: treino altera apenas rótulo e mantém decisão ao reabrir (772ms)
+  ✓  19 ../tests/browser/frontend.spec.cjs:515:1 › DJEN: importar parte do acervo preserva o restante para depois (689ms)
+  ✓  20 ../tests/browser/frontend.spec.cjs:529:1 › DJEN: descarte operacional marca irrelevante (426ms)
+  ✓  21 ../tests/browser/frontend.spec.cjs:539:1 › DJEN: monitoramento cadastra, pausa e navega pelas quatro abas (756ms)
+  ✓  22 ../tests/browser/frontend.spec.cjs:575:1 › processo sem caso: seleciona caso e atualiza detalhes após vincular (751ms)
+  ✓  23 ../tests/browser/frontend.spec.cjs:606:3 › DJEN: buscar todos os oab ativos continua após falha (468ms)
+  ✓  24 ../tests/browser/frontend.spec.cjs:606:3 › DJEN: buscar todos os parte ativos continua após falha (460ms)
+  ✓  25 ../tests/browser/frontend.spec.cjs:606:3 › DJEN: buscar todos os processo ativos continua após falha (431ms)
+  ✓  26 ../tests/browser/frontend.spec.cjs:637:1 › DJEN: CNJ vinculado é link e histórico completo ignora filtros (442ms)
+  ✓  27 ../tests/browser/frontend.spec.cjs:660:1 › DJEN: detalhes do processo busca histórico com progresso (443ms)
+  ✓  28 ../tests/browser/frontend.spec.cjs:680:1 › DJEN: detalhes do acervo usam o ID operacional correto e preservam filtros (655ms)
+  ✓  29 ../tests/browser/frontend.spec.cjs:704:1 › DJEN: monitoramento por nome explica tribunal obrigatório e permite corrigir (744ms)
+  ✓  30 ../tests/browser/frontend.spec.cjs:731:1 › DJEN: sugestões por contexto divergem e operação recebe escolha explícita (672ms)
+  ✓  31 ../tests/browser/frontend.spec.cjs:762:1 › DJEN: treino exige contexto e permite salvar nome, variações e tribunais (471ms)
+
+  31 passed (32.3s)

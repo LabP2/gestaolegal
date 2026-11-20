@@ -1,0 +1,489 @@
+{
+  "resultado": {
+    "nome": "UNIVERSIDADE FEDERAL DE MINAS GERAIS",
+    "de": "2021-11-17",
+    "ate": "2026-11-17",
+    "publicacoes_unicas": 16326,
+    "processos_distintos": 3443,
+    "tribunais": {
+      "TRF1": 133,
+      "TRF3": 15,
+      "CJF": 68,
+      "TRF2": 21,
+      "TJMG": 329,
+      "TRF6": 2881,
+      "TRF4": 31,
+      "TRT3": 10449,
+      "TST": 1890,
+      "STJ": 460,
+      "TRT10": 2,
+      "TRT9": 24,
+      "TRT2": 4,
+      "TJBA": 3,
+      "TRT15": 4,
+      "TRT13": 5,
+      "TJES": 1,
+      "TRT1": 4,
+      "TRF5": 2
+    },
+    "meses": [
+      {
+        "de": "2021-11-17",
+        "ate": "2021-11-30",
+        "retornadas": 22,
+        "requisicoes": 1
+      },
+      {
+        "de": "2021-12-01",
+        "ate": "2021-12-31",
+        "retornadas": 12,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-01-01",
+        "ate": "2022-01-31",
+        "retornadas": 12,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-02-01",
+        "ate": "2022-02-28",
+        "retornadas": 18,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-03-01",
+        "ate": "2022-03-31",
+        "retornadas": 26,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-04-01",
+        "ate": "2022-04-30",
+        "retornadas": 22,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-05-01",
+        "ate": "2022-05-31",
+        "retornadas": 12,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-06-01",
+        "ate": "2022-06-30",
+        "retornadas": 7,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-07-01",
+        "ate": "2022-07-31",
+        "retornadas": 3,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-08-01",
+        "ate": "2022-08-31",
+        "retornadas": 11,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-09-01",
+        "ate": "2022-09-30",
+        "retornadas": 2,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-10-01",
+        "ate": "2022-10-31",
+        "retornadas": 1,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-11-01",
+        "ate": "2022-11-30",
+        "retornadas": 12,
+        "requisicoes": 1
+      },
+      {
+        "de": "2022-12-01",
+        "ate": "2022-12-31",
+        "retornadas": 2,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-01-01",
+        "ate": "2023-01-31",
+        "retornadas": 6,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-02-01",
+        "ate": "2023-02-28",
+        "retornadas": 3,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-03-01",
+        "ate": "2023-03-31",
+        "retornadas": 5,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-04-01",
+        "ate": "2023-04-30",
+        "retornadas": 5,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-05-01",
+        "ate": "2023-05-31",
+        "retornadas": 2,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-06-01",
+        "ate": "2023-06-30",
+        "retornadas": 7,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-07-01",
+        "ate": "2023-07-31",
+        "retornadas": 9,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-08-01",
+        "ate": "2023-08-31",
+        "retornadas": 11,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-09-01",
+        "ate": "2023-09-30",
+        "retornadas": 2,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-10-01",
+        "ate": "2023-10-31",
+        "retornadas": 5,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-11-01",
+        "ate": "2023-11-30",
+        "retornadas": 5,
+        "requisicoes": 1
+      },
+      {
+        "de": "2023-12-01",
+        "ate": "2023-12-31",
+        "retornadas": 4,
+        "requisicoes": 1
+      },
+      {
+        "de": "2024-01-01",
+        "ate": "2024-01-31",
+        "retornadas": 2,
+        "requisicoes": 1
+      },
+      {
+        "de": "2024-02-01",
+        "ate": "2024-02-29",
+        "retornadas": 6,
+        "requisicoes": 1
+      },
+      {
+        "de": "2024-03-01",
+        "ate": "2024-03-31",
+        "retornadas": 4,
+        "requisicoes": 1
+      },
+      {
+        "de": "2024-04-01",
+        "ate": "2024-04-30",
+        "retornadas": 85,
+        "requisicoes": 1
+      },
+      {
+        "de": "2024-05-01",
+        "ate": "2024-05-31",
+        "retornadas": 363,
+        "requisicoes": 4
+      },
+      {
+        "de": "2024-06-01",
+        "ate": "2024-06-30",
+        "retornadas": 361,
+        "requisicoes": 4
+      },
+      {
+        "de": "2024-07-01",
+        "ate": "2024-07-31",
+        "retornadas": 413,
+        "requisicoes": 5
+      },
+      {
+        "de": "2024-08-01",
+        "ate": "2024-08-31",
+        "retornadas": 512,
+        "requisicoes": 6
+      },
+      {
+        "de": "2024-09-01",
+        "ate": "2024-09-30",
+        "retornadas": 739,
+        "requisicoes": 8
+      },
+      {
+        "de": "2024-10-01",
+        "ate": "2024-10-31",
+        "retornadas": 611,
+        "requisicoes": 7
+      },
+      {
+        "de": "2024-11-01",
+        "ate": "2024-11-30",
+        "retornadas": 319,
+        "requisicoes": 4
+      },
+      {
+        "de": "2024-12-01",
+        "ate": "2024-12-31",
+        "retornadas": 403,
+        "requisicoes": 5
+      },
+      {
+        "de": "2025-01-01",
+        "ate": "2025-01-31",
+        "retornadas": 320,
+        "requisicoes": 4
+      },
+      {
+        "de": "2025-02-01",
+        "ate": "2025-02-28",
+        "retornadas": 566,
+        "requisicoes": 6
+      },
+      {
+        "de": "2025-03-01",
+        "ate": "2025-03-31",
+        "retornadas": 530,
+        "requisicoes": 6
+      },
+      {
+        "de": "2025-04-01",
+        "ate": "2025-04-30",
+        "retornadas": 527,
+        "requisicoes": 6
+      },
+      {
+        "de": "2025-05-01",
+        "ate": "2025-05-31",
+        "retornadas": 604,
+        "requisicoes": 7
+      },
+      {
+        "de": "2025-06-01",
+        "ate": "2025-06-30",
+        "retornadas": 569,
+        "requisicoes": 6
+      },
+      {
+        "de": "2025-07-01",
+        "ate": "2025-07-31",
+        "retornadas": 658,
+        "requisicoes": 7
+      },
+      {
+        "de": "2025-08-01",
+        "ate": "2025-08-31",
+        "retornadas": 676,
+        "requisicoes": 7
+      },
+      {
+        "de": "2025-09-01",
+        "ate": "2025-09-30",
+        "retornadas": 716,
+        "requisicoes": 8
+      },
+      {
+        "de": "2025-10-01",
+        "ate": "2025-10-31",
+        "retornadas": 714,
+        "requisicoes": 8
+      },
+      {
+        "de": "2025-11-01",
+        "ate": "2025-11-30",
+        "retornadas": 605,
+        "requisicoes": 7
+      },
+      {
+        "de": "2025-12-01",
+        "ate": "2025-12-31",
+        "retornadas": 472,
+        "requisicoes": 5
+      },
+      {
+        "de": "2026-01-01",
+        "ate": "2026-01-31",
+        "retornadas": 198,
+        "requisicoes": 2
+      },
+      {
+        "de": "2026-02-01",
+        "ate": "2026-02-28",
+        "retornadas": 503,
+        "requisicoes": 6
+      },
+      {
+        "de": "2026-03-01",
+        "ate": "2026-03-31",
+        "retornadas": 633,
+        "requisicoes": 7
+      },
+      {
+        "de": "2026-04-01",
+        "ate": "2026-04-30",
+        "retornadas": 445,
+        "requisicoes": 5
+      },
+      {
+        "de": "2026-05-01",
+        "ate": "2026-05-31",
+        "retornadas": 506,
+        "requisicoes": 6
+      },
+      {
+        "de": "2026-06-01",
+        "ate": "2026-06-30",
+        "retornadas": 1004,
+        "requisicoes": 11
+      },
+      {
+        "de": "2026-07-01",
+        "ate": "2026-07-31",
+        "retornadas": 434,
+        "requisicoes": 5
+      },
+      {
+        "de": "2026-08-01",
+        "ate": "2026-08-31",
+        "retornadas": 474,
+        "requisicoes": 5
+      },
+      {
+        "de": "2026-09-01",
+        "ate": "2026-09-30",
+        "retornadas": 435,
+        "requisicoes": 5
+      },
+      {
+        "de": "2026-10-01",
+        "ate": "2026-10-31",
+        "retornadas": 503,
+        "requisicoes": 6
+      },
+      {
+        "de": "2026-11-01",
+        "ate": "2026-11-17",
+        "retornadas": 190,
+        "requisicoes": 2
+      }
+    ]
+  },
+  "conferencia_banco_local": {
+    "consultas": 61,
+    "status": {
+      "ok": 61
+    },
+    "novas": 16289,
+    "publicacoes": 16326,
+    "processos": 3443,
+    "tribunais": [
+      {
+        "sigla_tribunal": "TRF6",
+        "quantidade": 2881
+      },
+      {
+        "sigla_tribunal": "TRF1",
+        "quantidade": 133
+      },
+      {
+        "sigla_tribunal": "TRF3",
+        "quantidade": 15
+      },
+      {
+        "sigla_tribunal": "CJF",
+        "quantidade": 68
+      },
+      {
+        "sigla_tribunal": "TRF2",
+        "quantidade": 21
+      },
+      {
+        "sigla_tribunal": "TJMG",
+        "quantidade": 329
+      },
+      {
+        "sigla_tribunal": "TRF4",
+        "quantidade": 31
+      },
+      {
+        "sigla_tribunal": "TRT3",
+        "quantidade": 10449
+      },
+      {
+        "sigla_tribunal": "TST",
+        "quantidade": 1890
+      },
+      {
+        "sigla_tribunal": "STJ",
+        "quantidade": 460
+      },
+      {
+        "sigla_tribunal": "TRT10",
+        "quantidade": 2
+      },
+      {
+        "sigla_tribunal": "TRT9",
+        "quantidade": 24
+      },
+      {
+        "sigla_tribunal": "TRT2",
+        "quantidade": 4
+      },
+      {
+        "sigla_tribunal": "TJBA",
+        "quantidade": 3
+      },
+      {
+        "sigla_tribunal": "TRT15",
+        "quantidade": 4
+      },
+      {
+        "sigla_tribunal": "TRT13",
+        "quantidade": 5
+      },
+      {
+        "sigla_tribunal": "TJES",
+        "quantidade": 1
+      },
+      {
+        "sigla_tribunal": "TRT1",
+        "quantidade": 4
+      },
+      {
+        "sigla_tribunal": "TRF5",
+        "quantidade": 2
+      }
+    ],
+    "periodo": [
+      "2021-11-17",
+      "2026-11-17"
+    ]
+  }
+}

@@ -181,7 +181,7 @@ def limpar_djen() -> None:
             if "djen_exemplos" in metadata.tables:
                 session.execute(metadata.tables["djen_exemplos"].delete())
             session.execute(djen_comunicacoes.delete())
-            for nome in ('djen_contexto_historico', 'djen_publicacao_contextos', 'djen_modelos', 'djen_contextos', 'djen_monitoramentos', 'djen_publicacao_unidades', 'djen_consulta_resultados', 'djen_consultas', 'djen_classificacao_historico', 'djen_classificacoes', 'djen_publicacoes'):
+            for nome in ('djen_treinos', 'djen_contexto_historico', 'djen_publicacao_contextos', 'djen_modelos', 'djen_contextos', 'djen_monitoramentos', 'djen_publicacao_unidades', 'djen_consulta_resultados', 'djen_consultas', 'djen_classificacao_historico', 'djen_classificacoes', 'djen_publicacoes'):
                 session.execute(metadata.tables[nome].delete())
             session.execute(djen_sincronizacoes.delete())
             session.execute(update(tenants).values(djen_ativo=False))

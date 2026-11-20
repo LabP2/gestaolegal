@@ -450,3 +450,38 @@ def classificar_contexto(cid):
 def treinar_contexto(cid):
     from gestaolegal.services.djen_contexto_service import DjenContextoService
     return success_response(data=DjenContextoService().solicitar_treino(cid, RequestContext.get_unidade_ativa()), status_code=202)
+
+
+@djen_controller.route('/djen/contextos/previa', methods=['POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def previa_novo_contexto():
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().previa(_corpo(), RequestContext.get_unidade_ativa()))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>', methods=['PUT'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def editar_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().editar(cid, _corpo(), RequestContext.get_unidade_ativa()))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>/previa', methods=['POST'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def previa_edicao_contexto(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    return success_response(data=DjenContextoService().previa(_corpo(), RequestContext.get_unidade_ativa(), cid))
+
+
+@djen_controller.route('/djen/contextos/<int:cid>/treinos', methods=['GET'])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def historico_treinos(cid):
+    from gestaolegal.services.djen_contexto_service import DjenContextoService
+    pagina = request.args.get('page', 1, type=int)
+    if pagina is None or pagina < 1:
+        raise ValidationException('Página inválida')
+    return success_response(data=DjenContextoService().historico_treinos(cid, RequestContext.get_unidade_ativa(), pagina))

@@ -243,6 +243,11 @@ export interface AcervoItem {
 	id_caso: number | null;
 }
 export interface ContextoDjen {
+	descricao?: string | null;
+	criterios?: CriteriosContexto | null;
+	versao?: number;
+	avaliacoes_versao?: number;
+	modelo_desatualizado?: boolean;
 	treino_status?: 'ocioso' | 'na_fila' | 'executando' | 'concluido' | 'erro';
 	treino_erro?: string | null;
 	treino_solicitado_em?: string | null;
@@ -256,7 +261,7 @@ export interface ContextoDjen {
 	pode_treinar: boolean;
 	modelo: {
 		id: number;
-		metricas: { precisao: number; revocacao: number; f1: number; total: number };
+		metricas: MetricasTreino;
 	} | null;
 }
 export interface ClassificacaoContexto {
@@ -327,3 +332,57 @@ export type LogsMonitoramento = {
 	per_page: number;
 	retencao_dias: number;
 };
+
+export type CriteriosContexto = {
+	nomes?: string[];
+	nome_parte?: string;
+	polo?: string;
+	numero_processo?: string;
+	oab?: string;
+	tribunal?: string[];
+	inicio?: string;
+	fim?: string;
+	fonte?: string;
+};
+export interface MetricasTreino {
+	precisao: number;
+	revocacao: number;
+	f1: number;
+	total: number;
+	algoritmo?: string;
+	algoritmo_versao?: string;
+	contexto_versao?: number;
+	avaliacoes_versao?: number;
+	candidatos?: number;
+	processos?: number;
+	treino?: number;
+	teste?: number;
+	parametros?: Record<string, string | number | boolean | number[]>;
+	excluidos?: Record<string, number>;
+	classes?: Record<string, number>;
+	origens?: Record<string, number>;
+	bases?: Record<
+		'treino' | 'validacao',
+		{ exemplos: number; processos: number; relevantes: number; irrelevantes: number }
+	>;
+	matriz_confusao?: number[][];
+	avisos?: string[];
+}
+export interface TreinoDjen {
+	id: number;
+	contexto_id: number;
+	status: string;
+	etapa: string;
+	etapas_concluidas: number;
+	solicitado_em: string;
+	iniciado_em: string | null;
+	finalizado_em: string | null;
+	contexto_snapshot: Pick<
+		ContextoDjen,
+		'nome' | 'descricao' | 'criterios' | 'nomes' | 'tribunais' | 'versao' | 'avaliacoes_versao'
+	>;
+	logs: { horario: string; etapa: string; mensagem: string }[];
+	metricas: Partial<MetricasTreino>;
+	modelo_id: number | null;
+	erro: string | null;
+}

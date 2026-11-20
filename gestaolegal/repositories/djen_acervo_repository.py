@@ -184,7 +184,7 @@ class DjenAcervoRepository(BaseRepository):
         )
         return [dict(row) for row in self.session.execute(stmt).mappings()]
 
-    def listar(self, unidade, filtros, page, per_page):
+    def consulta_filtrada(self, unidade, filtros):
         from gestaolegal.services.djen_contexto_service import DjenContextoService
         from gestaolegal.database.tables import djen_publicacao_contextos as pc
 
@@ -198,7 +198,7 @@ class DjenAcervoRepository(BaseRepository):
                 exists(
                     self.escopo(
                         select(pc.c.id).where(
-                            pc.c.id_publicacao == p.c.id, pc.c.contexto_id == contexto
+                            pc.c.ativo.is_(True), pc.c.id_publicacao == p.c.id, pc.c.contexto_id == contexto
                         ),
                         pc,
                     )
@@ -211,7 +211,7 @@ class DjenAcervoRepository(BaseRepository):
                             select(pc.c.id).where(
                                 pc.c.id_publicacao == p.c.id,
                                 pc.c.contexto_id == contexto,
-                                pc.c.rotulo == filtros["rotulo"],
+                                pc.c.rotulo == filtros["rotulo"], pc.c.ativo.is_(True),
                             ),
                             pc,
                         )
@@ -270,7 +270,7 @@ class DjenAcervoRepository(BaseRepository):
                         & (pc.c.tenant_id == ctx.c.tenant_id),
                     )
                 )
-                .where(pc.c.id_publicacao == p.c.id, ctx.c.unidade_id == unidade),
+                .where(pc.c.ativo.is_(True), pc.c.id_publicacao == p.c.id, ctx.c.unidade_id == unidade),
                 pc,
                 ctx,
             )
@@ -282,6 +282,13 @@ class DjenAcervoRepository(BaseRepository):
                 stmt = stmt.where(
                     exists(previsoes.where(pc.c.sugestao == filtros["sugestao"]))
                 )
+        return stmt
+
+    def listar(self, unidade, filtros, page, per_page):
+        from gestaolegal.services.djen_contexto_service import DjenContextoService
+        contextos = DjenContextoService()
+        contexto = filtros.get("contexto_id")
+        stmt = self.consulta_filtrada(unidade, filtros)
         total = self.session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()

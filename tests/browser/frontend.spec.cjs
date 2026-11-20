@@ -491,7 +491,7 @@ async function acervoSetup(page) {
 
 test('DJEN: treino altera apenas rótulo e mantém decisão ao reabrir', async ({ page }) => {
   const state = await acervoSetup(page);
-  await page.goto('/djen/classificacao?contexto_id=1');
+  await page.goto('/djen/classificacao?contexto_id=1&rotulo=nao_classificado');
   await expect(page.getByRole('heading', { name: 'Acervo para treino' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
   await page.getByRole('button', { name: 'Relevante', exact: true }).click();
@@ -783,42 +783,44 @@ test('DJEN: sugestões por contexto divergem e operação recebe escolha explíc
  expect(state.errors).toEqual([]);
 });
 
-test('DJEN: treino exige contexto e permite salvar nome, variações e tribunais',async({page})=>{
- const state=await acervoSetup(page);let corpo;
- await page.route('**/api/djen/contextos',async route=>{
+test('DJEN: acervo de treino abre todas e cria contexto pelos filtros com prévia', async ({ page }) => {
+ const state = await acervoSetup(page); let corpo;
+ await page.route('**/api/djen/contextos/previa', route => route.fulfill({json:{success:true,data:{total:2,entram:2,saem:0,permanecem:0}}}));
+ await page.route('**/api/djen/contextos', async route => {
   if (route.request().method() === 'GET') return route.fallback();
-  corpo=route.request().postDataJSON();await route.fulfill({json:{success:true,data:{id:1,...corpo}}});
+  corpo=route.request().postDataJSON(); await route.fulfill({json:{success:true,data:{id:1,...corpo}}});
  });
- await page.goto('/djen/classificacao');
- await expect(page.getByText('Selecione ou crie um contexto para começar.',{exact:true})).toBeVisible();
- await expect(page.getByRole('checkbox',{name:'Selecionar publicação 98001'})).toHaveCount(0);
+ await page.goto('/djen/classificacao?tribunal=TJMG&fonte=oab');
+ await expect(page.getByRole('checkbox',{name:'Selecionar publicação 98001'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Relevante',exact:true})).toBeDisabled();
+ await expect(page.getByLabel('OAB',{exact:true})).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'Situação',exact:true})).toBeVisible();
+ await expect(page.getByRole('combobox',{name:'Origem da consulta',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Novo contexto',exact:true}).click();
- await page.getByLabel('Nome do contexto',{exact:true}).fill('UFMG — TRF6');
- await page.getByLabel('Nomes da parte (separe variações por ponto e vírgula)').fill('UFMG; Universidade Federal de Minas Gerais');
- await page.getByRole('button',{name:'Tribunais do contexto',exact:true}).click();
+ const form = page.getByRole('form', {name:'Novo contexto',exact:true});
+ await form.getByLabel('Nome do contexto',{exact:true}).fill('UFMG — TRF6');
+ await form.getByLabel('Nomes da parte (separe variações por ponto e vírgula)').fill('UFMG; Universidade Federal de Minas Gerais');
+ await form.getByRole('combobox',{name:'Tribunais',exact:true}).click();
  await page.getByRole('option',{name:'TRF6',exact:true}).click();
- await page.getByRole('option',{name:'TJMG',exact:true}).click();
  await page.keyboard.press('Escape');
- await expect(page.getByRole('button',{name:'Tribunais do contexto',exact:true})).toContainText('TRF6, TJMG');
- await page.getByRole('button',{name:'Salvar contexto'}).click();
+ await form.getByRole('button',{name:'Conferir contexto'}).click();
+ await expect(form.getByText(/2 publicações no contexto/)).toBeVisible();
+ await form.getByRole('button',{name:'Salvar contexto'}).click();
  await expect(page).toHaveURL(/contexto_id=1/);
- expect(corpo).toEqual({nome:'UFMG — TRF6',nomes:['UFMG','Universidade Federal de Minas Gerais'],tribunais:['TRF6','TJMG']});
+ expect(corpo.nome).toBe('UFMG — TRF6');
+ expect(corpo.nomes).toEqual(['UFMG','Universidade Federal de Minas Gerais']);
+ expect(corpo.criterios.tribunal).toEqual(['TJMG','TRF6']);
+ expect(corpo.criterios.fonte).toBe('oab');
  await expect(page.getByRole('button',{name:'Treinar modelo experimental'})).toBeDisabled();
- const card=page.getByRole('region',{name:'Contextos de classificação'});
- await expect(card.getByRole('combobox',{name:'Classificação',exact:true})).toBeVisible();
- await expect(card.getByRole('button',{name:'Treinar modelo experimental'})).toBeVisible();
- await expect(page.getByLabel('OAB',{exact:true})).toHaveCount(0);
- await expect(page.getByRole('combobox',{name:'Situação',exact:true})).toHaveCount(0);
- await expect(page.getByRole('combobox',{name:'Origem da consulta',exact:true})).toHaveCount(0);
- await expect(page.getByLabel('Número do processo',{exact:true})).toBeHidden();
- await card.getByText('Filtros adicionais',{exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'Classificação',exact:true})).toBeVisible();
  await page.getByLabel('Número do processo',{exact:true}).fill('00000000020268130001');
- await card.getByRole('button',{name:'Filtrar',exact:true}).click();
+ await page.getByRole('button',{name:'Filtrar',exact:true}).click();
  await expect(page).toHaveURL(/numero_processo=00000000020268130001/);
  expect(new URL(page.url()).searchParams.get('contexto_id')).toBe('1');
+ expect(new URL(page.url()).searchParams.get('tribunal')).toBe('TJMG');
  await page.setViewportSize({width:768,height:1024});
  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:'/tmp/djen-treino-simplificado.png',fullPage:true});
+ await page.screenshot({path:'/tmp/djen-treino-criterios.png',fullPage:true});
  expect(state.errors).toEqual([]);
 });
 
@@ -1095,4 +1097,210 @@ test('DJEN: polo da parte acompanha nome, paginação e importação',async({pag
  await expect(polo).toHaveText('Todos');
  expect(state.actions).toHaveLength(0);
  expect(state.errors).toEqual([]);
+});
+
+test('DJEN: exporta somente selecionadas com texto completo e CSV seguro', async ({ page }) => {
+  const state = await acervoSetup(page);
+  state.items[0].partes = ['João; "Silva"', '=HYPERLINK("https://example.invalid")'];
+  state.items[0].nome_orgao = '=1+1';
+  await page.route('**/api/djen/acervo/1', route => route.fulfill({ json: { success: true, data: {
+    ...state.items[0], texto_plano: 'Intimação; "íntegra"\nSegunda linha.', link: null, link_certidao: null
+  } } }));
+  await page.goto('/djen');
+  const exportar = page.getByRole('button', { name: 'Exportar selecionadas', exact: true });
+  await expect(exportar).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
+  const downloadPromise = page.waitForEvent('download');
+  await exportar.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^publicacoes-djen-\d{4}-\d{2}-\d{2}\.csv$/);
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const csv = Buffer.concat(chunks).toString('utf8');
+  expect(csv.startsWith('\uFEFF')).toBe(true);
+  expect(csv).toContain('"98001";"05/11/2026"');
+  expect(csv).not.toContain('98002');
+  expect(csv).toContain('"0000000-00.2026.8.13.0001"');
+  expect(csv).toContain('"\'=1+1"');
+  expect(csv).toContain('João; ""Silva""');
+  expect(csv).toContain('"Intimação; ""íntegra""\nSegunda linha."');
+  expect(state.actions).toEqual([]);
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeChecked();
+});
+
+test('DJEN: falha na exportação mantém seleção e permite tentar novamente', async ({ page }) => {
+  await acervoSetup(page);
+  await page.route('**/api/djen/acervo/2', route => route.fulfill({ status: 500, json: {
+    success: false, error: { message: 'Falha ao obter publicação.' }
+  } }));
+  await page.goto('/djen');
+  await page.getByRole('checkbox', { name: 'Selecionar esta página' }).check();
+  const downloads = [];
+  page.on('download', download => downloads.push(download));
+  await page.getByRole('button', { name: 'Exportar selecionadas', exact: true }).click();
+  await expect(page.getByText('Falha ao obter publicação.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar selecionadas', exact: true })).toBeEnabled();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98002' })).toBeChecked();
+  expect(downloads).toHaveLength(0);
+});
+
+async function acervoPaginado(page, quantidade = 3) {
+  const state = await acervoSetup(page);
+  const modelo = state.items[0];
+  state.items.splice(0, state.items.length, ...Array.from({ length: quantidade }, (_, i) => ({
+    ...modelo, id: i + 1, id_djen: 98001 + i
+  })));
+  const consultas = [];
+  await page.route('**/api/djen/acervo?**', route => {
+    const params = new URL(route.request().url()).searchParams;
+    consultas.push(Object.fromEntries(params));
+    const pagina = Number(params.get('page') || 1);
+    const tamanho = Math.min(Number(params.get('per_page') || 2), quantidade === 3 ? 2 : 100);
+    return route.fulfill({ json: { success: true, data: {
+      items: state.items.slice((pagina - 1) * tamanho, pagina * tamanho),
+      total: quantidade, page: pagina, per_page: tamanho, contextos: []
+    } } });
+  });
+  return { ...state, consultas };
+}
+
+test('DJEN: selecionar todas exporta outras páginas respeitando filtros e exclusões', async ({ page }) => {
+  const state = await acervoPaginado(page);
+  await page.goto('/djen?tribunal=TJMG&nome_parte=João');
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).check();
+  await expect(page.getByText('3 selecionadas', { exact: true })).toBeVisible();
+  expect(state.consultas.filter(c => c.per_page === '100')).toEqual([]);
+  await page.getByRole('checkbox', { name: 'Selecionar esta página', exact: true }).uncheck();
+  await expect(page.getByText('1 selecionadas', { exact: true })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar selecionadas', exact: true }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const csv = Buffer.concat(chunks).toString('utf8');
+  expect(state.consultas.filter(c => c.per_page === '100')).toEqual([
+    { tribunal: 'TJMG', nome_parte: 'João', per_page: '100', page: '1' },
+    { tribunal: 'TJMG', nome_parte: 'João', per_page: '100', page: '2' }
+  ]);
+  expect(csv).toContain('"98003";');
+  expect(csv).not.toContain('"98001";');
+  expect(csv).not.toContain('"98002";');
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).check();
+  await expect(page.getByText('3 selecionadas', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).uncheck();
+  await expect(page.getByText('Nenhuma selecionada', { exact: true })).toBeVisible();
+});
+
+test('DJEN: selecionar todas inclui outras páginas na importação e divide descarte em lotes', async ({ page }) => {
+  const state = await acervoPaginado(page, 101);
+  await page.goto('/djen');
+  await page.getByRole('checkbox', { name: 'Selecionar todas (101)', exact: true }).check();
+  await expect(page.getByText('101 selecionadas', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Importar', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Selecionadas (101)', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click();
+  await expect.poll(() => state.actions.length).toBe(2);
+  expect(state.actions.map(a => a.body.ids.length)).toEqual([100, 1]);
+  expect(new Set(state.actions.flatMap(a => a.body.ids)).size).toBe(101);
+  await expect(page.getByText('Nenhuma selecionada', { exact: true })).toBeVisible();
+});
+
+test('DJEN: falha ao carregar seleção completa não exporta parcialmente e preserva exclusões', async ({ page }) => {
+  await acervoPaginado(page);
+  await page.goto('/djen');
+  await page.route('**/api/djen/acervo?**', async route => {
+    if (new URL(route.request().url()).searchParams.get('page') !== '2') return route.fallback();
+    await route.fulfill({ status: 500, json: { success: false, error: { message: 'Falha na segunda página.' } } });
+  });
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98002' }).uncheck();
+  const downloads = [];
+  page.on('download', download => downloads.push(download));
+  await page.getByRole('button', { name: 'Exportar selecionadas', exact: true }).click();
+  await expect(page.getByText('Falha na segunda página.', { exact: true })).toBeVisible();
+  await expect(page.getByText('2 selecionadas', { exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98002' })).not.toBeChecked();
+  expect(downloads).toHaveLength(0);
+});
+
+test('DJEN: selecionar mais de 16 mil é imediato e não consulta outras páginas', async ({ page }) => {
+  const state = await acervoPaginado(page, 16001);
+  await page.goto('/djen');
+  await expect(page.getByRole('checkbox', { name: 'Selecionar todas (16001)', exact: true })).toBeVisible();
+  const consultasIniciais = state.consultas.length;
+  await page.getByRole('checkbox', { name: 'Selecionar todas (16001)', exact: true }).check();
+  await expect(page.getByText('16001 selecionadas', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar selecionadas', exact: true })).toBeEnabled();
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).uncheck();
+  await expect(page.getByText('16000 selecionadas', { exact: true })).toBeVisible();
+  expect(state.consultas).toHaveLength(consultasIniciais);
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98001' }).check();
+  await expect(page.getByText('16001 selecionadas', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Selecionar todas (16001)', exact: true }).uncheck();
+  await expect(page.getByText('Nenhuma selecionada', { exact: true })).toBeVisible();
+  expect(state.consultas).toHaveLength(consultasIniciais);
+});
+
+test('DJEN: importar seleção completa respeita exclusões e mudar filtros limpa seleção', async ({ page }) => {
+  const state = await acervoPaginado(page);
+  await page.goto('/djen');
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Selecionar publicação 98002' }).uncheck();
+  await importarSemParte(page);
+  await expect.poll(() => state.actions.length).toBe(1);
+  expect(state.actions[0].body.ids).toEqual([98001, 98003]);
+  await page.getByRole('checkbox', { name: 'Selecionar todas (3)', exact: true }).check();
+  await page.getByLabel('Número do processo', { exact: true }).fill('123');
+  await expect(page).toHaveURL(/numero_processo=123/);
+  await expect(page.getByText('Nenhuma selecionada', { exact: true })).toBeVisible();
+});
+
+test('DJEN: contexto permite edição com prévia e preserva versão enviada', async ({ page }) => {
+  await acervoSetup(page);
+  const ctx = {id:1,nome:'Contexto existente',descricao:'Objetivo inicial',versao:3,criterios:{tribunal:['TJMG']},nomes:[],tribunais:[],contagens:{relevante:100},pode_treinar:false,modelo:null};
+  await page.route('**/api/djen/acervo?**', route => route.fulfill({json:{success:true,data:{items:[],total:0,page:1,per_page:20,contextos:[ctx]}}}));
+  await page.route('**/api/djen/contextos/1/previa', route => route.fulfill({json:{success:true,data:{total:8,entram:2,saem:4,permanecem:6}}}));
+  let corpo;
+  await page.route('**/api/djen/contextos/1', route => {
+    corpo = route.request().postDataJSON(); Object.assign(ctx, corpo, {versao:4});
+    return route.fulfill({json:{success:true,data:ctx}});
+  });
+  await page.goto('/djen/classificacao?contexto_id=1');
+  await page.getByRole('button',{name:'Editar contexto',exact:true}).click();
+  const form = page.getByRole('form',{name:'Editar contexto'});
+  await form.getByLabel('Nome do contexto',{exact:true}).fill('Novo objetivo');
+  await form.getByRole('button',{name:'Conferir contexto'}).click();
+  await expect(form.getByRole('status')).toContainText('2 entram, 4 saem, 6 permanecem');
+  await form.getByRole('button',{name:'Salvar contexto'}).click();
+  await expect(page.getByRole('combobox',{name:'Contexto de classificação',exact:true})).toContainText('Novo objetivo');
+  expect(corpo.versao).toBe(3);
+  expect(corpo.criterios.tribunal).toEqual(['TJMG']);
+});
+
+test('DJEN: treinamento mostra progresso real, log, algoritmo, bases e métricas', async ({ page }) => {
+  await acervoSetup(page);
+  const ctx={id:1,nome:'Treino auditável',nomes:[],tribunais:[],versao:2,contagens:{relevante:120,irrelevante:120},pode_treinar:true,modelo:null,treino_status:'executando'};
+  const execucao={id:7,contexto_id:1,status:'executando',etapa:'Treinar modelo de avaliação',etapas_concluidas:3,solicitado_em:'2026-11-18T10:00:00',iniciado_em:'2026-11-18T10:00:01',finalizado_em:null,contexto_snapshot:{nome:'Treino auditável',versao:2,avaliacoes_versao:240,criterios:{tribunal:['TJMG']}},logs:[{horario:'2026-11-18T10:00:03',etapa:'Treinar modelo de avaliação',mensagem:'TF-IDF preparado com 100 atributos.'}],metricas:{},modelo_id:null,erro:null};
+  await page.route('**/api/djen/contextos',route=>route.fulfill({json:{success:true,data:[ctx]}}));
+  await page.route('**/api/djen/acervo?**',route=>route.fulfill({json:{success:true,data:{items:[],total:0,page:1,per_page:20,contextos:[ctx]}}}));
+  await page.route('**/api/djen/contextos/1/treinos?**',route=>route.fulfill({json:{success:true,data:{items:[execucao],total:1,page:1,per_page:20}}}));
+  await page.goto('/djen/classificacao?contexto_id=1');
+  await expect(page.getByRole('progressbar')).toHaveAttribute('value','3');
+  await expect(page.getByText(/TF-IDF preparado com 100 atributos/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Editar contexto',exact:true})).toBeDisabled();
+  Object.assign(execucao,{status:'concluido',etapa:'Concluído',etapas_concluidas:7,finalizado_em:'2026-11-18T10:00:10',modelo_id:9,metricas:{algoritmo:'TF-IDF + regressão logística',total:240,processos:60,classes:{relevante:120,irrelevante:120},origens:{classificacao:240},excluidos:{sem_texto:2,sem_processo:0},bases:{treino:{exemplos:180,processos:45,relevantes:90,irrelevantes:90},validacao:{exemplos:60,processos:15,relevantes:30,irrelevantes:30}},precisao:0.9,revocacao:0.9,f1:0.9,matriz_confusao:[[27,3],[3,27]],parametros:{max_iter:1000}}});
+  ctx.treino_status='concluido';
+  await expect(page.getByRole('progressbar')).toHaveAttribute('value','7',{timeout:10000});
+  await expect(page.getByText(/TF-IDF \+ regressão logística/)).toBeVisible();
+  await expect(page.getByRole('table',{name:'Divisão dos exemplos'})).toContainText('180');
+  await expect(page.getByRole('table',{name:'Divisão dos exemplos'})).toContainText('25.0%');
+  await expect(page.getByRole('table',{name:'Matriz de confusão'})).toContainText('3 falsos positivos');
+  await expect(page.getByRole('button',{name:'Editar contexto',exact:true})).toBeEnabled();
+  await page.setViewportSize({width:390,height:844});
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:'/tmp/djen-treino-painel-mobile.png',fullPage:true});
 });

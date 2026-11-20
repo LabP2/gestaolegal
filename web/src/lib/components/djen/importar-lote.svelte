@@ -11,12 +11,16 @@
 	let {
 		itens,
 		selecionados,
+		obterSelecionadas,
+		quantidadeSelecionada,
 		total,
 		contextoIds,
 		ocupado = $bindable(false)
 	}: {
 		itens: AcervoItem[];
 		selecionados: number[];
+		obterSelecionadas: () => Promise<AcervoItem[]>;
+		quantidadeSelecionada: number;
 		total: number;
 		contextoIds: number[];
 		ocupado?: boolean;
@@ -26,6 +30,8 @@
 	let todas = $state(false);
 	let semParte = $state(false);
 	let amostra = $state<AcervoItem[]>([]);
+	let carregarSelecao = false;
+	let tamanhoSelecao = $state(0);
 	let grupos = $state<Grupo[]>([]);
 	let ignoradas = $state(0);
 	let processadas = $state(0);
@@ -45,7 +51,9 @@
 	});
 
 	function abrir() {
-		todas = selecionados.length === 0;
+		todas = quantidadeSelecionada === 0;
+		carregarSelecao = !todas;
+		tamanhoSelecao = quantidadeSelecionada;
 		semParte = false;
 		amostra = itens.filter((item) => selecionados.includes(item.id_djen));
 		preparar();
@@ -61,6 +69,11 @@
 		contextos = [...contextoIds];
 		origem = page.url.href;
 		try {
+			if (!todas && carregarSelecao) {
+				amostra = await obterSelecionadas();
+				carregarSelecao = false;
+				tamanhoSelecao = amostra.length;
+			}
 			let lista = amostra;
 			if (todas) {
 				lista = [];
@@ -190,12 +203,12 @@
 					type="radio"
 					name="alcance-importacao"
 					checked={!todas}
-					disabled={!amostra.length}
+					disabled={!tamanhoSelecao}
 					onchange={() => {
 						todas = false;
 						preparar();
 					}}
-				/>Selecionadas ({amostra.length})
+				/>Selecionadas ({tamanhoSelecao})
 			</label>
 			<label class="flex items-center gap-2">
 				<input
