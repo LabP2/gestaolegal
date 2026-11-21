@@ -9,6 +9,9 @@
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import FiltrosBusca from '#lib/components/djen/filtros-busca.svelte';
 	import Search from '@lucide/svelte/icons/search';
+	import CircleHelp from '@lucide/svelte/icons/circle-help';
+	import History from '@lucide/svelte/icons/history';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { BUSCA_PARTE_MAX_DIAS } from '#lib/types/index.ts';
 	import BuscaParte from '#lib/components/djen/busca-parte.svelte';
 	import { MAX_TRIBUNAIS } from '#lib/utils/tribunais-djen.ts';
@@ -27,6 +30,7 @@
 	let valor = $state('');
 	let tribunais = $state<string[]>([]);
 	let ocupado = $state(false);
+	let ajudaAberta = $state(false);
 	let parteOcupada = $state(false);
 	const bloqueado = $derived(ocupado || parteOcupada);
 	let buscaEmAndamento = $state<string | null>(null);
@@ -202,7 +206,21 @@
 
 <div class="space-y-6">
 	<div>
-		<h1 class="text-2xl font-semibold">Monitoramento do DJEN</h1>
+		<div class="flex items-center gap-2">
+			<h1 class="text-2xl font-semibold">Monitoramento do DJEN</h1>
+			<Button
+				variant="ghost"
+				size="icon"
+				aria-label="Ajuda sobre o monitoramento"
+				title="Ajuda"
+				onclick={() => (ajudaAberta = true)}
+			>
+				<CircleHelp class="size-5" />
+			</Button>
+			<Button variant="outline" size="sm" href="/djen/monitoramento/execucoes" class="ml-auto">
+				<History /> Ver execuções
+			</Button>
+		</div>
 		<p class="text-muted-foreground">
 			Rotina diária: 04h ({data.logs.agendamento?.janela_dias ?? 7} dias), 10h e 16h ({data.logs
 				.agendamento?.janela_diurna_dias ?? 3} dias), horário de Brasília. As buscas preservam as decisões
@@ -454,3 +472,39 @@
 		</section>
 	{/if}
 </div>
+
+<Dialog.Root bind:open={ajudaAberta}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Como funciona o monitoramento</Dialog.Title>
+			<Dialog.Description>
+				O que cada tipo consulta no DJEN e em quais tribunais.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="space-y-3 text-sm">
+			<p>
+				<strong>Nome da parte:</strong> a consulta é feita apenas nos tribunais selecionados, e selecionar
+				ao menos um é obrigatório. Cada tribunal gera uma consulta separada: marcar TJMG e TRT3 faz duas
+				consultas. Isso evita trazer publicações de homônimos do país inteiro e estourar o limite de páginas
+				da API.
+			</p>
+			<p>
+				Se o mesmo nome for monitorado mais de uma vez com tribunais diferentes (por exemplo, em
+				unidades diferentes), a rotina consulta a união desses tribunais.
+			</p>
+			<p>
+				<strong>OAB e número do processo:</strong> não usam filtro de tribunal; a consulta abrange todos
+				os tribunais.
+			</p>
+			<p>
+				<strong>Rotina automática:</strong> às 04h (últimos {data.logs.agendamento?.janela_dias ??
+					7}
+				dias), 10h e 16h (últimos {data.logs.agendamento?.janela_diurna_dias ?? 3} dias), horário de Brasília.
+				Processos ativos dos casos entram no monitoramento automaticamente.
+			</p>
+		</div>
+		<Dialog.Footer>
+			<Button onclick={() => (ajudaAberta = false)}>Entendi</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

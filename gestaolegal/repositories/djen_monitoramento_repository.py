@@ -63,9 +63,83 @@ class DjenMonitoramentoRepository(BaseRepository):
         )
         self.session.commit()
 
+    def execucoes(self, user, filtros):
+        """Execuções da rotina automática do NPJ, mais recentes primeiro.
+
+        A execução cobre todas as unidades do NPJ. Quem não é admin vê só as
+        consultas das próprias unidades e não vê a mensagem consolidada, que
+        pode citar itens monitorados de outras unidades.
+        """
+        stmt = self.escopo(select(s), s)
+        if filtros.get("status"):
+            stmt = stmt.where(s.c.status == filtros["status"])
+        try:
+            if filtros.get("de"):
+                stmt = stmt.where(s.c.inicio >= datetime.fromisoformat(filtros["de"]))
+            if filtros.get("ate"):
+                stmt = stmt.where(
+                    s.c.inicio
+                    < datetime.fromisoformat(filtros["ate"]) + timedelta(days=1)
+                )
+            page = max(1, int(filtros.get("page", 1)))
+        except (ValueError, TypeError):
+            raise ValidationException("Filtro de data ou página inválido")
+        total = self.session.execute(
+            select(func.count()).select_from(stmt.subquery())
+        ).scalar()
+        rows = list(
+            self.session.execute(
+                stmt.order_by(s.c.inicio.desc(), s.c.id.desc())
+                .limit(30)
+                .offset((page - 1) * 30)
+            ).mappings()
+        )
+        ids = [row["id"] for row in rows]
+        por_execucao = {}
+        if ids:
+            consultas = self._visibilidade(
+                select(q.c.execucao_id, q.c.status, func.count().label("total"))
+                .where(q.c.execucao_id.in_(ids))
+                .group_by(q.c.execucao_id, q.c.status),
+                q,
+                user,
+            )
+            for linha in self.session.execute(consultas).mappings():
+                contagem = por_execucao.setdefault(linha["execucao_id"], {})
+                contagem[linha["status"]] = linha["total"]
+        items = []
+        for row in rows:
+            parametros = row["parametros"] or {}
+            items.append(
+                dict(
+                    id=row["id"],
+                    inicio=row["inicio"].isoformat(),
+                    fim=row["fim"].isoformat() if row["fim"] else None,
+                    duracao_segundos=(
+                        max(0, int((row["fim"] - row["inicio"]).total_seconds()))
+                        if row["fim"]
+                        else None
+                    ),
+                    status=row["status"],
+                    janela_dias=parametros.get("janela_dias"),
+                    novas=row["novas"],
+                    atualizadas=row["atualizadas"],
+                    vinculadas=row["vinculadas"],
+                    consultas=por_execucao.get(row["id"], {}),
+                    mensagem=row["mensagem"] if user.urole == "admin" else None,
+                )
+            )
+        return dict(
+            items=items,
+            total=total,
+            page=page,
+            per_page=30,
+            retencao_dias=Config.DJEN_LOG_RETENCAO_DIAS,
+        )
+
     def logs(self, user, filtros):
         stmt = self._visibilidade(select(q), q, user)
-        for chave in ("origem", "status", "modo", "unidade_id"):
+        for chave in ("origem", "status", "modo", "unidade_id", "execucao_id"):
             if filtros.get(chave):
                 stmt = stmt.where(q.c[chave] == filtros[chave])
         try:

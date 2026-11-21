@@ -2,13 +2,14 @@
 
 from datetime import datetime, timedelta
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from gestaolegal.database import session as db
 from gestaolegal.database.tables import (
     djen_monitoramentos as m,
     djen_consultas as q,
     djen_publicacoes as p,
     djen_publicacao_unidades as a,
+    djen_sincronizacoes as s,
 )
 from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
 from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
@@ -341,3 +342,80 @@ def test_historico_completo_restrito_a_processo(client, auth_headers, tipo, valo
     res = client.post(f"{BASE}/buscar", headers=auth_headers,
         json={"tipo": tipo, "valor": valor, "historico_completo": True})
     assert res.status_code == 400
+
+
+def test_execucoes_listam_rotina_e_filtram_consultas(
+    client, auth_headers, transporte, app
+):
+    numero = numero_cnj_novo()
+    cadastrar(client, auth_headers, "processo", numero)
+    transporte.por_processo[numero] = [item_djen(990301, numero)]
+    with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+        assert DjenMonitoramentoService().djen.sincronizar(3)["status"] == "ok"
+    dados = client.get(BASE + "/execucoes", headers=auth_headers).json["data"]
+    execucao = dados["items"][0]
+    assert dados["total"] >= 1 and dados["retencao_dias"] == 90
+    assert execucao["status"] == "ok" and execucao["janela_dias"] == 3
+    assert execucao["consultas"].get("ok", 0) >= 1
+    assert execucao["duracao_segundos"] is not None
+    logs = client.get(
+        BASE + f"/logs?execucao_id={execucao['id']}&origem=processo&status=ok",
+        headers=auth_headers,
+    ).json["data"]
+    assert logs["items"] and all(
+        log["execucao_id"] == execucao["id"] for log in logs["items"]
+    )
+    todos = client.get(
+        BASE + f"/logs?execucao_id={execucao['id']}", headers=auth_headers
+    ).json["data"]
+    assert todos["total"] == sum(execucao["consultas"].values())
+    vazio = client.get(BASE + "/execucoes?status=erro", headers=auth_headers)
+    assert all(i["status"] == "erro" for i in vazio.json["data"]["items"])
+    assert (
+        client.get(BASE + "/execucoes?de=ontem", headers=auth_headers).status_code
+        == 400
+    )
+
+
+def test_execucoes_restringem_mensagem_e_consultas_do_gestor(
+    client, auth_headers, transporte, app
+):
+    from .conftest import criar_usuario, headers_para
+
+    cadastrar(client, auth_headers, "oab", "765432/MG", unidade_id=2)
+    with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+        service = DjenMonitoramentoService()
+        service.djen.sincronizar(3)
+        execucao = service.session.execute(
+            service.escopo(select(s.c.id), s).order_by(s.c.id.desc())
+        ).scalar()
+        service.session.execute(
+            service.escopo(update(s).where(s.c.id == execucao), s).values(
+                mensagem="OAB 765432/MG: falha"
+            )
+        )
+        service.session.commit()
+    with app.app_context():
+        criar_usuario("prof.exec@teste.br", "senha12345", "prof", "Professor execuções")
+    h = headers_para(client, "prof.exec@teste.br", "senha12345")
+    admin = client.get(BASE + "/execucoes", headers=auth_headers).json["data"]
+    gestor = client.get(BASE + "/execucoes", headers=h).json["data"]
+    item_admin = next(i for i in admin["items"] if i["id"] == execucao)
+    item_gestor = next(i for i in gestor["items"] if i["id"] == execucao)
+    assert item_admin["mensagem"] == "OAB 765432/MG: falha"
+    assert item_gestor["mensagem"] is None
+    assert sum(item_admin["consultas"].values()) > sum(item_gestor["consultas"].values())
+
+
+def test_execucoes_isoladas_entre_npjs(client, auth_headers, headers_outro, app, transporte):
+    from .conftest import TENANT_OUTRO
+    from .djen_fixtures import ligar_djen
+
+    with app.app_context():
+        ligar_djen(TENANT_OUTRO)
+    with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+        DjenMonitoramentoService().djen.sincronizar(3)
+    meus = client.get(BASE + "/execucoes", headers=auth_headers).json["data"]
+    res = client.get(BASE + "/execucoes", headers=headers_outro)
+    assert res.status_code == 200
+    assert meus["total"] >= 1 and res.json["data"]["total"] == 0

@@ -430,6 +430,14 @@ def logs_monitoramento():
     return success_response(data=DjenMonitoramentoService().logs(RequestContext.get_current_user(), request.args))
 
 
+@djen_controller.route("/djen/monitoramentos/execucoes", methods=["GET"])
+@authorized(*PAPEIS_GESTAO)
+@djen_habilitado
+def execucoes_monitoramento():
+    from gestaolegal.services.djen_monitoramento_service import DjenMonitoramentoService
+    return success_response(data=DjenMonitoramentoService().execucoes(RequestContext.get_current_user(), request.args))
+
+
 @djen_controller.route('/djen/contextos', methods=['GET', 'POST'])
 @authorized(*PAPEIS_GESTAO)
 @djen_habilitado

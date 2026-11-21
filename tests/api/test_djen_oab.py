@@ -4,6 +4,7 @@ Sem rede: respostas sintéticas do `TransporteFalso`, com dados inventados.
 """
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from flask import Flask
@@ -220,7 +221,8 @@ class TestCapturaPorOab:
         assert rodar_rotina(app, janela_dias=3)["daj-ufmg"] == "ok"
         chamadas = [c for c in transporte.chamadas if "numeroOab" in c]
         assert [(c["numeroOab"], c["ufOab"]) for c in chamadas] == [("123456", "MG")]
-        hoje = datetime.now().date()
+        # A rotina conta o dia no fuso de Brasília; o runner do CI usa UTC.
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
         assert chamadas[0]["dataDisponibilizacaoFim"] == hoje.isoformat()
         assert chamadas[0]["dataDisponibilizacaoInicio"] == (hoje - timedelta(days=2)).isoformat()
 
