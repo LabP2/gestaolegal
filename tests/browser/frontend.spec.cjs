@@ -1634,3 +1634,17 @@ test('DJEN: abrir contexto sem filtro inicia fila e oculta classificação rápi
  await expect(page.getByRole('checkbox',{name:'Selecionar publicação 98001',exact:true})).toBeVisible();
  expect(state.errors).toEqual([]);
 });
+
+test('Sobre: versão, licença e links; menu DJEN em ordem', async ({ page }) => {
+  await setup(page, { user: { ...user, urole: 'admin', tenant: { sigla: 'ENS', djen_ativo: true } } });
+  await page.goto('/sobre');
+  await expect(page.getByRole('heading', { name: 'Sobre', level: 1 })).toBeVisible();
+  await expect(page.getByText('Gestão Legal 3.5.1')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'GNU AGPL 3.0' })).toHaveAttribute('href', 'https://www.gnu.org/licenses/agpl-3.0.html');
+  await expect(page.getByRole('link', { name: 'https://github.com/LabP2/gestaolegal' })).toHaveAttribute('href', 'https://github.com/LabP2/gestaolegal');
+  await expect(page.getByRole('link', { name: 'LabP2', exact: true })).toHaveAttribute('href', 'https://labp2.direito.ufmg.br/');
+  await expect(page.locator('[data-sidebar="menu-button"][href="/sobre"]')).toHaveText('Sobre');
+  await page.getByRole('button', { name: 'DJEN' }).click();
+  const djen = page.locator('a[href^="/djen"]');
+  await expect(djen).toHaveText(['Publicações', 'Monitoramento', 'Acervo para treino (experimental)']);
+});

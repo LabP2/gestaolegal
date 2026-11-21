@@ -15,6 +15,7 @@
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
 	import NewspaperIcon from '@lucide/svelte/icons/newspaper';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import { PROCESSO_PAPEIS_SEM_CASO } from '#lib/types/index.ts';
 
 	type NavItem = ItemComPapeis & {
@@ -135,13 +136,13 @@
 					url: '/djen'
 				},
 				{
-					title: 'Acervo para treino',
-					url: '/djen/classificacao',
+					title: 'Monitoramento',
+					url: '/djen/monitoramento',
 					roles: ['admin', 'prof', 'orient']
 				},
 				{
-					title: 'Monitoramento',
-					url: '/djen/monitoramento',
+					title: 'Acervo para treino (experimental)',
+					url: '/djen/classificacao',
 					roles: ['admin', 'prof', 'orient']
 				}
 			]
@@ -164,6 +165,12 @@
 			url: '/relatorios',
 			icon: ChartBarIcon,
 			roles: ['admin', 'orient', 'colab_ext'],
+			items: []
+		},
+		{
+			title: 'Sobre',
+			url: '/sobre',
+			icon: InfoIcon,
 			items: []
 		}
 	];
