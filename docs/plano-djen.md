@@ -8,6 +8,7 @@ Esta seção substitui horários, limites de processos e retenção descritos no
 - Vínculos e descartes anteriores são preservados; a classificação humana não é sobrescrita. Sem processo correspondente, a publicação permanece para importação manual.
 - Processo com caso gera evento e notificações; processo sem caso recebe o vínculo sem evento. Reconsultas não duplicam eventos.
 - OAB/processo consultam todos os tribunais na rotina; manual permite período e tribunais.
+- Na rotina, processo é consultado só por `numeroProcesso`, sem datas: a API devolve o histórico inteiro na mesma requisição que uma janela custaria. OAB e parte continuam em janelas de até 30 dias, que é limite nosso, não da API (20/11/2026).
 - Todos os dias às 04h (hoje + 6 dias), 10h e 16h (hoje + 2 dias), America/Sao_Paulo.
 - Processos ativos entram automaticamente. Pausa/remoção por item preserva o acervo.
 - Admin vê o NPJ; demais gestores veem suas unidades. Consulta compartilhada por item/tribunal.

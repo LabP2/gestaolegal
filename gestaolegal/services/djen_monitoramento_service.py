@@ -340,15 +340,26 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
         erros = []
         trabalhos = []
         for (tipo, valor, tribunal), itens in grupos.items():
+            unidades = sorted({it["unidade_id"] for it in itens})
+            if tipo == "processo":
+                # `numeroProcesso` devolve o histórico inteiro sem datas, ao custo
+                # de uma requisição, igual a uma janela: não há o que fatiar, e
+                # consultar tudo cobre o que veio antes do cadastro.
+                consultas = self._preparar(
+                    tipo, valor, None, None, tribunal, unidades, None, "automatico", id
+                )
+                trabalhos.append(
+                    (tipo, valor, None, None, tribunal, unidades, itens, consultas)
+                )
+                continue
             inicio_periodo = hoje - timedelta(days=janela - 1)
             for item in itens:
                 referencia = item["ultimo_sucesso"] or item["criado_em"].date()
                 inicio_periodo = min(inicio_periodo, referencia - timedelta(days=1))
-            # Split long outages into bounded date windows; no unbounded history query.
+            # OAB e parte só filtram por período: janelas de até 30 dias.
             cursor = inicio_periodo
             while cursor <= hoje:
                 fim = min(hoje, cursor + timedelta(days=29))
-                unidades = sorted({it["unidade_id"] for it in itens})
                 consultas = self._preparar(
                     tipo, valor, cursor, fim, tribunal, unidades, None, "automatico", id
                 )
