@@ -557,6 +557,29 @@ test('DJEN: descarte operacional marca irrelevante', async ({ page }) => {
   expect(state.errors).toEqual([]);
 });
 
+test('DJEN: filtro Não analisado não derruba a página de publicações', async ({ page }) => {
+  const state = await acervoSetup(page);
+  // Como na API real: djen/publicacoes só conhece vinculada, pendente e descartada.
+  const publicacoes = [];
+  await page.route('**/api/djen/publicacoes?**', route => {
+    const situacao = new URL(route.request().url()).searchParams.get('situacao');
+    publicacoes.push(situacao);
+    if (situacao && !['vinculada', 'pendente', 'descartada'].includes(situacao))
+      return route.fulfill({ status: 400, json: { success: false, message: 'Situação inválida' } });
+    return route.fulfill({ json: { success: true, data: { items: [], total: 0, page: 1, per_page: 20 } } });
+  });
+  await page.goto('/djen');
+  await page.getByRole('combobox', { name: 'Situação', exact: true }).click();
+  await page.getByRole('option', { name: 'Não analisado', exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('situacao')).toBe('nao_importada');
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeVisible();
+  await expect(page.getByText('Situação inválida')).toHaveCount(0);
+  expect(publicacoes).toEqual([]);
+  expect(state.errors).toEqual([]);
+});
+
 test('DJEN: monitoramento cadastra, pausa e navega pelas quatro abas', async ({ page }) => {
   await setup(page, { user: { ...user, tenant: { sigla: 'ENS', djen_ativo: true } } });
   let items = [];

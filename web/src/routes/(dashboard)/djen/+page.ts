@@ -12,6 +12,12 @@ import {
 export const load: PageLoad = async ({ url, fetch, parent }) => {
 	const { me } = await parent();
 	try {
+		// Gestão vê só o acervo. Os filtros dele (ex.: situacao=nao_importada) não
+		// existem em djen/publicacoes, que responderia 400 e derrubaria a página.
+		if (['admin', 'prof', 'orient'].includes(me.urole)) {
+			const acervo = await api.get<AcervoPagina>(`djen/acervo?${url.searchParams}`, {}, fetch);
+			return { acervo, publicacoes: null, status: null };
+		}
 		const [publicacoes, status] = await Promise.all([
 			api.get<Paginated<PublicacaoListItem>>(
 				`djen/publicacoes?${url.searchParams.toString()}`,
@@ -20,10 +26,7 @@ export const load: PageLoad = async ({ url, fetch, parent }) => {
 			),
 			api.get<StatusDjen>('djen/status', {}, fetch)
 		]);
-		const acervo = ['admin', 'prof', 'orient'].includes(me.urole)
-			? await api.get<AcervoPagina>(`djen/acervo?${url.searchParams}`, {}, fetch)
-			: null;
-		return { publicacoes, status, acervo };
+		return { acervo: null, publicacoes, status };
 	} catch (err) {
 		if (err instanceof ApiException) {
 			error(err.statusCode || 500, err.message);
