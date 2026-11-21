@@ -139,6 +139,11 @@ def test_migrations_com_dois_npjs(mysql_descartavel):
     with pytest.raises(RuntimeError, match="Remova-os antes do downgrade"):
         command.downgrade(cfg, "a0b1c2d3e4f5")
     command.upgrade(cfg, "head")
+    # O ciclo de downgrade apagou as tabelas posteriores à M2 (partes do
+    # processo, OAB do DJEN): o seed as completa, e só elas, e a reexecução
+    # seguinte não cria nada.
+    criados = seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
+    assert set(criados) == {"processo_partes", "djen_oabs"}
     assert not seed_database(engine, senha="123456", tenants=("daj-ufmg", "npj-demo"))
 
 
@@ -465,7 +470,8 @@ def test_monitoramento_migra_acesso_e_oabs(mysql_descartavel):
     command.upgrade(cfg,'head')
     with engine.begin() as conn:
         assert conn.execute(text('SELECT id_publicacao,unidade_id,origem FROM djen_publicacao_unidades WHERE tenant_id=1')).one()==(pid,1,'parte')
-        assert conn.execute(text('SELECT valor,ativo FROM djen_monitoramentos WHERE tenant_id=1')).one()==('123456/MG',0)
+        # A OAB do orientador do seed (990001, pausada) também migra.
+        assert sorted(conn.execute(text('SELECT valor,ativo FROM djen_monitoramentos WHERE tenant_id=1')).all())==[('123456/MG',0),('990001/MG',0)]
         conn.execute(text('DELETE FROM djen_consulta_resultados WHERE tenant_id=1'))
         conn.execute(text('DELETE FROM djen_consultas WHERE tenant_id=1'))
         assert conn.execute(text('SELECT COUNT(*) FROM djen_publicacao_unidades WHERE tenant_id=1')).scalar()==1

@@ -5,7 +5,11 @@ Uso: uv run python scripts/seed_database.py [--dry-run] [--unidade SIGLA]
 Requer migrations aplicadas. Toda a carga usa uma única transação. Sem
 `--tenant`, semeia os dois NPJs de demonstração: o `daj-ufmg` (tenant 1, criado
 pela migration, contas @ufmg.br) e o `npj-demo` (criado aqui se faltar, contas
-@npjdemo.br). Com `--unidade` e sem `--tenant`, semeia só o `daj-ufmg`.
+@npjdemo.br). Com `--unidade` e sem `--tenant`, semeia só o `daj-ufmg`. Em
+qualquer caso, garante também o administrador da plataforma de demonstração.
+
+Nada aqui aciona o DJEN de verdade: os números CNJ dos processos usam o
+segmento 0, que não existe, e a OAB do orientador fica pausada.
 """
 
 from __future__ import annotations
@@ -34,6 +38,12 @@ metadata = runpy.run_path(
 
 TENANT_PADRAO_SLUG = "daj-ufmg"
 
+
+def normalizar_cnj(numero: str | None) -> str | None:
+    """Cópia de gestaolegal/utils/cnj.py: o pacote exige a configuração da API."""
+    digitos = "".join(c for c in numero or "" if c.isdigit())
+    return digitos if len(digitos) == 20 else None
+
 MARCA_ANTIGA = "seed_database:v1"
 MARCA = "Demonstração"
 CONTAS = (
@@ -41,7 +51,11 @@ CONTAS = (
     ("orient", "Olívia Orientadora"),
     ("estag_direito", "Eduardo Estagiário"),
     ("colab_ext", "Carla Colaboradora"),
+    # Novas contas entram no fim: a posição fixa o CPF e o RG das anteriores.
+    ("prof", "Paula Professora"),
+    ("colab_proj", "Célio Colaborador de Projeto"),
 )
+PLATAFORMA_ADMIN = ("plataforma@npjdemo.br", "Administração da Plataforma")
 NOMES_ATENDIDOS = (
     "Maria Exemplo", "José Exemplo", "Ana Martins", "Bruno Ferreira",
     "Camila Costa", "Diego Almeida", "Elisa Santos", "Fábio Oliveira",
@@ -68,6 +82,8 @@ class TenantDemo:
     contas: tuple[tuple[str, str], ...]
     nomes_atendidos: tuple[str, ...]
     base_cpf_usuarios: int
+    # OAB fictícia do orientador; MG não chega a esse número.
+    oab_orientador: str
     # None: o tenant vem da migration (tenant 1) e não é criado pelo seed.
     criar: tuple[str, str] | None = None  # (nome, sigla) do tenant
     unidade: tuple[str, str] | None = None  # (nome, sigla) da unidade criada
@@ -77,6 +93,7 @@ TENANTS_DEMO = {
     TENANT_PADRAO_SLUG: TenantDemo(
         slug=TENANT_PADRAO_SLUG, dominio="ufmg.br", contas=CONTAS,
         nomes_atendidos=NOMES_ATENDIDOS, base_cpf_usuarios=900_000_000,
+        oab_orientador="990001",
     ),
     "npj-demo": TenantDemo(
         slug="npj-demo", dominio="npjdemo.br",
@@ -85,8 +102,11 @@ TENANTS_DEMO = {
             ("orient", "Otávio Orientador"),
             ("estag_direito", "Estela Estagiária"),
             ("colab_ext", "Caio Colaborador"),
+            ("prof", "Priscila Professora"),
+            ("colab_proj", "Celso Colaborador de Projeto"),
         ),
         nomes_atendidos=NOMES_ATENDIDOS_NPJ_DEMO, base_cpf_usuarios=910_000_000,
+        oab_orientador="990002",
         criar=("NPJ de Demonstração", "NPJD"), unidade=("Sede", "SEDE"),
     ),
 }
@@ -109,6 +129,19 @@ def cpf_demonstracao(base: int) -> str:
     return f"{value[:3]}.{value[3:6]}.{value[6:9]}-{value[9:]}"
 
 
+def cnj_demonstracao(sequencial: int, ano: int, origem: int) -> str:
+    """Número no formato CNJ com dígito verificador válido e segmento 0.
+
+    O segmento (J) vai de 1 a 9 na Resolução 65/2008: com 0, o número nunca
+    coincide com um processo real, nem se a rotina do DJEN o consultar.
+    """
+    if not (0 < sequencial < 10_000_000 and 0 <= origem < 10_000):
+        raise ValueError("Sequencial ou origem fora do formato CNJ.")
+    tr = 13  # MG, só para a máscara parecer familiar.
+    resto = int(f"{sequencial:07d}{ano:04d}0{tr:02d}{origem:04d}00") % 97
+    return f"{sequencial:07d}-{98 - resto:02d}.{ano:04d}.0.{tr:02d}.{origem:04d}"
+
+
 class Seed:
     def __init__(self, conn: Connection, tenant_id: int,
                  demo: TenantDemo = TENANTS_DEMO[TENANT_PADRAO_SLUG],
@@ -127,9 +160,15 @@ class Seed:
         """
         cache = self.__dict__.setdefault("_colunas_cache", {})
         if tabela.name not in cache:
-            reais = {c["name"] for c in inspect(self.conn).get_columns(tabela.name)}
+            insp = inspect(self.conn)
+            reais = ({c["name"] for c in insp.get_columns(tabela.name)}
+                     if insp.has_table(tabela.name) else set())
             cache[tabela.name] = [c for c in tabela.c if c.name in reais]
         return cache[tabela.name]
+
+    def existe(self, nome_tabela: str) -> bool:
+        """Tabela criada no banco? Numa revisão antiga, as mais novas faltam."""
+        return bool(self._colunas(metadata.tables[nome_tabela]))
 
     def buscar(self, tabela: Table, chave: dict):
         # Tudo o que o seed lê ou grava fica no tenant escolhido.
@@ -146,6 +185,8 @@ class Seed:
         return result.inserted_primary_key[0] if "id" in tabela.c else None
 
     def garantir(self, nome_tabela: str, chave: dict, **dados):
+        if not self.existe(nome_tabela):
+            return None
         tabela = metadata.tables[nome_tabela]
         existente = self.buscar(tabela, chave)
         # Reconhece os identificadores antigos sem duplicar casos, eventos e escalas.
@@ -223,6 +264,12 @@ class Seed:
                 tabela = metadata.tables["usuarios"]
                 self.conn.execute(tabela.update().where(tabela.c.id == uid).values(criadopor=uid))
 
+        # Pausada: a aba OAB do monitoramento mostra o registro, e a rotina
+        # do DJEN não consulta o número.
+        self.garantir("djen_oabs", {"numero_oab": self.demo.oab_orientador, "uf_oab": "MG"},
+            id_usuario=usuarios["orient"], ativo=False, criado_em=agora,
+            id_criado_por=usuarios["admin"], unidade_id=selecionadas[0]["id"])
+
         for unidade in selecionadas:
             unidade_id = unidade["id"]
             for uid in usuarios.values():
@@ -270,10 +317,14 @@ class Seed:
                     id_colaborador=usuarios["colab_ext"], data_criacao=agora,
                     id_criado_por=admin, situacao_deferimento="ativo", status=True)
                 self.garantir("casos_atendidos", {"id_caso": caso, "id_atendido": atendido})
-                self.garantir("processos", {"id_caso": caso, "identificacao": f"[{MARCA}] {assunto}"},
+                numero = cnj_demonstracao(unidade_id * 1000 + indice, hoje.year, unidade_id)
+                processo = self.garantir("processos", {"id_caso": caso, "identificacao": f"[{MARCA}] {assunto}"},
                     unidade_id=unidade_id, especie="Ação", status=True, id_criado_por=admin,
                     vara="Vara de demonstração", data_distribuicao=hoje,
                     obs="Processo fictício, sem número judicial real.")
+                self.numerar_processo(processo, numero)
+                self.garantir("processo_partes", {"id_processo": processo, "id_atendido": atendido},
+                              polo="ativo")
                 for numero, (tipo, dias, descricao) in enumerate((
                     ("reuniao", -7, "Entrevista inicial"),
                     ("audencia", 7, "Audiência de conciliação"),
@@ -302,6 +353,40 @@ class Seed:
             for uid in (orient, estag):
                 self.garantir("dias_marcados_plantao", {"plantao_id": escala, "id_usuario": uid, "data_marcada": dia},
                     unidade_id=unidade_id, confirmacao="aberto", status=True)
+
+
+    def numerar_processo(self, processo_id: int, numero: str):
+        """Dá número CNJ ao processo do seed que ainda não tem.
+
+        Também cobre bancos semeados antes dessas colunas. `djen_pendente`
+        fica falso: a consulta ao DJEN não roda para número fictício.
+        """
+        tabela = metadata.tables["processos"]
+        atual = self.buscar(tabela, {"id": processo_id})
+        reais = {c.name for c in self._colunas(tabela)}
+        ajustes = {}
+        if atual.get("numero") is None:
+            ajustes["numero"] = numero
+        if "numero_cnj" in reais and atual.get("numero_cnj") is None:
+            ajustes["numero_cnj"] = normalizar_cnj(ajustes.get("numero") or atual["numero"])
+            ajustes["djen_pendente"] = False
+        if ajustes:
+            self.conn.execute(tabela.update().where(tabela.c.id == processo_id).values(**ajustes))
+
+
+def garantir_plataforma_admin(conn: Connection, senha: str, agora: datetime,
+                              criados: Counter[str]) -> None:
+    """Conta de login em /plataforma; a reexecução não troca a senha."""
+    tabela = metadata.tables["plataforma_admins"]
+    if not inspect(conn).has_table(tabela.name):
+        return
+    email, nome = PLATAFORMA_ADMIN
+    if conn.execute(select(tabela.c.id).where(tabela.c.email == email)).first():
+        return
+    conn.execute(tabela.insert().values(
+        nome=nome, email=email, ativo=True, criado_em=agora,
+        senha=bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()))
+    criados["plataforma_admins"] += 1
 
 
 def garantir_tenant(conn: Connection, demo: TenantDemo, agora: datetime,
@@ -337,6 +422,7 @@ def seed_database(engine: Engine, *, senha: str, sigla: str | None = None,
     criados: Counter[str] = Counter()
     with engine.connect() as conn:
         with conn.begin() as transaction:
+            garantir_plataforma_admin(conn, senha, datetime.combine(hoje, time(9)), criados)
             for slug in dict.fromkeys(tenants):
                 demo = TENANTS_DEMO[slug]
                 tenant_id = garantir_tenant(conn, demo, datetime.combine(hoje, time(9)), criados)
