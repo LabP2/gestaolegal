@@ -341,6 +341,27 @@ export type LogsMonitoramento = {
 	retencao_dias: number;
 };
 
+export type ExecucaoMonitoramento = {
+	id: number;
+	inicio: string;
+	fim: string | null;
+	duracao_segundos: number | null;
+	status: string;
+	janela_dias: number | null;
+	novas: number;
+	atualizadas: number;
+	vinculadas: number;
+	consultas: Record<string, number>;
+	mensagem: string | null;
+};
+export type ExecucoesMonitoramento = {
+	items: ExecucaoMonitoramento[];
+	total: number;
+	page: number;
+	per_page: number;
+	retencao_dias: number;
+};
+
 export type CriteriosContexto = {
 	nomes?: string[];
 	nome_parte?: string;

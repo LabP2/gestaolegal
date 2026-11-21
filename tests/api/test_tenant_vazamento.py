@@ -405,6 +405,7 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("GET", "/api/djen/busca-parte"): Rota("colecao", query=f"nome={BUSCA}&de=2026-11-01&ate=2026-11-05"),
     ("GET", "/api/djen/monitoramentos"): Rota("colecao"),
     ("GET", "/api/djen/monitoramentos/logs"): Rota("colecao", query="modo=automatico"),
+    ("GET", "/api/djen/monitoramentos/execucoes"): Rota("colecao"),
     ("POST", "/api/djen/monitoramentos"): Rota("escrita", json=lambda _: {"tipo": "parte", "valor": "Teste monitoramento", "tribunais": ["TJMG"]}),
     ("PATCH", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}, json=lambda _: {"ativo": False}),
     ("DELETE", "/api/djen/monitoramentos/<int:id>"): Rota("id", {"id": "acervo"}),
@@ -864,7 +865,7 @@ def cenario(app: Flask, client: FlaskClient, create_admin_user: None, banco_pres
     meus["meu_atendido"] = _ok(client.post("/api/atendido/", json=corpo, headers=outro))["id"]
 
     antes = {}
-    for chave in sorted(_de("colecao"), key=lambda c: c[1].endswith("/monitoramentos/logs")):
+    for chave in sorted(_de("colecao"), key=lambda c: c[1].endswith(("/monitoramentos/logs", "/monitoramentos/execucoes"))):
         # Busca por parte é GET e grava logs próprios; fotografe logs após essa busca.
         response = _chamar(client, *chave, ROTAS[chave], {}, outro)
         _exigir_sucesso(response)
