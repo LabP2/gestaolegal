@@ -3,6 +3,10 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import pacote from './package.json' with { type: 'json' };
+
+// Versão exibida em Sobre: uma fonte só, o package.json.
+const version = pacote.version;
 
 export default defineConfig({
 	plugins: [
@@ -18,5 +22,6 @@ export default defineConfig({
 			})
 		})
 	],
+	define: { __VERSAO__: JSON.stringify(version) },
 	envDir: '..'
 });
