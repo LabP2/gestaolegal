@@ -144,11 +144,54 @@ def test_rotina_reconsulta_processo_e_recupera_periodo(
         assert service.djen.sincronizar(3)["status"] == "ok"
     logs = [row for row in _linhas(q) if row["parametros"].get("valor") == numero]
     assert len(logs) == 2
-    assert (
-        logs[0]["parametros"]["de"]
-        <= (datetime.now().date() - timedelta(days=15)).isoformat()
+    # Processo é consultado sem datas: o histórico inteiro cobre os 15 dias
+    # perdidos e também o que veio antes do cadastro.
+    assert all(log["parametros"]["historico_completo"] is True for log in logs)
+    assert all(log["parametros"]["de"] is None for log in logs)
+    chamadas = [c for c in transporte.chamadas if c.get("numeroProcesso") == numero]
+    assert len(chamadas) == 2
+    assert not any(
+        {"dataDisponibilizacaoInicio", "dataDisponibilizacaoFim"} & c.keys()
+        for c in chamadas
     )
     assert len(_linhas(p)) == 1
+
+
+def test_rotina_processo_traz_historico_anterior_ao_cadastro(
+    client, auth_headers, transporte, app
+):
+    numero = numero_cnj_novo()
+    cadastrar(client, auth_headers, "processo", numero)
+    transporte.por_processo[numero] = [
+        item_djen(990010, numero, data="2025-01-15"),
+        item_djen(990011, numero),
+    ]
+    with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+        assert DjenMonitoramentoService().djen.sincronizar(3)["status"] == "ok"
+    # O transporte falso não filtra por data: o que prova o histórico é a
+    # chamada ter saído sem período.
+    chamadas = [c for c in transporte.chamadas if c.get("numeroProcesso") == numero]
+    assert chamadas and all("dataDisponibilizacaoInicio" not in c for c in chamadas)
+    assert {row["id_djen"] for row in _linhas(p)} == {990010, 990011}
+
+
+def test_rotina_oab_continua_em_janelas(client, auth_headers, transporte, app):
+    cadastrar(client, auth_headers)
+    with app.test_request_context(), contexto_tenant(TENANT_DAJ):
+        service = DjenMonitoramentoService()
+        service.session.execute(
+            service.escopo(update(m).where(m.c.valor == "123456/MG"), m).values(
+                ultimo_sucesso=datetime.now().date() - timedelta(days=45)
+            )
+        )
+        service.session.commit()
+        assert service.djen.sincronizar(3)["status"] == "ok"
+    chamadas = [c for c in transporte.chamadas if c.get("numeroOab") == "123456"]
+    assert len(chamadas) == 2
+    assert all(
+        c["dataDisponibilizacaoInicio"] and c["dataDisponibilizacaoFim"]
+        for c in chamadas
+    )
 
 
 def test_duas_unidades_compartilham_consulta_sem_duplicar(
