@@ -13,10 +13,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: "0.7.17"
           enable-cache: true
@@ -46,7 +46,7 @@ jobs:
             dockerfile: web/Dockerfile
             image_name: gestaolegal-web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build ${{ matrix.name }} image
         run: docker build ${{ matrix.context }} --file ${{ matrix.dockerfile }} --tag ${{ matrix.image_name }} --label "runnumber=${GITHUB_RUN_ID}" --pull --target prod
