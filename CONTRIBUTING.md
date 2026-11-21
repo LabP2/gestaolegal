@@ -13,9 +13,11 @@ make seed ARGS="--dry-run"
 make seed
 ```
 
-O comando usa `scripts/seed_database.py`. Ele cria `admin@ufmg.br`,
-`orient@ufmg.br`, `estag_direito@ufmg.br` e `colab_ext@ufmg.br`, com senha
-inicial `123456` (substituível por `SEED_PASSWORD`). Reexecutar preserva
+O comando usa `scripts/seed_database.py`. Ele cria uma conta por papel
+(`admin@ufmg.br`, `prof@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br`,
+`colab_proj@ufmg.br` e `colab_ext@ufmg.br`, e as equivalentes em
+`@npjdemo.br`), além do administrador da plataforma `plataforma@npjdemo.br`.
+Todas usam a senha inicial `123456` (substituível por `SEED_PASSWORD`). Reexecutar preserva
 as senhas e os registros existentes. O script `scripts/seed_local.py` é uma
 alternativa via API, com contas próprias, para testar endpoints e uploads.
 

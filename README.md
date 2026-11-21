@@ -171,20 +171,27 @@ para o outro. Sem `--tenant`, o seed semeia dois NPJs de demonstração:
 
 | NPJ (slug) | Origem | Unidades | Contas |
 |---|---|---|---|
-| DAJ/UFMG (`daj-ufmg`) | tenant 1, criado pela migration | as ativas das migrations (BH, Nova Lima) | `admin@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br`, `colab_ext@ufmg.br` |
-| NPJ de Demonstração (`npj-demo`) | criado pelo seed, se faltar | `Sede` (`SEDE`), criada pelo seed | `admin@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_ext@npjdemo.br` |
+| DAJ/UFMG (`daj-ufmg`) | tenant 1, criado pela migration | as ativas das migrations (BH, Nova Lima) | `admin@ufmg.br`, `prof@ufmg.br`, `orient@ufmg.br`, `estag_direito@ufmg.br`, `colab_proj@ufmg.br`, `colab_ext@ufmg.br` |
+| NPJ de Demonstração (`npj-demo`) | criado pelo seed, se faltar | `Sede` (`SEDE`), criada pelo seed | `admin@npjdemo.br`, `prof@npjdemo.br`, `orient@npjdemo.br`, `estag_direito@npjdemo.br`, `colab_proj@npjdemo.br`, `colab_ext@npjdemo.br` |
 
 Os nomes dos atendidos diferem entre os dois NPJs, para que um vazamento fique
 visível na tela. `--unidade` sem `--tenant` semeia só a DAJ, como antes; com
 `--tenant`, a sigla é procurada em cada NPJ informado. Só esses dois slugs são
 aceitos: o seed nunca grava dados fictícios num NPJ real.
 
-Em cada NPJ, o script `scripts/seed_database.py` cria quatro usuários
-compartilhados entre as unidades e, por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
+Em cada NPJ, o script `scripts/seed_database.py` cria seis usuários, um por
+papel, compartilhados entre as unidades e, por unidade ativa, **20 atendidos (10 deles assistidos)**, dois casos com processos, quatro eventos,
 duas orientações jurídicas, dois lembretes e uma escala com duas marcações.
 Os dados são fictícios. Usuários e atendidos recebem CPFs sintéticos, distintos
-e com dígitos verificadores válidos; isso não comprova inscrição real. Processos
-não têm número judicial real. Os nomes e demais textos exibidos não contêm “Seed”.
+e com dígitos verificadores válidos; isso não comprova inscrição real. Cada
+processo tem número no formato CNJ, com o atendido do caso como parte ativa. O
+número usa o segmento de Justiça `0`, que não existe, e por isso nunca é de um
+processo real. A OAB fictícia do orientador (`990001/MG` na DAJ, `990002/MG` no
+NPJ de demonstração) entra pausada. O seed não cria publicações, e a rotina do
+DJEN não traz nada de verdade para esses dados.
+
+O seed cria também o administrador da plataforma `plataforma@npjdemo.br`, que
+entra em `/plataforma`. Os nomes e demais textos exibidos não contêm “Seed”.
 Não são criados anexos nem enviados e-mails. As unidades da DAJ vêm das
 migrations.
 

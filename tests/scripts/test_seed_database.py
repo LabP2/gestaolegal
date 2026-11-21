@@ -36,7 +36,7 @@ def snapshot(engine):
 
 def test_seed_relacoes_senha_e_idempotencia(engine):
     criados = seed_database(engine, senha="123456", hoje=date(2026, 10, 13))
-    assert criados["usuarios"] == 4
+    assert criados["usuarios"] == 6
     assert criados["atendidos"] == 40
     assert criados["assistidos"] == 20
     assert criados["casos"] == 4
@@ -49,6 +49,8 @@ def test_seed_relacoes_senha_e_idempotencia(engine):
             "orient@ufmg.br": "orient",
             "estag_direito@ufmg.br": "estag_direito",
             "colab_ext@ufmg.br": "colab_ext",
+            "prof@ufmg.br": "prof",
+            "colab_proj@ufmg.br": "colab_proj",
         }
         for usuario in contas:
             assert bcrypt.checkpw(b"123456", usuario["senha"].encode())
@@ -129,7 +131,7 @@ def test_cpfs_validos_unicos_e_metade_assistidos_por_unidade(engine):
                     check = (sum(digits[i] * (length + 1 - i) for i in range(length)) * 10 % 11) % 10
                     assert digits[length] == check
                 cpfs.append(cpf)
-        assert len(cpfs) == len(set(cpfs)) == 44
+        assert len(cpfs) == len(set(cpfs)) == 46
         atendidos, assistidos = metadata.tables["atendidos"], metadata.tables["assistidos"]
         for unidade in (7, 12):
             people = set(conn.execute(select(atendidos.c.id).where(atendidos.c.unidade_id == unidade)).scalars())
@@ -180,7 +182,7 @@ def test_npj_demo_criado_com_tenant_unidade_e_contas_proprias(engine):
     criados = seed_database(engine, senha="123456", hoje=date(2026, 10, 13), tenants=DEMOS)
     assert criados["tenants"] == 1
     assert criados["unidades"] == 1
-    assert criados["usuarios"] == 8
+    assert criados["usuarios"] == 12
     with engine.connect() as conn:
         demo = _tenant(conn, "npj-demo")
         assert demo is not None and demo["ativo"] and demo["id"] != 1
@@ -193,10 +195,12 @@ def test_npj_demo_criado_com_tenant_unidade_e_contas_proprias(engine):
         assert por_tenant[1] == {
             "admin@ufmg.br": "admin", "orient@ufmg.br": "orient",
             "estag_direito@ufmg.br": "estag_direito", "colab_ext@ufmg.br": "colab_ext",
+            "prof@ufmg.br": "prof", "colab_proj@ufmg.br": "colab_proj",
         }
         assert por_tenant[demo["id"]] == {
             "admin@npjdemo.br": "admin", "orient@npjdemo.br": "orient",
             "estag_direito@npjdemo.br": "estag_direito", "colab_ext@npjdemo.br": "colab_ext",
+            "prof@npjdemo.br": "prof", "colab_proj@npjdemo.br": "colab_proj",
         }
         unidades = metadata.tables["unidades"]
         (sede,) = conn.execute(select(unidades).where(unidades.c.tenant_id == demo["id"])).mappings()
@@ -240,7 +244,7 @@ def test_dois_npjs_reexecucao_nao_duplica_nem_troca_senha(engine):
 
 def test_npj_demo_sozinho_nao_toca_a_daj(engine):
     criados = seed_database(engine, senha="123456", tenants=("npj-demo",))
-    assert criados["usuarios"] == 4 and criados["casos"] == 2
+    assert criados["usuarios"] == 6 and criados["casos"] == 2
     with engine.connect() as conn:
         for tabela in metadata.sorted_tables:
             if "tenant_id" in tabela.c and tabela.name != "unidades":
@@ -252,7 +256,7 @@ def test_cpfs_unicos_entre_os_dois_npjs(engine):
     with engine.connect() as conn:
         cpfs = [cpf for nome in ("usuarios", "atendidos")
                 for cpf in conn.execute(select(metadata.tables[nome].c.cpf)).scalars()]
-    assert len(cpfs) == len(set(cpfs)) == 8 + 60
+    assert len(cpfs) == len(set(cpfs)) == 12 + 60
 
 
 def test_email_do_npj_demo_em_uso_na_daj_aborta_sem_gravar(engine):
@@ -310,3 +314,99 @@ def test_cli_recusa_tenant_desconhecido():
     with pytest.raises(SystemExit) as exc:
         main(["--tenant", "npj-real"])
     assert exc.value.code == 2
+
+
+def _digito_cnj(digitos):
+    """Dígito verificador CNJ (Resolução 65/2008, anexo VIII), módulo 97."""
+    base = digitos[:7] + digitos[9:] + "00"
+    return 98 - int(base) % 97
+
+
+def test_processos_com_cnj_ficticio_sem_pendencia_djen(engine):
+    seed_database(engine, senha="123456", hoje=date(2026, 10, 13), tenants=DEMOS)
+    with engine.connect() as conn:
+        processos = metadata.tables["processos"]
+        rows = conn.execute(select(processos)).mappings().all()
+    assert len(rows) == 6
+    numeros = set()
+    for p in rows:
+        digitos = "".join(c for c in p["numero"] if c.isdigit())
+        assert p["numero_cnj"] == digitos and len(digitos) == 20
+        # Segmento 0 não existe: o número nunca é de um processo real.
+        assert digitos[13] == "0"
+        assert int(digitos[7:9]) == _digito_cnj(digitos)
+        assert p["djen_pendente"] is False or p["djen_pendente"] == 0
+        numeros.add((p["tenant_id"], p["numero"]))
+    assert len(numeros) == 6
+
+
+def test_atendido_do_caso_e_parte_ativa_do_processo(engine):
+    seed_database(engine, senha="123456", tenants=DEMOS)
+    with engine.connect() as conn:
+        partes = metadata.tables["processo_partes"]
+        processos = metadata.tables["processos"]
+        links = metadata.tables["casos_atendidos"]
+        rows = conn.execute(
+            select(partes.c.polo, partes.c.tenant_id, processos.c.tenant_id.label("tp"),
+                   links.c.id_atendido.label("do_caso"), partes.c.id_atendido)
+            .select_from(partes.join(processos, processos.c.id == partes.c.id_processo)
+                         .join(links, links.c.id_caso == processos.c.id_caso))
+        ).mappings().all()
+    assert len(rows) == 6
+    for r in rows:
+        assert r["polo"] == "ativo"
+        assert r["tenant_id"] == r["tp"]
+        assert r["id_atendido"] == r["do_caso"]
+
+
+def test_oab_do_orientador_pausada_em_cada_npj(engine):
+    seed_database(engine, senha="123456", tenants=DEMOS)
+    with engine.connect() as conn:
+        oabs = metadata.tables["djen_oabs"]
+        usuarios = metadata.tables["usuarios"]
+        rows = conn.execute(
+            select(oabs, usuarios.c.urole, usuarios.c.tenant_id.label("tu"))
+            .join(usuarios, usuarios.c.id == oabs.c.id_usuario)
+        ).mappings().all()
+    assert {(r["numero_oab"], r["uf_oab"]) for r in rows} == {("990001", "MG"), ("990002", "MG")}
+    for r in rows:
+        # Pausada: a rotina do DJEN não consulta uma OAB que pode ser de alguém.
+        assert not r["ativo"]
+        assert r["urole"] == "orient" and r["tenant_id"] == r["tu"]
+
+
+def test_admin_da_plataforma_criado_uma_vez(engine):
+    criados = seed_database(engine, senha="123456", tenants=("npj-demo",))
+    assert criados["plataforma_admins"] == 1
+    seed_database(engine, senha="OutraSenha123!", tenants=DEMOS)
+    with engine.connect() as conn:
+        (admin,) = conn.execute(select(metadata.tables["plataforma_admins"])).mappings()
+    assert admin["email"] == "plataforma@npjdemo.br" and admin["ativo"]
+    assert bcrypt.checkpw(b"123456", admin["senha"].encode())
+
+
+def test_banco_semeado_antes_do_cnj_ganha_numero_e_contas_novas(engine):
+    seed_database(engine, senha="123456")
+    processos, partes = metadata.tables["processos"], metadata.tables["processo_partes"]
+    usuarios = metadata.tables["usuarios"]
+    with engine.begin() as conn:
+        conn.execute(processos.update().values(numero=None, numero_cnj=None))
+        conn.execute(partes.delete())
+        novos = select(usuarios.c.id).where(usuarios.c.urole.in_(("prof", "colab_proj")))
+        vinculos = metadata.tables["usuarios_unidades"]
+        conn.execute(vinculos.delete().where(vinculos.c.usuario_id.in_(novos)))
+        conn.execute(usuarios.delete().where(usuarios.c.urole.in_(("prof", "colab_proj"))))
+    criados = seed_database(engine, senha="123456")
+    assert criados["processo_partes"] == 4 and criados["usuarios"] == 2
+    with engine.connect() as conn:
+        assert all(p["numero_cnj"] for p in conn.execute(select(processos)).mappings())
+
+
+def test_cnj_demonstracao_recusa_fora_do_formato():
+    from scripts.seed_database import cnj_demonstracao
+
+    assert cnj_demonstracao(7001, 2026, 7) == "0007001-%02d.2026.0.13.0007" % _digito_cnj(
+        "0007001" + "00" + "2026" + "0" + "13" + "0007")
+    for args in ((0, 2026, 1), (10_000_000, 2026, 1), (1, 2026, 10_000)):
+        with pytest.raises(ValueError):
+            cnj_demonstracao(*args)
