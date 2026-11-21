@@ -485,8 +485,8 @@
 			<p>
 				<strong>Nome da parte:</strong> a consulta é feita apenas nos tribunais selecionados, e selecionar
 				ao menos um é obrigatório. Cada tribunal gera uma consulta separada: marcar TJMG e TRT3 faz duas
-				consultas. Isso evita trazer publicações de homônimos do país inteiro e estourar o limite de
-				páginas da API.
+				consultas. Isso evita trazer publicações de homônimos do país inteiro e estourar o limite de páginas
+				da API.
 			</p>
 			<p>
 				Se o mesmo nome for monitorado mais de uma vez com tribunais diferentes (por exemplo, em
@@ -499,8 +499,8 @@
 			<p>
 				<strong>Rotina automática:</strong> às 04h (últimos {data.logs.agendamento?.janela_dias ??
 					7}
-				dias), 10h e 16h (últimos {data.logs.agendamento?.janela_diurna_dias ?? 3} dias), horário de
-				Brasília. Processos ativos dos casos entram no monitoramento automaticamente.
+				dias), 10h e 16h (últimos {data.logs.agendamento?.janela_diurna_dias ?? 3} dias), horário de Brasília.
+				Processos ativos dos casos entram no monitoramento automaticamente.
 			</p>
 		</div>
 		<Dialog.Footer>
