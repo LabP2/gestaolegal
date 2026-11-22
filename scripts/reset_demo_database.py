@@ -5,6 +5,10 @@ Use scripts/reset_demo.sh para também parar a API durante a operação.
 O DROP apaga todos os NPJs (tenants) do banco. Por isso, `--check` e o próprio
 reset recusam quando há tenant com slug fora de DEMO_TENANT_SLUGS (lista
 separada por vírgulas; padrão e mínimo: os NPJs de demonstração do seed).
+
+As senhas seguem o seed: SEED_PASSWORD para todas as contas, sobreposta por
+SEED_PASSWORD_<SLUG> em cada NPJ e por SEED_PLATAFORMA_PASSWORD no admin da
+plataforma.
 """
 from __future__ import annotations
 
@@ -23,7 +27,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from scripts.seed_database import SLUGS_DEMO, seed_database
+from scripts.seed_database import (SENHA_PADRAO, SLUGS_DEMO, VARIAVEL_SENHA, seed_database,
+                                   senhas_do_ambiente, validar_senha)
 SYSTEM_DATABASES = {"mysql", "sys", "information_schema", "performance_schema"}
 
 
@@ -37,9 +42,10 @@ def configuration():
     name = os.environ["DB_NAME"]
     if name != os.environ["DEMO_DB_NAME"] or name.lower() in SYSTEM_DATABASES:
         raise ValueError("DEMO_DB_NAME deve confirmar exatamente DB_NAME, fora dos bancos de sistema.")
-    password = os.environ.get("SEED_PASSWORD", "123456")
-    if not 6 <= len(password.encode("utf-8")) <= 72:
-        raise ValueError("SEED_PASSWORD deve ter entre 6 e 72 bytes em UTF-8.")
+    password = os.environ.get(VARIAVEL_SENHA, SENHA_PADRAO)
+    validar_senha(password, VARIAVEL_SENHA)
+    # Valida as sobreposições já no --check, antes de parar a API.
+    senhas_do_ambiente(password)
     url = URL.create("mysql+pymysql", username=os.environ["DB_USER"],
                      password=os.environ["DB_PASSWORD"], host=os.environ["DB_HOST"],
                      port=int(os.environ.get("DB_PORT", "3306")), database=name)
@@ -99,6 +105,8 @@ def verificar_tenants(url, permitidos) -> None:
 
 def reset(url, password, config, permitidos=None):
     permitidos = slugs_permitidos() if permitidos is None else permitidos
+    # Antes do DROP: uma senha inválida não pode deixar o banco vazio.
+    senhas, senha_plataforma = senhas_do_ambiente(password)
     server = create_engine(url.set(database=None), isolation_level="AUTOCOMMIT")
     try:
         with server.connect() as conn:
@@ -116,7 +124,8 @@ def reset(url, password, config, permitidos=None):
                 command.upgrade(config, "head")
                 engine = create_engine(url)
                 try:
-                    seed_database(engine, senha=password, tenants=SLUGS_DEMO)
+                    seed_database(engine, senha=password, tenants=SLUGS_DEMO,
+                                  senhas=senhas, senha_plataforma=senha_plataforma)
                 finally:
                     engine.dispose()
                 print("Reset de demonstração concluído.", flush=True)

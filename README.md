@@ -196,6 +196,20 @@ Não são criados anexos nem enviados e-mails. As unidades da DAJ vêm das
 migrations.
 
 A senha inicial de todas as contas é `123456`, configurável por `SEED_PASSWORD`.
+Cada NPJ pode ter senha própria, e o administrador da plataforma também:
+
+| Variável | Contas afetadas |
+|---|---|
+| `SEED_PASSWORD` | todas, salvo as sobrepostas abaixo (padrão `123456`) |
+| `SEED_PASSWORD_DAJ_UFMG` | contas `@ufmg.br` do NPJ `daj-ufmg` |
+| `SEED_PASSWORD_NPJ_DEMO` | contas `@npjdemo.br` do NPJ `npj-demo` |
+| `SEED_PLATAFORMA_PASSWORD` | administrador da plataforma (`plataforma@npjdemo.br`) |
+
+O nome da variável de cada NPJ vem do slug, em maiúsculas e com `-` trocado
+por `_`. Variável ausente ou vazia cai em `SEED_PASSWORD`; sem nenhuma delas,
+todas as contas recebem a mesma senha, como antes. Cada senha precisa ter de 6
+a 72 bytes em UTF-8; fora disso o seed não grava nada. As senhas só valem para
+contas criadas na execução: reexecutar não troca a senha de conta existente.
 Reexecutar reconhece os identificadores da versão antiga, remove seus rótulos
 “Seed” e substitui CPFs zerados pelos sintéticos, preservando IDs, vínculos,
 senhas e outros campos editados. Não é preciso apagar o banco. Datas de
@@ -216,6 +230,14 @@ cenários que precisam exercitar endpoints e uploads.
 `scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, com
 todos os NPJs, aplica as migrations e executa `seed_database.py` nos dois NPJs
 de demonstração. As contas e senhas voltam aos valores do seed a cada execução.
+
+As senhas seguem as mesmas variáveis do seed (`SEED_PASSWORD`,
+`SEED_PASSWORD_DAJ_UFMG`, `SEED_PASSWORD_NPJ_DEMO` e
+`SEED_PLATAFORMA_PASSWORD`; ver [Dados de demonstração](#dados-de-demonstração-seed)).
+Como o banco é recriado, todas as contas voltam às senhas configuradas. Defina-as
+no `.env` da demo: o Compose repassa esse arquivo ao container do reset
+(`env_file`). Uma senha fora de 6 a 72 bytes faz o `--check` falhar antes de
+parar a API.
 
 Antes de parar a API (`--check`) e de novo antes do `DROP`, o reset lê a tabela
 `tenants` e **recusa** se houver NPJ com slug fora de `DEMO_TENANT_SLUGS`

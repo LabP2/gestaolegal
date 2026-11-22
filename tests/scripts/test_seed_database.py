@@ -410,3 +410,136 @@ def test_cnj_demonstracao_recusa_fora_do_formato():
     for args in ((0, 2026, 1), (10_000_000, 2026, 1), (1, 2026, 10_000)):
         with pytest.raises(ValueError):
             cnj_demonstracao(*args)
+
+
+# Senhas por NPJ e do admin da plataforma (valores fictícios).
+
+def _senhas_por_dominio(engine):
+    with engine.connect() as conn:
+        usuarios = conn.execute(select(metadata.tables["usuarios"])).mappings().all()
+        (admin,) = conn.execute(select(metadata.tables["plataforma_admins"])).mappings()
+    return usuarios, admin
+
+
+def test_senha_por_npj_e_da_plataforma(engine):
+    seed_database(engine, senha="BaseFicticia", tenants=DEMOS,
+                  senhas={"daj-ufmg": "Ficticia@1", "npj-demo": "Ficticia@2"},
+                  senha_plataforma="Ficticia@3")
+    usuarios, admin = _senhas_por_dominio(engine)
+    esperadas = {"ufmg.br": b"Ficticia@1", "npjdemo.br": b"Ficticia@2"}
+    assert {u["email"].split("@")[1] for u in usuarios} == set(esperadas)
+    for u in usuarios:
+        senha = esperadas[u["email"].split("@")[1]]
+        assert bcrypt.checkpw(senha, u["senha"].encode()), u["email"]
+        assert not bcrypt.checkpw(b"BaseFicticia", u["senha"].encode())
+    assert bcrypt.checkpw(b"Ficticia@3", admin["senha"].encode())
+    assert not bcrypt.checkpw(b"BaseFicticia", admin["senha"].encode())
+
+
+def test_npj_sem_senha_propria_e_plataforma_caem_em_senha(engine):
+    seed_database(engine, senha="BaseFicticia", tenants=DEMOS, senhas={"npj-demo": "Ficticia@2"})
+    usuarios, admin = _senhas_por_dominio(engine)
+    for u in usuarios:
+        senha = b"Ficticia@2" if u["email"].endswith("@npjdemo.br") else b"BaseFicticia"
+        assert bcrypt.checkpw(senha, u["senha"].encode()), u["email"]
+    assert bcrypt.checkpw(b"BaseFicticia", admin["senha"].encode())
+
+
+def test_reexecucao_com_senhas_novas_nao_troca_senhas(engine):
+    seed_database(engine, senha="BaseFicticia", tenants=DEMOS)
+    assert not seed_database(engine, senha="BaseFicticia", tenants=DEMOS,
+                             senhas={"daj-ufmg": "Ficticia@1", "npj-demo": "Ficticia@2"},
+                             senha_plataforma="Ficticia@3")
+    usuarios, admin = _senhas_por_dominio(engine)
+    for registro in (*usuarios, admin):
+        assert bcrypt.checkpw(b"BaseFicticia", registro["senha"].encode())
+
+
+@pytest.mark.parametrize("kwargs,variavel", [
+    ({"senhas": {"daj-ufmg": "12345"}}, "SEED_PASSWORD_DAJ_UFMG"),
+    ({"senhas": {"npj-demo": "x" * 73}}, "SEED_PASSWORD_NPJ_DEMO"),
+    ({"senhas": {"npj-demo": "ç" * 37}}, "SEED_PASSWORD_NPJ_DEMO"),  # 74 bytes
+    ({"senha_plataforma": "12345"}, "SEED_PLATAFORMA_PASSWORD"),
+    ({"senha_plataforma": ""}, "SEED_PLATAFORMA_PASSWORD"),
+])
+def test_senhas_fora_do_tamanho_nao_gravam(engine, kwargs, variavel):
+    antes = snapshot(engine)
+    with pytest.raises(ValueError, match=variavel):
+        seed_database(engine, senha="BaseFicticia", tenants=DEMOS, **kwargs)
+    assert snapshot(engine) == antes
+
+
+def test_senha_para_npj_fora_da_demonstracao(engine):
+    with pytest.raises(ValueError, match="npj-real"):
+        seed_database(engine, senha="BaseFicticia", senhas={"npj-real": "Ficticia@1"})
+
+
+def test_variavel_de_senha_derivada_do_slug():
+    from scripts.seed_database import variavel_senha_npj
+    assert variavel_senha_npj("daj-ufmg") == "SEED_PASSWORD_DAJ_UFMG"
+    assert variavel_senha_npj("npj-demo") == "SEED_PASSWORD_NPJ_DEMO"
+
+
+def test_senhas_do_ambiente_com_fallback():
+    from scripts.seed_database import senhas_do_ambiente
+    assert senhas_do_ambiente("BaseFicticia", {}) == (
+        {"daj-ufmg": "BaseFicticia", "npj-demo": "BaseFicticia"}, "BaseFicticia")
+    assert senhas_do_ambiente("BaseFicticia", {
+        "SEED_PASSWORD_DAJ_UFMG": "Ficticia@1", "SEED_PASSWORD_NPJ_DEMO": "",
+        "SEED_PLATAFORMA_PASSWORD": "Ficticia@3",
+    }) == ({"daj-ufmg": "Ficticia@1", "npj-demo": "BaseFicticia"}, "Ficticia@3")
+
+
+@pytest.fixture
+def cli(monkeypatch):
+    import scripts.seed_database as modulo
+    from collections import Counter
+    from unittest.mock import MagicMock
+
+    for chave, valor in {"FLASK_ENV": "development", "DB_USER": "u", "DB_PASSWORD": "p",
+                         "DB_HOST": "h", "DB_NAME": "n"}.items():
+        monkeypatch.setenv(chave, valor)
+    for chave in ("SEED_PASSWORD", "SEED_PASSWORD_DAJ_UFMG", "SEED_PASSWORD_NPJ_DEMO",
+                  "SEED_PLATAFORMA_PASSWORD"):
+        monkeypatch.delenv(chave, raising=False)
+    monkeypatch.setattr(modulo, "load_dotenv", lambda *_: None)
+    monkeypatch.setattr(modulo, "create_engine", MagicMock())
+    chamada = MagicMock(return_value=Counter())
+    monkeypatch.setattr(modulo, "seed_database", chamada)
+    return chamada
+
+
+def test_cli_sem_variaveis_novas_usa_seed_password(cli, monkeypatch):
+    monkeypatch.setenv("SEED_PASSWORD", "BaseFicticia")
+    assert main([]) == 0
+    kwargs = cli.call_args.kwargs
+    assert kwargs["senha"] == "BaseFicticia"
+    assert kwargs["senhas"] == {"daj-ufmg": "BaseFicticia", "npj-demo": "BaseFicticia"}
+    assert kwargs["senha_plataforma"] == "BaseFicticia"
+
+
+def test_cli_sem_nenhuma_variavel_usa_padrao(cli):
+    assert main([]) == 0
+    kwargs = cli.call_args.kwargs
+    assert kwargs["senha"] == "123456"
+    assert set(kwargs["senhas"].values()) == {"123456"}
+    assert kwargs["senha_plataforma"] == "123456"
+
+
+def test_cli_le_senha_por_npj_e_da_plataforma(cli, monkeypatch):
+    monkeypatch.setenv("SEED_PASSWORD_DAJ_UFMG", "Ficticia@1")
+    monkeypatch.setenv("SEED_PASSWORD_NPJ_DEMO", "Ficticia@2")
+    monkeypatch.setenv("SEED_PLATAFORMA_PASSWORD", "Ficticia@3")
+    assert main([]) == 0
+    kwargs = cli.call_args.kwargs
+    assert kwargs["senhas"] == {"daj-ufmg": "Ficticia@1", "npj-demo": "Ficticia@2"}
+    assert kwargs["senha_plataforma"] == "Ficticia@3"
+
+
+@pytest.mark.parametrize("variavel", ["SEED_PASSWORD", "SEED_PASSWORD_DAJ_UFMG",
+                                      "SEED_PASSWORD_NPJ_DEMO", "SEED_PLATAFORMA_PASSWORD"])
+def test_cli_recusa_senha_curta(cli, monkeypatch, capsys, variavel):
+    monkeypatch.setenv(variavel, "12345")
+    assert main([]) == 1
+    cli.assert_not_called()
+    assert variavel in capsys.readouterr().err
