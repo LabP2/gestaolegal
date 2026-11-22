@@ -5,10 +5,14 @@ from sqlalchemy.engine import URL
 
 from scripts import reset_demo_database as resetter
 
+SENHAS_NOVAS = ("SEED_PASSWORD_DAJ_UFMG", "SEED_PASSWORD_NPJ_DEMO", "SEED_PLATAFORMA_PASSWORD")
+
 
 @pytest.fixture
 def demo_env(monkeypatch):
     monkeypatch.setattr(resetter, "load_dotenv", lambda *_: None)
+    for key in SENHAS_NOVAS:
+        monkeypatch.delenv(key, raising=False)
     for key, value in {
         "FLASK_ENV": "testing", "DB_USER": "demo", "DB_PASSWORD": "p@ss%word",
         "DB_HOST": "db", "DB_PORT": "3307", "DB_NAME": "demo",
@@ -48,6 +52,8 @@ def test_rejects_system_database(demo_env, monkeypatch, name):
 
 @pytest.fixture
 def operations(monkeypatch):
+    for key in SENHAS_NOVAS:
+        monkeypatch.delenv(key, raising=False)
     server, engine = MagicMock(), MagicMock()
     conn = server.connect.return_value.__enter__.return_value
     conn.execute.return_value.scalar.return_value = 1
@@ -72,7 +78,9 @@ def test_reset_order_and_cleanup(operations):
     assert [c[0] for c in steps.mock_calls] == ["ddl", "ddl", "migrate", "seed"]
     assert conn.exec_driver_sql.call_args_list[0].args == ("DROP DATABASE IF EXISTS `demo`",)
     upgrade.assert_called_once_with(config, "head")
-    seed.assert_called_once_with(engine, senha="123456", tenants=resetter.SLUGS_DEMO)
+    seed.assert_called_once_with(
+        engine, senha="123456", tenants=resetter.SLUGS_DEMO,
+        senhas={"daj-ufmg": "123456", "npj-demo": "123456"}, senha_plataforma="123456")
     assert "RELEASE_LOCK" in str(conn.execute.call_args.args[0])
     engine.dispose.assert_called_once()
     server.dispose.assert_called_once()
@@ -243,3 +251,61 @@ def test_check_sem_conexao_falha_antes_de_parar_a_api(demo_env, monkeypatch, cap
     erro = capsys.readouterr().err
     assert "NPJs do banco" in erro and "p@ss%word" not in erro
     server.dispose.assert_called_once()
+
+
+# Senhas por NPJ e do admin da plataforma (valores fictícios).
+
+def test_reset_repassa_senha_por_npj_e_da_plataforma(operations, monkeypatch):
+    _, engine, _, _, seed, _ = operations
+    monkeypatch.setenv("SEED_PASSWORD_DAJ_UFMG", "Ficticia@1")
+    monkeypatch.setenv("SEED_PASSWORD_NPJ_DEMO", "Ficticia@2")
+    monkeypatch.setenv("SEED_PLATAFORMA_PASSWORD", "Ficticia@3")
+    resetter.reset(URL.create("mysql+pymysql", database="demo"), "BaseFicticia", object())
+    seed.assert_called_once_with(
+        engine, senha="BaseFicticia", tenants=resetter.SLUGS_DEMO,
+        senhas={"daj-ufmg": "Ficticia@1", "npj-demo": "Ficticia@2"},
+        senha_plataforma="Ficticia@3")
+
+
+def test_reset_sem_sobreposicao_usa_seed_password(operations, monkeypatch):
+    _, engine, _, _, seed, _ = operations
+    monkeypatch.setenv("SEED_PASSWORD_NPJ_DEMO", "")  # vazia equivale a ausente
+    resetter.reset(URL.create("mysql+pymysql", database="demo"), "BaseFicticia", object())
+    assert seed.call_args.kwargs["senhas"] == {"daj-ufmg": "BaseFicticia", "npj-demo": "BaseFicticia"}
+    assert seed.call_args.kwargs["senha_plataforma"] == "BaseFicticia"
+
+
+@pytest.mark.parametrize("key", SENHAS_NOVAS)
+@pytest.mark.parametrize("value", ["12345", "x" * 73, "ç" * 37])
+def test_configuration_recusa_sobreposicao_fora_do_tamanho(demo_env, monkeypatch, key, value):
+    monkeypatch.setenv(key, value)
+    with pytest.raises(ValueError, match=key):
+        resetter.configuration()
+
+
+@pytest.mark.parametrize("key", SENHAS_NOVAS)
+def test_check_recusa_sobreposicao_invalida_antes_de_ler_o_banco(demo_env, monkeypatch, capsys, key):
+    monkeypatch.setenv(key, "curta")
+    leitura = MagicMock()
+    monkeypatch.setattr(resetter, "verificar_tenants", leitura)
+    monkeypatch.setattr(resetter.sys, "argv", ["reset_demo_database.py", "--check"])
+    assert resetter.main() == 1
+    leitura.assert_not_called()
+    assert key in capsys.readouterr().err
+
+
+def test_reset_com_sobreposicao_invalida_nao_apaga_o_banco(operations, monkeypatch):
+    _, _, conn, upgrade, seed, _ = operations
+    monkeypatch.setenv("SEED_PLATAFORMA_PASSWORD", "curta")
+    with pytest.raises(ValueError, match="SEED_PLATAFORMA_PASSWORD"):
+        resetter.reset(URL.create("mysql+pymysql", database="demo"), "123456", object())
+    conn.exec_driver_sql.assert_not_called()
+    upgrade.assert_not_called()
+    seed.assert_not_called()
+
+
+def test_configuration_aceita_sobreposicoes_validas(demo_env, monkeypatch):
+    monkeypatch.setenv("SEED_PASSWORD_DAJ_UFMG", "Ficticia@1")
+    monkeypatch.setenv("SEED_PLATAFORMA_PASSWORD", "x" * 72)
+    _, password, _ = resetter.configuration()
+    assert password == "123456"

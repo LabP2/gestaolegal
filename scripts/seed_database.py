@@ -10,6 +10,12 @@ qualquer caso, garante também o administrador da plataforma de demonstração.
 
 Nada aqui aciona o DJEN de verdade: os números CNJ dos processos usam o
 segmento 0, que não existe, e a OAB do orientador fica pausada.
+
+Senhas das contas novas: `SEED_PASSWORD` (padrão "123456") vale para todas.
+`SEED_PASSWORD_<SLUG>` (slug em maiúsculas, hífen vira sublinhado, como
+`SEED_PASSWORD_NPJ_DEMO`) a substitui nas contas daquele NPJ, e
+`SEED_PLATAFORMA_PASSWORD`, no administrador da plataforma. Contas que já
+existem mantêm a senha.
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ import os
 import runpy
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -111,6 +117,38 @@ TENANTS_DEMO = {
     ),
 }
 SLUGS_DEMO = tuple(TENANTS_DEMO)
+
+SENHA_PADRAO = "123456"
+VARIAVEL_SENHA = "SEED_PASSWORD"
+VARIAVEL_SENHA_PLATAFORMA = "SEED_PLATAFORMA_PASSWORD"
+
+
+def variavel_senha_npj(slug: str) -> str:
+    """Variável que sobrepõe SEED_PASSWORD nas contas do NPJ: daj-ufmg → SEED_PASSWORD_DAJ_UFMG."""
+    return f"{VARIAVEL_SENHA}_{slug.upper().replace('-', '_')}"
+
+
+def validar_senha(senha: str, variavel: str) -> None:
+    # O bcrypt ignora o que passa de 72 bytes.
+    if not 6 <= len(senha.encode("utf-8")) <= 72:
+        raise ValueError(f"{variavel} deve ter entre 6 e 72 bytes em UTF-8.")
+
+
+def senhas_do_ambiente(senha: str, environ: Mapping[str, str] | None = None
+                       ) -> tuple[dict[str, str], str]:
+    """Senha de cada NPJ de demonstração e do admin da plataforma, já validadas.
+
+    Variável ausente ou vazia cai em `senha` (o valor de SEED_PASSWORD).
+    """
+    environ = os.environ if environ is None else environ
+    senhas = {}
+    for slug in TENANTS_DEMO:
+        variavel = variavel_senha_npj(slug)
+        senhas[slug] = environ.get(variavel) or senha
+        validar_senha(senhas[slug], variavel)
+    plataforma = environ.get(VARIAVEL_SENHA_PLATAFORMA) or senha
+    validar_senha(plataforma, VARIAVEL_SENHA_PLATAFORMA)
+    return senhas, plataforma
 
 
 def cpf_demonstracao(base: int) -> str:
@@ -409,9 +447,24 @@ def garantir_tenant(conn: Connection, demo: TenantDemo, agora: datetime,
 
 def seed_database(engine: Engine, *, senha: str, sigla: str | None = None,
                   dry_run: bool = False, hoje: date | None = None,
-                  tenants: Sequence[str] = (TENANT_PADRAO_SLUG,)) -> Counter:
-    if not 6 <= len(senha.encode("utf-8")) <= 72:
-        raise ValueError("SEED_PASSWORD deve ter entre 6 e 72 bytes em UTF-8.")
+                  tenants: Sequence[str] = (TENANT_PADRAO_SLUG,),
+                  senhas: Mapping[str, str] | None = None,
+                  senha_plataforma: str | None = None) -> Counter:
+    """Semeia os NPJs de demonstração.
+
+    `senha` vale para todas as contas novas; `senhas` (slug → senha) a
+    substitui nas contas de cada NPJ, e `senha_plataforma`, no admin da
+    plataforma. Contas existentes mantêm a senha.
+    """
+    validar_senha(senha, VARIAVEL_SENHA)
+    senhas = dict(senhas or {})
+    fora = [slug for slug in senhas if slug not in TENANTS_DEMO]
+    if fora:
+        raise ValueError("Senha para NPJ fora da demonstração: " + ", ".join(fora))
+    for slug, valor in senhas.items():
+        validar_senha(valor, variavel_senha_npj(slug))
+    senha_plataforma = senha if senha_plataforma is None else senha_plataforma
+    validar_senha(senha_plataforma, VARIAVEL_SENHA_PLATAFORMA)
     if isinstance(tenants, str) or not tenants:
         raise ValueError("Informe ao menos um tenant de demonstração.")
     desconhecidos = [slug for slug in tenants if slug not in TENANTS_DEMO]
@@ -422,11 +475,11 @@ def seed_database(engine: Engine, *, senha: str, sigla: str | None = None,
     criados: Counter[str] = Counter()
     with engine.connect() as conn:
         with conn.begin() as transaction:
-            garantir_plataforma_admin(conn, senha, datetime.combine(hoje, time(9)), criados)
+            garantir_plataforma_admin(conn, senha_plataforma, datetime.combine(hoje, time(9)), criados)
             for slug in dict.fromkeys(tenants):
                 demo = TENANTS_DEMO[slug]
                 tenant_id = garantir_tenant(conn, demo, datetime.combine(hoje, time(9)), criados)
-                Seed(conn, tenant_id, demo, criados).carregar(senha, sigla, hoje)
+                Seed(conn, tenant_id, demo, criados).carregar(senhas.get(slug, senha), sigla, hoje)
             if dry_run:
                 transaction.rollback()
         return criados
@@ -458,9 +511,12 @@ def main(argv=None) -> int:
         url = URL.create("mysql+pymysql", username=os.environ["DB_USER"],
             password=os.environ["DB_PASSWORD"], host=os.environ["DB_HOST"],
             port=int(os.environ.get("DB_PORT", "3306")), database=os.environ["DB_NAME"])
+        senha = os.environ.get(VARIAVEL_SENHA, SENHA_PADRAO)
+        validar_senha(senha, VARIAVEL_SENHA)
+        senhas, senha_plataforma = senhas_do_ambiente(senha)
         engine = create_engine(url)
-        criados = seed_database(engine, senha=os.environ.get("SEED_PASSWORD", "123456"),
-            sigla=args.unidade, dry_run=args.dry_run, tenants=tenants)
+        criados = seed_database(engine, senha=senha, sigla=args.unidade, dry_run=args.dry_run,
+            tenants=tenants, senhas=senhas, senha_plataforma=senha_plataforma)
     except (ValueError, SQLAlchemyError) as exc:
         # Erros SQL podem carregar parâmetros, inclusive hashes de senha.
         mensagem = str(exc) if isinstance(exc, ValueError) else "Falha no banco. Confira a conexão e aplique as migrations. A transação foi desfeita."
