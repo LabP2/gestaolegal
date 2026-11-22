@@ -136,15 +136,35 @@ def separar_oab(valor: str | None) -> tuple[str, str] | None:
     return digitos.lstrip("0") or "0", letras
 
 
+def demo_ligado() -> bool:
+    """`DEMO_MODE` do app em curso (os testes alteram `app.config`)."""
+    from flask import current_app, has_app_context
+
+    if has_app_context():
+        return bool(current_app.config.get("DEMO_MODE", Config.DEMO_MODE))
+    return Config.DEMO_MODE
+
+
+def cliente_padrao() -> DJENClient:
+    """Cliente da API real ou, no ambiente de demonstração, o DJEN fictício."""
+    if demo_ligado():
+        from gestaolegal.integrations.djen_demo import transporte_demo
+
+        return DJENClient(base_url=Config.DJEN_API_URL, transporte=transporte_demo)
+    return DJENClient(base_url=Config.DJEN_API_URL)
+
+
 def link_certidao(hash_: str | None) -> str | None:
     if not hash_:
         return None
+    if hash_.startswith("demo-"):
+        return None  # publicação fictícia: não há certidão no DJEN
     return f"{Config.DJEN_API_URL}/api/v1/comunicacao/{hash_}/certidao"
 
 
 class DJENService:
     def __init__(self, client: DJENClient | None = None):
-        self.client = client or DJENClient(base_url=Config.DJEN_API_URL)
+        self.client = client or cliente_padrao()
         self.repo = DjenComunicacaoRepository()
         self.sincronizacoes = DjenSincronizacaoRepository()
         self.processos = ProcessoRepository()

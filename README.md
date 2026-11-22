@@ -233,11 +233,29 @@ mostram o aviso “Ambiente de demonstração: os dados são apagados todos os d
 `GET /api/ambiente`, que devolve só `{"demo": true|false}`; por isso a mesma
 imagem serve à produção e à demo. Sem a variável (o padrão), nada aparece.
 
+### DJEN fictício na demonstração
+
+Com `DEMO_MODE=true`, o cliente do DJEN não acessa a rede: ele usa o
+transporte de `gestaolegal/integrations/djen_demo.py`, que responde assim:
+
+- processo com CNJ de demonstração (segmento de justiça 0, como os do seed):
+  histórico fixo de publicações inventadas, até a sentença;
+- OAB de demonstração (número iniciado por `9900`): publicações recentes de um
+  processo não cadastrado, que caem em "Publicações sem caso";
+- qualquer CNJ, OAB ou nome de parte real: resposta vazia, sem erro.
+
+Nenhuma publicação verdadeira entra na demo, e as telas do DJEN mostram uma
+nota dizendo isso. `flask --app 'gestaolegal:create_app()' djen semear-demo`
+liga o DJEN do NPJ `npj-demo`, ativa a OAB do orientador e faz a primeira
+captura. Sem `DEMO_MODE`, o comando sai sem fazer nada. O reset abaixo já o
+executa depois do seed.
+
 ### Reset automático do banco de demo
 
 `scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, com
 todos os NPJs, aplica as migrations e executa `seed_database.py` nos dois NPJs
-de demonstração. As contas e senhas voltam aos valores do seed a cada execução.
+de demonstração. Em seguida roda `flask djen semear-demo` (veja acima); se
+essa etapa falhar, a API sobe sem as publicações fictícias. As contas e senhas voltam aos valores do seed a cada execução.
 
 As senhas seguem as mesmas variáveis do seed (`SEED_PASSWORD`,
 `SEED_PASSWORD_DAJ_UFMG`, `SEED_PASSWORD_NPJ_DEMO` e

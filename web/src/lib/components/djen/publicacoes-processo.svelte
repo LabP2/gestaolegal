@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProgressoBusca from '#lib/components/djen/progresso-busca.svelte';
+	import AvisoDjenDemo from '#lib/components/djen/aviso-djen-demo.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -115,6 +116,7 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
+			<AvisoDjenDemo />
 			{#if processo.numero_cnj}<p class="text-sm text-muted-foreground">
 					A busca consulta todas as páginas do histórico disponível no DJEN, sem filtro de período
 					ou tribunal, e preserva as publicações já recebidas.

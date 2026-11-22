@@ -1670,3 +1670,19 @@ test('Aviso de demonstração: aparece no login e no topo do painel com DEMO_MOD
   await expect(page.getByRole('heading', { name: 'Sobre', level: 1 })).toBeVisible();
   await expect(aviso).toHaveText(/apagados todos os dias à 0h/);
 });
+
+test('DJEN na demonstração: nota de publicações fictícias só com DEMO_MODE', async ({ page }) => {
+  const state = await acervoSetup(page);
+  await page.route('**/api/ambiente', route => route.fulfill({ json: { success: true, data: { demo: true } } }));
+  await page.goto('/djen');
+  await expect(page.getByTestId('aviso-djen-demo')).toHaveText(/Demonstração: as publicações do DJEN são fictícias e a consulta ao DJEN real está desativada/);
+  expect(state.errors).toEqual([]);
+});
+
+test('DJEN fora da demonstração: sem nota de publicações fictícias', async ({ page }) => {
+  const state = await acervoSetup(page);
+  await page.goto('/djen');
+  await expect(page.getByRole('checkbox', { name: 'Selecionar publicação 98001' })).toBeVisible();
+  await expect(page.getByTestId('aviso-djen-demo')).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});

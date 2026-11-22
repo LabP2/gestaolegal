@@ -12,6 +12,11 @@ A senha é pedida no terminal, sem eco, e não aparece no histórico do shell.
 `flask djen sincronizar [--tenant SLUG]` roda a captura do DJEN para os NPJs
 com a chave ligada (docs/plano-djen.md, §4). Sai sem fazer nada com
 `DJEN_SYNC_ENABLED` desligado. O agendamento (cron no host) está no README.
+
+`flask djen semear-demo [--tenant npj-demo]` só funciona com `DEMO_MODE=true`:
+liga o DJEN do NPJ de demonstração, ativa as OABs dele e roda uma captura no
+DJEN fictício (gestaolegal/integrations/djen_demo.py), para a demo já abrir
+com publicações. O reset da demo (scripts/reset_demo.sh) chama este comando.
 """
 
 import click
@@ -123,3 +128,52 @@ def sincronizar_djen(
 def sincronizar(slug: str | None, janela_dias: int | None, max_processos: int | None) -> None:
     """Captura as publicações do DJEN (rotina agendada por cron no host)."""
     sincronizar_djen(slug, janela_dias, max_processos)
+
+
+def semear_djen_demo(slug: str = "npj-demo", echo=click.echo) -> dict | None:
+    """Liga o DJEN do NPJ de demonstração e captura as publicações fictícias.
+
+    Recusa (sem erro) fora do `DEMO_MODE`: em produção, ligar o DJEN de um NPJ
+    é decisão da plataforma, e a captura iria à API real.
+    """
+    from gestaolegal.repositories.tenant_repository import TenantRepository
+    from gestaolegal.services.djen_service import DJENService, demo_ligado
+    from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
+
+    if not demo_ligado():
+        echo("DEMO_MODE desligado: nada a fazer.")
+        return None
+
+    with current_app.test_request_context():
+        try:
+            repo = TenantRepository()
+            with sem_tenant("djen: ligar o DJEN do NPJ de demonstração"):
+                tenant_id = repo.ligar_djen_demonstracao(slug)
+            if tenant_id is None:
+                raise click.ClickException(f"NPJ não encontrado: {slug}")
+            repo.session.commit()
+            close_session()
+        except Exception as e:
+            close_session(e)
+            raise
+
+    with current_app.test_request_context():
+        try:
+            with contexto_tenant(tenant_id):
+                registro = DJENService().sincronizar()
+            close_session()
+        except Exception as e:
+            close_session(e)
+            raise
+    echo(
+        f"{slug}: DJEN ligado; {registro['novas']} publicação(ões) fictícia(s), "
+        f"{registro['vinculadas']} vinculada(s)"
+    )
+    return registro
+
+
+@djen_cli.command("semear-demo")
+@click.option("--tenant", "slug", default="npj-demo", help="Slug do NPJ de demonstração.")
+def semear_demo(slug: str) -> None:
+    """Liga o DJEN fictício no NPJ de demonstração (só com DEMO_MODE=true)."""
+    semear_djen_demo(slug)
