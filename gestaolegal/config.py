@@ -174,6 +174,11 @@ class Config:
     PASSWORD_RESET_JANELA_MINUTES: ClassVar[int] = 15
     PASSWORD_MIN_LENGTH: ClassVar[int] = 8
 
+    # Ambiente de demonstração: liga o aviso na tela de login e no painel de
+    # que os dados são fictícios e apagados periodicamente. Desligado em
+    # produção (padrão); a rota pública GET /api/ambiente expõe só o booleano.
+    DEMO_MODE: ClassVar[bool] = _parse_bool(os.environ.get("DEMO_MODE"))
+
     # DJEN (docs/plano-djen.md, §4 "Configuração"). DJEN_SYNC_ENABLED é a
     # trava do ambiente: desligada, a rotina sai sem chamar a API, mesmo para
     # NPJs com `tenants.djen_ativo` ligado. Ligar em QA ou produção exige

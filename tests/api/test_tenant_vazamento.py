@@ -275,6 +275,8 @@ ROTAS: dict[tuple[str, str], Rota] = {
     ("POST", "/api/auth/forgot-password"): Rota("publica"),
     ("POST", "/api/auth/reset-password"): Rota("publica"),
     ("GET", "/api/auth/reset-password/<token>/validate"): Rota("publica"),
+    # Só o booleano DEMO_MODE; não toca o banco (test_ambiente_api.py).
+    ("GET", "/api/ambiente"): Rota("publica"),
     # --- arquivos gerais ---
     ("GET", "/api/arquivo/"): Rota("colecao"),
     ("POST", "/api/arquivo/"): Rota(

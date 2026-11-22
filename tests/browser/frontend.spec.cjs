@@ -126,6 +126,7 @@ async function setup(page, overrides = {}) {
     else if (path === "/api/user/me") data = db.user;
     else if (path === "/api/user/opcoes") data = { items: [db.user] };
     else if (path === "/api/unidades") data = unidades;
+    else if (path === "/api/ambiente") data = { demo: db.demo === true };
     else if (path.endsWith("/lembretes") || path.endsWith("/arquivos"))
       data = [];
     await route.fulfill({ json: { success: true, data } });
@@ -1647,4 +1648,25 @@ test('Sobre: versão, licença e links; menu DJEN em ordem', async ({ page }) =>
   await page.getByRole('button', { name: 'DJEN' }).click();
   const djen = page.locator('a[href^="/djen"]');
   await expect(djen).toHaveText(['Publicações', 'Monitoramento', 'Acervo para treino (experimental)']);
+});
+
+test('Aviso de demonstração: ausente no login e no painel sem DEMO_MODE', async ({ page }) => {
+  const aviso = page.getByTestId('aviso-demo');
+  await setup(page);
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: 'Acesse sua conta' })).toBeVisible();
+  await expect(aviso).toHaveCount(0);
+  await page.goto('/sobre');
+  await expect(page.getByRole('heading', { name: 'Sobre', level: 1 })).toBeVisible();
+  await expect(aviso).toHaveCount(0);
+});
+
+test('Aviso de demonstração: aparece no login e no topo do painel com DEMO_MODE', async ({ page }) => {
+  const aviso = page.getByTestId('aviso-demo');
+  await setup(page, { demo: true });
+  await page.goto('/login');
+  await expect(aviso).toHaveText('Ambiente de demonstração: os dados são apagados todos os dias à 0h. Não envie documentos nem dados reais.');
+  await page.goto('/sobre');
+  await expect(page.getByRole('heading', { name: 'Sobre', level: 1 })).toBeVisible();
+  await expect(aviso).toHaveText(/apagados todos os dias à 0h/);
 });
