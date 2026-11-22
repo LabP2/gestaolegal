@@ -1,6 +1,7 @@
 <script lang="ts">
 	import AppFooter from '#lib/components/app-footer.svelte';
 	import AppSidebar from '#lib/components/app-sidebar.svelte';
+	import AvisoDemo from '#lib/components/aviso-demo.svelte';
 	import DynamicBreadcrumb from '#lib/components/dynamic-breadcrumb.svelte';
 	import GlobalSearchDialog from '#lib/components/global-search-dialog.svelte';
 	import NotificacaoBell from '#lib/components/notificacao-bell.svelte';
@@ -55,6 +56,7 @@
 <Sidebar.Provider>
 	<AppSidebar {user} />
 	<Sidebar.Inset>
+		<AvisoDemo />
 		<header class="flex h-16 shrink-0 items-center gap-4 border-b px-4">
 			<div class="flex items-center gap-2">
 				<Sidebar.Trigger class="-ml-1" />

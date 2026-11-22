@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import AppFooter from '#lib/components/app-footer.svelte';
+	import AvisoDemo from '#lib/components/aviso-demo.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import * as Form from '#lib/components/ui/form/index.ts';
@@ -85,6 +86,8 @@
 				alt="Gestão Legal"
 				class="mx-auto w-96 max-w-full drop-shadow-lg"
 			/>
+
+			<AvisoDemo variante="cartao" />
 
 			<div class="space-y-8 rounded-xl bg-white/80 p-8 shadow-lg backdrop-blur-md">
 				<!-- O nome do sistema já aparece no logo acima; aqui basta a ação. -->

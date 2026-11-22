@@ -3,6 +3,7 @@ export type { ApiResponse, ApiError } from './api-response';
 export { ApiException } from './api-response';
 
 // Domain types
+export type { Ambiente } from './ambiente';
 export type { Me, TenantIdentificacao, User, UserOption } from './user';
 export type { OrientacaoJuridica } from './orientacao-juridica';
 export type {

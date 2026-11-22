@@ -211,6 +211,14 @@ O seed via API existente, `scripts/seed_local.py`, continua disponível para
 cenários que precisam exercitar endpoints e uploads.
 
 
+### Aviso de ambiente de demonstração
+
+Com `DEMO_MODE=true` no `.env` da API, a tela de login e o topo do painel
+mostram o aviso “Ambiente de demonstração: os dados são apagados todos os dias
+à 0h. Não envie documentos nem dados reais.”. O front consulta a rota pública
+`GET /api/ambiente`, que devolve só `{"demo": true|false}`; por isso a mesma
+imagem serve à produção e à demo. Sem a variável (o padrão), nada aparece.
+
 ### Reset automático do banco de demo
 
 `scripts/reset_demo.sh` para a API, **apaga e recria o banco inteiro**, com
