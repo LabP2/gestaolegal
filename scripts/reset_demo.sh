@@ -9,11 +9,16 @@ flock -n 9 || { echo 'reset-demo: outra execução está em andamento.'; exit 1;
 service="${RESET_API_SERVICE:-api}"
 compose=(docker compose -f "${RESET_COMPOSE_FILE:-docker-compose.yml}")
 run=("${compose[@]}" run --rm --no-deps -T --entrypoint python "$service" scripts/reset_demo_database.py)
+# Com DEMO_MODE=true, liga o DJEN fictício no NPJ de demonstração e captura
+# as primeiras publicações; sem DEMO_MODE, o comando sai sem fazer nada.
+semear=("${compose[@]}" run --rm --no-deps -T --entrypoint flask "$service" --app 'gestaolegal:create_app()' djen semear-demo)
 
 # Valida o alvo antes de interromper a API.
 "${run[@]}" --check
 "${compose[@]}" stop "$service"
 # Se falhar, deixa a API parada para não servir um banco parcial.
 "${run[@]}"
+# Publicações fictícias são acessório: se falharem, a demo sobe sem elas.
+"${semear[@]}" || echo 'reset-demo: publicações fictícias do DJEN não foram criadas.'
 "${compose[@]}" start "$service"
 echo 'reset-demo: API iniciada.'

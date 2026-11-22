@@ -108,10 +108,12 @@ def test_migration_failure_stops_before_seed(operations):
 
 
 @pytest.mark.parametrize("fail_at,expected", [
-    ("", ["check", "stop", "reset", "start"]),
+    ("", ["check", "stop", "reset", "semear", "start"]),
     ("check", ["check"]),
     ("stop", ["check", "stop"]),
     ("reset", ["check", "stop", "reset"]),
+    # As publicações fictícias do DJEN são acessório: a API sobe mesmo assim.
+    ("semear", ["check", "stop", "reset", "semear", "start"]),
 ])
 def test_wrapper_sequence(tmp_path, monkeypatch, fail_at, expected):
     import os
@@ -128,6 +130,7 @@ case "$*" in
   *--check) step=check ;;
   *" stop "*) step=stop ;;
   *" start "*) step=start ;;
+  *semear-demo*) step=semear ;;
   *) step=reset ;;
 esac
 printf '%s\\n' "$step" >> "$TEST_LOG"
@@ -139,7 +142,7 @@ if [ "$step" = "$FAIL_AT" ]; then exit 1; fi
     monkeypatch.setenv("FAIL_AT", fail_at)
     result = subprocess.run(["bash", str(scripts / "reset_demo.sh")], cwd="/tmp",
                             capture_output=True, text=True)
-    assert (result.returncode == 0) == (not fail_at), result.stderr
+    assert (result.returncode == 0) == (fail_at in ("", "semear")), result.stderr
     assert (tmp_path / "calls").read_text().splitlines() == expected
 
 

@@ -44,6 +44,37 @@ class TenantRepository(BaseRepository):
         stmt = select(tenants).order_by(tenants.c.id)
         return [Tenant(**row) for row in self.session.execute(stmt).mappings()]
 
+    def ligar_djen_demonstracao(self, slug: str) -> int | None:
+        """Liga o DJEN e as OABs do NPJ (`flask djen semear-demo`, só na demo).
+
+        Ativa também os monitores de OAB já criados, que guardam a pausa
+        separada da OAB. Devolve o id do NPJ, ou None se o slug não existe.
+        """
+        from gestaolegal.database.tables import djen_monitoramentos, djen_oabs
+
+        self.exigir_sem_tenant()
+        tenant_id = self.session.execute(
+            select(tenants.c.id).where(tenants.c.slug == slug)
+        ).scalar_one_or_none()
+        if tenant_id is None:
+            return None
+        self.session.execute(
+            sql_update(tenants).where(tenants.c.id == tenant_id).values(djen_ativo=True)
+        )
+        self.session.execute(
+            sql_update(djen_oabs).where(djen_oabs.c.tenant_id == tenant_id).values(ativo=True)
+        )
+        self.session.execute(
+            sql_update(djen_monitoramentos)
+            .where(
+                djen_monitoramentos.c.tenant_id == tenant_id,
+                djen_monitoramentos.c.tipo == "oab",
+                djen_monitoramentos.c.removido.is_(False),
+            )
+            .values(ativo=True)
+        )
+        return tenant_id
+
     # --- plataforma -------------------------------------------------------
 
     def listar(self, ativo: bool | None = None, q: str = "") -> list[Tenant]:
