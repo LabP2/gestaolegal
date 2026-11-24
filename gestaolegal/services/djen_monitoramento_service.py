@@ -1,8 +1,7 @@
 """Monitoramento por unidade, consultas compartilhadas e logs com retenção."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import timedelta
 
 from gestaolegal.config import Config
 from gestaolegal.repositories.djen_monitoramento_repository import (
@@ -14,10 +13,7 @@ from gestaolegal.exceptions import (
     BusinessLogicException,
 )
 from gestaolegal.utils.cnj import normalizar_cnj
-
-
-def agora():
-    return datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+from gestaolegal.utils.tempo import agora_utc, hoje_brasilia, utc_para_brasilia
 
 
 class DjenMonitoramentoService(DjenMonitoramentoRepository):
@@ -38,7 +34,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
                     unidade_id=oab["unidade_id"],
                     tribunais=[],
                     ativo=oab["ativo"],
-                    criado_em=agora(),
+                    criado_em=agora_utc(),
                 )
             )
         # Tombstones preservam pausa/remoção mesmo quando o processo segue ativo.
@@ -52,7 +48,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
                         unidade_id=unidade,
                         tribunais=[],
                         automatico=True,
-                        criado_em=agora(),
+                        criado_em=agora_utc(),
                     )
                 )
         self.session.commit()
@@ -105,7 +101,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
         ):
             raise ValidationException("Unidade não encontrada")
         tribunais = self.djen._parametros_busca(
-            ["validar"], agora().date(), agora().date(), corpo.get("tribunais")
+            ["validar"], hoje_brasilia(), hoje_brasilia(), corpo.get("tribunais")
         )[3]
         if tipo == "parte" and not tribunais:
             raise ValidationException(
@@ -119,7 +115,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
                 valor=valor,
                 unidade_id=unidade,
                 tribunais=tribunais,
-                criado_em=agora(),
+                criado_em=agora_utc(),
             )
         )
         self.reativar(tipo, valor, unidade, tribunais)
@@ -181,7 +177,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
         consultas = consultas or self._preparar(
             tipo, valor, inicio, fim, tribunal, unidades, executor, modo, execucao
         )
-        self.mudar_consultas(consultas, status="executando", inicio=agora())
+        self.mudar_consultas(consultas, status="executando", inicio=agora_utc())
         self.session.commit()
         cliente = self.djen.client
         limite_anterior = cliente.max_paginas
@@ -265,7 +261,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
             cliente.max_paginas = limite_anterior
         for consulta in consultas:
             self.mudar_consultas(
-                [consulta], fim=agora(), status=status, mensagem=mensagem
+                [consulta], fim=agora_utc(), status=status, mensagem=mensagem
             )
         self.session.commit()
         return dict(
@@ -313,10 +309,10 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
     def executar(self, janela=None):
         self.reconciliar_processos()
         janela = max(1, janela or Config.DJEN_JANELA_DIAS)
-        hoje = agora().date()
+        hoje = hoje_brasilia()
         # Caller owns the tenant lock: old unfinished executions cannot still run.
         self.interromper_anteriores()
-        inicio = agora()
+        inicio = agora_utc()
         id = self.djen.sincronizacoes.registrar(
             dict(
                 inicio=inicio,
@@ -354,7 +350,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
                 continue
             inicio_periodo = hoje - timedelta(days=janela - 1)
             for item in itens:
-                referencia = item["ultimo_sucesso"] or item["criado_em"].date()
+                referencia = item["ultimo_sucesso"] or utc_para_brasilia(item["criado_em"]).date()
                 inicio_periodo = min(inicio_periodo, referencia - timedelta(days=1))
             # OAB e parte só filtram por período: janelas de até 30 dias.
             cursor = inicio_periodo
@@ -405,7 +401,7 @@ class DjenMonitoramentoService(DjenMonitoramentoRepository):
         )
         registro = dict(
             inicio=inicio,
-            fim=agora(),
+            fim=agora_utc(),
             status=status,
             novas=sum(res["novas"] for res in resultados),
             atualizadas=sum(res["atualizadas"] for res in resultados),

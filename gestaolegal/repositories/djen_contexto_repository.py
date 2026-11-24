@@ -1,6 +1,5 @@
 """Classificação contextual independente da operação; artefatos JSON, nunca pickle."""
 
-from datetime import datetime
 import unicodedata
 from sqlalchemy import select, insert, update, delete, func, exists
 from gestaolegal.repositories.repository import BaseRepository
@@ -14,6 +13,7 @@ from gestaolegal.database.tables import (
     djen_treinos as t,
 )
 from gestaolegal.exceptions import ValidationException, NotFoundException
+from gestaolegal.utils.tempo import agora_utc, agora_utc_iso
 
 
 def normalizar(texto):
@@ -77,7 +77,7 @@ class DjenContextoRepository(BaseRepository):
                         nomes=list(dict.fromkeys(n.strip() for n in nomes)),
                         tribunais=list(dict.fromkeys(t.upper() for t in tribunais)),
                         unidade_id=unidade,
-                        criado_em=datetime.now(),
+                        criado_em=agora_utc(),
                     )
                 )
             )
@@ -172,7 +172,7 @@ class DjenContextoRepository(BaseRepository):
             rotulo=rotulo,
             origem=origem,
             id_rotulado_por=usuario,
-            rotulado_em=datetime.now(),
+            rotulado_em=agora_utc(),
         )
         return self._gravar_mudanca(atual, cid, valores)
 
@@ -183,7 +183,7 @@ class DjenContextoRepository(BaseRepository):
         recebe autor e origem restaurados, e o histórico registra quem reverteu.
         """
         # O histórico sempre data a ação; a relação pode receber a data restaurada.
-        registro = dict(valores, rotulado_em=datetime.now(), **(historico or {}))
+        registro = dict(valores, rotulado_em=agora_utc(), **(historico or {}))
         hid = self.session.execute(
             insert(h).values(
                 **self.valores(
@@ -424,7 +424,7 @@ class DjenContextoRepository(BaseRepository):
                 **self.valores(
                     dict(
                         contexto_id=cid,
-                        criado_em=datetime.now(),
+                        criado_em=agora_utc(),
                         artefato=artefato,
                         metricas=metricas,
                     )
@@ -508,13 +508,13 @@ class DjenContextoRepository(BaseRepository):
                     "Treino exige 200 rótulos, com pelo menos 50 de cada classe"
                 )
             token = str(uuid4())
-            self.session.execute(insert(t).values(**self.valores(dict(contexto_id=cid, token=token, status="na_fila", etapa="Na fila", solicitado_em=datetime.now(), contexto_snapshot=self.snapshot(atual), logs=[dict(horario=datetime.now().isoformat(), etapa="Na fila", mensagem="Treinamento solicitado; aguardando worker.")]))))
+            self.session.execute(insert(t).values(**self.valores(dict(contexto_id=cid, token=token, status="na_fila", etapa="Na fila", solicitado_em=agora_utc(), contexto_snapshot=self.snapshot(atual), logs=[dict(horario=agora_utc_iso(), etapa="Na fila", mensagem="Treinamento solicitado; aguardando worker.")]))))
             self.session.execute(
                 self.escopo(update(c).where(c.c.id == cid), c).values(
                     treino_status="na_fila",
                     treino_token=token,
                     treino_erro=None,
-                    treino_solicitado_em=datetime.now(),
+                    treino_solicitado_em=agora_utc(),
                     treino_iniciado_em=None,
                     treino_finalizado_em=None,
                 )
@@ -531,10 +531,10 @@ class DjenContextoRepository(BaseRepository):
                     c.c.treino_status == "na_fila",
                 ),
                 c,
-            ).values(treino_status="executando", treino_iniciado_em=datetime.now())
+            ).values(treino_status="executando", treino_iniciado_em=agora_utc())
         )
         if result.rowcount == 1:
-            self.atualizar_execucao(cid, token, "Preparar exemplos", 0, "Execução iniciada.", status="executando", iniciado_em=datetime.now())
+            self.atualizar_execucao(cid, token, "Preparar exemplos", 0, "Execução iniciada.", status="executando", iniciado_em=agora_utc())
         self.session.commit()
         return result.rowcount == 1
 
@@ -551,12 +551,12 @@ class DjenContextoRepository(BaseRepository):
             ).values(
                 treino_status="erro",
                 treino_erro=mensagem[:500],
-                treino_finalizado_em=datetime.now(),
+                treino_finalizado_em=agora_utc(),
             )
         )
         if result.rowcount == 1:
             row = self.session.execute(self.escopo(select(t.c.etapas_concluidas).where(t.c.contexto_id == cid, t.c.token == token), t)).first()
-            self.atualizar_execucao(cid, token, "Falhou", row[0] if row else 0, mensagem[:500], status="erro", erro=mensagem[:500], finalizado_em=datetime.now())
+            self.atualizar_execucao(cid, token, "Falhou", row[0] if row else 0, mensagem[:500], status="erro", erro=mensagem[:500], finalizado_em=agora_utc())
         self.session.commit()
 
     def concluir_treino(self, cid, token):
@@ -576,7 +576,7 @@ class DjenContextoRepository(BaseRepository):
         self.session.execute(
             self.escopo(update(c).where(c.c.id == cid), c).values(
                 treino_status="concluido",
-                treino_finalizado_em=datetime.now(),
+                treino_finalizado_em=agora_utc(),
                 treino_erro=None,
             )
         )
@@ -679,7 +679,7 @@ class DjenContextoRepository(BaseRepository):
         if corpo.get('versao') != atual['versao']:
             raise ValidationException('O contexto foi alterado. Reabra a edição para conferir a versão atual')
         novo = self.dados_edicao(atual, corpo)
-        revisoes = list(atual.get('revisoes') or []) + [dict(self.snapshot(atual), alterado_em=datetime.now().isoformat())]
+        revisoes = list(atual.get('revisoes') or []) + [dict(self.snapshot(atual), alterado_em=agora_utc_iso())]
         self.session.execute(self.escopo(update(c).where(c.c.id == cid), c).values(nome=novo['nome'], descricao=novo['descricao'], criterios=novo['criterios'], versao=atual['versao'] + 1, revisoes=revisoes))
         self.sincronizar(novo)
         self.session.execute(self.escopo(update(r).where(r.c.contexto_id == cid), r).values(modelo_id=None, sugestao=None, probabilidade=None))
@@ -735,5 +735,5 @@ class DjenContextoRepository(BaseRepository):
     def atualizar_execucao(self, cid, token, etapa, concluidas, mensagem, **extras):
         row = self.session.execute(self.escopo(select(t).where(t.c.contexto_id == cid, t.c.token == token), t).with_for_update()).mappings().first()
         if row:
-            logs = list(row['logs']) + [dict(horario=datetime.now().isoformat(), etapa=etapa, mensagem=mensagem)]
+            logs = list(row['logs']) + [dict(horario=agora_utc_iso(), etapa=etapa, mensagem=mensagem)]
             self.session.execute(self.escopo(update(t).where(t.c.id == row['id']), t).values(etapa=etapa, etapas_concluidas=concluidas, logs=logs, **extras))

@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import Iterable, Literal
 
 from gestaolegal.common import PageParams, PaginatedResult
@@ -8,6 +7,7 @@ from gestaolegal.exceptions import NotFoundException
 from gestaolegal.models.notificacao import NotificacaoListItem, TipoNotificacao
 from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.notificacao_repository import NotificacaoRepository
+from gestaolegal.utils.tempo import agora_utc, hoje_brasilia
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class NotificacaoService:
         pulado.
         Devolve quantas foram criadas. Chamar dentro da transação da origem.
         """
-        agora = datetime.now()
+        agora = agora_utc()
         alvos: list[int | None] = [None] if geral else []
         vistos: set[int] = set()
         for dest in destinatarios:
@@ -108,7 +108,7 @@ class NotificacaoService:
             rows.append(
                 {
                     "acao": acao,
-                    "data": agora.date(),
+                    "data": hoje_brasilia(),
                     "data_criacao": agora,
                     "id_executor_acao": executor_id,
                     "id_usu_notificar": dest,

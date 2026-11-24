@@ -1,7 +1,6 @@
 import logging
 import secrets
 import string
-from datetime import datetime
 from typing import Any
 
 import bcrypt
@@ -26,6 +25,7 @@ from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.repositories.unidade_repository import UnidadeRepository
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext, sem_tenant
+from gestaolegal.utils.tempo import agora_utc, hoje_brasilia
 
 logger = logging.getLogger(__name__)
 
@@ -216,8 +216,8 @@ class UsuarioService:
         user_data["endereco_id"] = endereco_id
         user_data["criadopor"] = criado_por
         user_data["modificadopor"] = criado_por
-        user_data["modificado"] = datetime.now()
-        user_data["criado"] = datetime.now()
+        user_data["modificado"] = agora_utc()
+        user_data["criado"] = agora_utc()
         user_data["status"] = True
 
         password_length = 12
@@ -277,7 +277,7 @@ class UsuarioService:
         self.__parse_date_fields(user_data)
 
         user_data["modificadopor"] = modificado_por
-        user_data["modificado"] = datetime.now()
+        user_data["modificado"] = agora_utc()
 
         self.repository.update(user_id, user_data)
         if unidade_ids is not None:
@@ -322,7 +322,7 @@ class UsuarioService:
 
         password_data = {
             "senha": hashed_password,
-            "modificado": datetime.now(),
+            "modificado": agora_utc(),
         }
 
         self.repository.update(user_id, password_data)
@@ -429,7 +429,7 @@ class UsuarioService:
             senha_aleatoria.encode("utf-8"), bcrypt.gensalt()
         ).decode("utf-8")
 
-        agora = datetime.now()
+        agora = agora_utc()
         user_data = {
             "email": email,
             "senha": hashed_password,
@@ -440,12 +440,12 @@ class UsuarioService:
             "cpf": "000.000.000-00",
             "profissao": "Administrador",
             "estado_civil": "N/A",
-            "nascimento": agora.date(),
+            "nascimento": hoje_brasilia(),
             "telefone": None,
             "celular": "N/A",
             "oab": None,
             "obs": "Primeiro admin do NPJ, criado pela plataforma",
-            "data_entrada": agora.date(),
+            "data_entrada": hoje_brasilia(),
             "data_saida": None,
             "matricula": "ADMIN",
             "bolsista": False,

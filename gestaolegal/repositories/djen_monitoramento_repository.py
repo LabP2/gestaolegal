@@ -14,11 +14,7 @@ from gestaolegal.database.tables import (
 )
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.exceptions import ValidationException
-from zoneinfo import ZoneInfo
-
-
-def agora():
-    return datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+from gestaolegal.utils.tempo import agora_utc
 
 
 class DjenMonitoramentoRepository(BaseRepository):
@@ -40,7 +36,7 @@ class DjenMonitoramentoRepository(BaseRepository):
         return stmt
 
     def limpar_logs(self):
-        limite = agora() - timedelta(days=max(1, Config.DJEN_LOG_RETENCAO_DIAS))
+        limite = agora_utc() - timedelta(days=max(1, Config.DJEN_LOG_RETENCAO_DIAS))
         velhas = self.escopo(
             select(q.c.id).where(
                 q.c.inicio < limite, q.c.status.not_in(["executando", "aguardando"])
@@ -269,13 +265,13 @@ class DjenMonitoramentoRepository(BaseRepository):
                 q,
             ).values(
                 status="interrompida",
-                fim=agora(),
+                fim=agora_utc(),
                 mensagem="Execução anterior interrompida",
             )
         )
         self.session.execute(
             self.escopo(update(s).where(s.c.fim.is_(None)), s).values(
-                status="erro", fim=agora(), mensagem="Execução anterior interrompida"
+                status="erro", fim=agora_utc(), mensagem="Execução anterior interrompida"
             )
         )
 
@@ -299,7 +295,7 @@ class DjenMonitoramentoRepository(BaseRepository):
                     p.c.status.is_(True),
                 ),
                 p,
-            ).values(djen_pendente=False, djen_consultado_em=agora())
+            ).values(djen_pendente=False, djen_consultado_em=agora_utc())
         )
 
     def concluir_execucao(self, id, registro):

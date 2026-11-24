@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from gestaolegal.config import Config
 from gestaolegal.database.session import transaction
@@ -13,6 +13,7 @@ from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.mail_service import enviar_link_recuperacao
 from gestaolegal.utils.request_context import RequestContext, sem_tenant
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class PasswordResetService:
             logger.info(f"Recuperação de senha pedida para conta desativada: {email}")
             return
 
-        janela = datetime.now() - timedelta(
+        janela = agora_utc() - timedelta(
             minutes=Config.PASSWORD_RESET_JANELA_MINUTES
         )
         token = secrets.token_urlsafe(32)
@@ -77,7 +78,7 @@ class PasswordResetService:
             self.repository.create(
                 usuario.id,
                 _hash(token),
-                datetime.now()
+                agora_utc()
                 + timedelta(minutes=Config.PASSWORD_RESET_TOKEN_TTL_MINUTES),
             )
 
@@ -95,7 +96,7 @@ class PasswordResetService:
         token = secrets.token_urlsafe(32)
         self.repository.invalidate_for_user(usuario_id)
         self.repository.create(
-            usuario_id, _hash(token), datetime.now() + PRIMEIRO_ACESSO_TTL
+            usuario_id, _hash(token), agora_utc() + PRIMEIRO_ACESSO_TTL
         )
         return f"{Config.FRONTEND_URL}/redefinir-senha/{token}"
 

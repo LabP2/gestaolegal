@@ -1,7 +1,5 @@
 """Acervo persistente DJEN, classificação auditada e consultas, por NPJ."""
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import insert, select, update, func, exists, or_
 
@@ -16,6 +14,7 @@ from gestaolegal.database.tables import (
 )
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.repositories.djen_filtros import filtrar_identificacao
+from gestaolegal.utils.tempo import agora_utc
 
 
 class DjenAcervoRepository(BaseRepository):
@@ -24,7 +23,7 @@ class DjenAcervoRepository(BaseRepository):
         valores = {
             k: v for k, v in dados.items() if k in p.c and k not in ("id", "tenant_id")
         }
-        agora = datetime.now()
+        agora = agora_utc()
         from sqlalchemy.dialects.mysql import insert as mysql_insert
         from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -121,7 +120,7 @@ class DjenAcervoRepository(BaseRepository):
             rotulo=rotulo,
             origem=origem,
             id_rotulado_por=usuario,
-            rotulado_em=datetime.now(),
+            rotulado_em=agora_utc(),
         )
         self.session.execute(
             insert(h).values(
@@ -447,9 +446,7 @@ class DjenAcervoRepository(BaseRepository):
                         parametros=parametros,
                         unidade_id=unidade,
                         id_executor=executor,
-                        inicio=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(
-                            tzinfo=None
-                        ),
+                        inicio=agora_utc(),
                         status="executando",
                     )
                 )
@@ -499,7 +496,7 @@ class DjenAcervoRepository(BaseRepository):
         self.session.execute(
             self.escopo(update(q).where(q.c.id == consulta), q).values(
                 status=status,
-                fim=datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None),
+                fim=agora_utc(),
             )
         )
 

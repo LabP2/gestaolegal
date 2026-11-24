@@ -264,3 +264,50 @@ def test_item_da_fila_de_outra_unidade_responde_404(
             f"/api/fila_atendimento/{item['id']}/{acao}", headers=auth_headers_nl
         )
         assert response.status_code == 404, acao
+
+
+def test_fila_grava_utc_e_exibe_o_instante_certo(
+    client: FlaskClient,
+    auth_headers: dict[str, str],
+    sample_atendido_data: dict[str, Any],
+    monkeypatch,
+) -> None:
+    # Regressão: a fila gravava o horário de Brasília e o JSON o marcava como
+    # GMT; quem incluía alguém às 15:30 via 12:30 na tela.
+    from datetime import date, datetime
+    from email.utils import parsedate_to_datetime
+
+    from gestaolegal.services import fila_atendimento_service
+    from gestaolegal.utils.tempo import FUSO_BRASILIA
+
+    _reset(client)
+    hoje = date(2026, 11, 24)
+    monkeypatch.setattr(fila_atendimento_service, "_hoje_brasilia", lambda: hoje)
+
+    def incluir(agora_utc: datetime, nome: str, cpf: str) -> dict[str, Any]:
+        monkeypatch.setattr(fila_atendimento_service, "_agora", lambda: agora_utc)
+        aid = _criar_atendido(client, auth_headers, sample_atendido_data, nome, cpf)
+        r = client.post(
+            "/api/fila_atendimento/",
+            json={"id_atendido": aid, "prioridade": 0, "psicologia": False},
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.json
+        return get_success_data(r)
+
+    def em_brasilia(valor: str) -> str:
+        return parsedate_to_datetime(valor).astimezone(FUSO_BRASILIA).strftime("%d/%m %H:%M")
+
+    # 15:30 em Brasília = 18:30 UTC.
+    primeiro = incluir(datetime(2026, 11, 24, 18, 30), "Ana", "111")
+    assert em_brasilia(primeiro["data_criacao"]) == "24/11 15:30"
+    # 22:00 em Brasília já é dia 25 em UTC, mas é a mesma fila do dia 24.
+    segundo = incluir(datetime(2026, 11, 25, 1, 0), "Bia", "222")
+    assert segundo["senha"] == "N02"
+    # 01:00 do dia 24 em UTC ainda é dia 23 em Brasília: fica fora da fila.
+    monkeypatch.setattr(
+        fila_atendimento_service, "_agora", lambda: datetime(2026, 11, 24, 2, 0)
+    )
+    fila = get_success_data(client.get("/api/fila_atendimento/", headers=auth_headers))
+    assert [i["senha"] for i in fila["fila"]] == ["N01", "N02"]
+    assert em_brasilia(fila["fila"][1]["data_criacao"]) == "24/11 22:00"

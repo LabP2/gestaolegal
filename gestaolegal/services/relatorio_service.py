@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from gestaolegal.exceptions import ValidationException
 from gestaolegal.repositories.relatorio_repository import RelatorioRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.tempo import brasilia_para_utc, utc_para_brasilia
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,9 @@ class RelatorioService:
                 "A data final deve ser maior ou igual à data inicial.",
                 field="data_final",
             )
-        return inicio, fim
+        # As datas são dias de Brasília; os instantes no banco estão em UTC.
+        # Colunas de data pura usam `.date()` destes limites, que não muda.
+        return brasilia_para_utc(inicio), brasilia_para_utc(fim)
 
     @staticmethod
     def _parse_areas(areas: str | None) -> list[str] | None:
@@ -101,9 +104,9 @@ class RelatorioService:
                 "id_usuario": p["id_usuario"],
                 "nome": p["nome"],
                 "urole": p["urole"],
-                "data": p["data_entrada"].date().isoformat(),
-                "entrada": p["data_entrada"].strftime("%H:%M"),
-                "saida": p["data_saida"].strftime("%H:%M"),
+                "data": utc_para_brasilia(p["data_entrada"]).date().isoformat(),
+                "entrada": utc_para_brasilia(p["data_entrada"]).strftime("%H:%M"),
+                "saida": utc_para_brasilia(p["data_saida"]).strftime("%H:%M"),
                 "confirmacao": p["confirmacao"],
             }
             for p in self.repository.presencas_no_periodo(

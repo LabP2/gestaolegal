@@ -42,7 +42,7 @@ class FilaAtendimentoRepository(BaseRepository):
             .where(
                 fila_atendimentos.c.prioridade == prioridade,
                 fila_atendimentos.c.data_criacao >= inicio,
-                fila_atendimentos.c.data_criacao <= fim,
+                fila_atendimentos.c.data_criacao < fim,
             )
         )
         stmt = self.escopo(stmt, fila_atendimentos)
@@ -74,7 +74,7 @@ class FilaAtendimentoRepository(BaseRepository):
             )
             .where(
                 fila_atendimentos.c.data_criacao >= inicio,
-                fila_atendimentos.c.data_criacao <= fim,
+                fila_atendimentos.c.data_criacao < fim,
             )
         )
         stmt = self.escopo(stmt, fila_atendimentos)

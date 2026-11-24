@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import and_, func, insert, or_, select
@@ -10,6 +9,7 @@ from gestaolegal.database.tables import notificacao, usuarios
 from gestaolegal.models.notificacao import Notificacao, NotificacaoListItem
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.utils.dataclass_utils import from_dict
+from gestaolegal.utils.tempo import agora_utc
 
 
 class NotificacaoRepository(BaseRepository):
@@ -132,7 +132,7 @@ class NotificacaoRepository(BaseRepository):
             sql_update(notificacao)
             .where(notificacao.c.id == id)
             .where(self._visiveis_para(user_id, inclui_gerais))
-            .values(data_arquivamento=datetime.now() if arquivar else None)
+            .values(data_arquivamento=agora_utc() if arquivar else None)
         )
         return self.session.execute(stmt).rowcount > 0
 
@@ -142,6 +142,6 @@ class NotificacaoRepository(BaseRepository):
             .where(self._visiveis_para(user_id, inclui_gerais))
             .where(notificacao.c.lida.is_(True))
             .where(notificacao.c.data_arquivamento.is_(None))
-            .values(data_arquivamento=datetime.now())
+            .values(data_arquivamento=agora_utc())
         )
         return self.session.execute(stmt).rowcount

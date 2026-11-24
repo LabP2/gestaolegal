@@ -29,14 +29,17 @@ def _inserir_presenca(app, id_usuario: int, dia: date, entrada: str, saida: str,
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import registro_entrada
 
+    from gestaolegal.utils.tempo import brasilia_para_utc
+
     h_e, m_e = (int(x) for x in entrada.split(":"))
     h_s, m_s = (int(x) for x in saida.split(":"))
+    # Horas informadas em Brasília; o banco guarda o instante em UTC.
     with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         session.execute(
             insert(registro_entrada).values(tenant_id=1, 
-                data_entrada=datetime.combine(dia, time(h_e, m_e)),
-                data_saida=datetime.combine(dia, time(h_s, m_s)),
+                data_entrada=brasilia_para_utc(datetime.combine(dia, time(h_e, m_e))),
+                data_saida=brasilia_para_utc(datetime.combine(dia, time(h_s, m_s))),
                 id_usuario=id_usuario,
                 status=False,
                 confirmacao=confirmacao,

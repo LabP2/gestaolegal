@@ -1,11 +1,11 @@
 import logging
-from datetime import datetime
 
 from gestaolegal.database.session import transaction
 from gestaolegal.exceptions import NotFoundException, ValidationException
 from gestaolegal.models.unidade import Unidade
 from gestaolegal.models.unidade_input import UnidadeCreateInput, UnidadeUpdateInput
 from gestaolegal.repositories.unidade_repository import UnidadeRepository
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class UnidadeService:
                     "nome": nome,
                     "sigla": sigla,
                     "ativa": dados.ativa,
-                    "criado": datetime.now(),
+                    "criado": agora_utc(),
                 }
             )
 

@@ -1,7 +1,6 @@
 import logging
-from datetime import date, datetime, time
+from datetime import date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from gestaolegal.exceptions import NotFoundException, ValidationException
 from gestaolegal.models.fila_atendimento import (
@@ -16,25 +15,14 @@ from gestaolegal.repositories.fila_atendimento_repository import (
 )
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existente
+from gestaolegal.utils.tempo import agora_utc, hoje_brasilia, intervalo_utc_do_dia
 
 logger = logging.getLogger(__name__)
 
-# A fila é organizada por dia de Brasília (senhas zeram à 00h local, não em GMT).
-# O servidor roda em UTC, então precisamos converter explicitamente.
-FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
-
-
-def _agora_brasilia() -> datetime:
-    """Data/hora atual no fuso de Brasília, como datetime "naive" (sem tzinfo).
-
-    Gravamos os timestamps da fila já no horário de parede de Brasília para que
-    a filtragem por dia (_intervalo_do_dia) seja consistente com o que é exibido.
-    """
-    return datetime.now(FUSO_BRASILIA).replace(tzinfo=None)
-
-
-def _hoje_brasilia() -> date:
-    return _agora_brasilia().date()
+# A fila é organizada por dia de Brasília (as senhas zeram à 00h local), mas os
+# horários são gravados em UTC, como todos os instantes do sistema (utils/tempo).
+_agora = agora_utc
+_hoje_brasilia = hoje_brasilia
 
 
 class FilaAtendimentoService:
@@ -44,12 +32,8 @@ class FilaAtendimentoService:
         self.repository = FilaAtendimentoRepository()
 
     def _intervalo_do_dia(self, dia: date | None = None) -> tuple[datetime, datetime]:
-        """Início e fim (inclusivos) do dia informado (padrão: hoje em Brasília)."""
-        dia = dia or _hoje_brasilia()
-        return (
-            datetime.combine(dia, time(0, 0, 0)),
-            datetime.combine(dia, time(23, 59, 59, 999999)),
-        )
+        """Início (inclusivo) e fim (exclusivo), em UTC, de um dia de Brasília."""
+        return intervalo_utc_do_dia(dia or _hoje_brasilia())
 
     def _proximo_numero(self, prioridade: int) -> int:
         # As senhas são por unidade: cada local tem a sua sequência do dia.
@@ -146,7 +130,7 @@ class FilaAtendimentoService:
             "psicologia": 1 if dados.psicologia else 0,
             "senha": senha,
             "status": FilaStatus.NA_FILA,
-            "data_criacao": _agora_brasilia(),
+            "data_criacao": _agora(),
             "data_saida": None,
             "unidade_id": RequestContext.get_unidade_ativa(),
         }
@@ -172,7 +156,7 @@ class FilaAtendimentoService:
 
         self.repository.update(
             fila_id,
-            {"status": novo_status, "data_saida": _agora_brasilia()},
+            {"status": novo_status, "data_saida": _agora()},
         )
         logger.info(f"Fila {fila_id} atualizada para status {novo_status}")
         return self._item_por_id(fila_id)

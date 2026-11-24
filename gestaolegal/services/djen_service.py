@@ -56,6 +56,7 @@ from gestaolegal.repositories.tenant_repository import TenantRepository
 from gestaolegal.services.notificacao_service import NotificacaoService
 from gestaolegal.services.referencias import exigir_existente
 from gestaolegal.utils.cnj import mascarar_cnj
+from gestaolegal.utils.tempo import agora_utc, hoje_brasilia, utc_para_brasilia
 
 logger = logging.getLogger(__name__)
 
@@ -295,10 +296,10 @@ class DJENService:
         }
         if ultima is None:
             return {"ultima": None, "atrasada": True, "rotina": rotina}
-        referencia = (ultima.fim or ultima.inicio).date()
+        referencia = utc_para_brasilia(ultima.fim or ultima.inicio).date()
         return {
             "ultima": ultima.__dict__,
-            "atrasada": dias_uteis_entre(referencia, date.today()) > 2,
+            "atrasada": dias_uteis_entre(referencia, hoje_brasilia()) > 2,
             "rotina": rotina,
         }
 
@@ -339,7 +340,7 @@ class DJENService:
         `processo` vem da busca pelo número; sem ele, casa pelo `numero_cnj`.
         Toda captura pode vincular ao processo; descartes e vínculos anteriores são preservados.
         """
-        agora = datetime.now()
+        agora = agora_utc()
         pid = self.acervo.guardar(self._dados_publicacao(item))
         existente = self.repo.find_by_id_djen(item.id_djen)
         alvo = processo if processo is not None else self._casar(item.numero_processo)
@@ -442,7 +443,7 @@ class DJENService:
                 "id_caso": caso.id if caso else None,
                 "unidade_id": caso.unidade_id if caso else processo.unidade_id,
                 "situacao": "vinculada",
-                "data_situacao": datetime.now(),
+                "data_situacao": agora_utc(),
                 "id_vinculado_por": executor_id if manual else None,
             },
         )
@@ -509,7 +510,7 @@ class DJENService:
                 ),
                 "descricao": descricao,
                 "data_evento": comunicacao.data_disponibilizacao,
-                "data_criacao": datetime.now(),
+                "data_criacao": agora_utc(),
                 "id_criado_por": executor_id,
                 "id_usuario_responsavel": caso.id_estagiario or caso.id_orientador,
                 "status": True,
@@ -580,7 +581,7 @@ class DJENService:
                 comunicacao.id,
                 {
                     "situacao": "descartada",
-                    "data_situacao": datetime.now(),
+                    "data_situacao": agora_utc(),
                     "id_vinculado_por": user.id,
                 },
             )
@@ -665,7 +666,7 @@ class DJENService:
             "id_usuario": self._id_usuario(dados),
             "unidade_id": self._unidade_escolhida(dados, user, unidade_id),
             "ativo": ativo,
-            "criado_em": datetime.now(),
+            "criado_em": agora_utc(),
             "id_criado_por": user.id,
         }
         if self.oabs.existe(numero, uf):
@@ -762,7 +763,7 @@ class DJENService:
     def _consultar_oab(
         self, oab: OabMonitorada, janela_dias: int, resultado: ResultadoCaptura
     ) -> None:
-        fim = date.today()
+        fim = hoje_brasilia()
         inicio = fim - timedelta(days=janela_dias)
         for item in self._capturar(
             self.client,
@@ -800,7 +801,7 @@ class DJENService:
         finally:
             self.client.max_paginas = limite_anterior
         self.processos.update(
-            processo.id, {"djen_pendente": False, "djen_consultado_em": datetime.now()}
+            processo.id, {"djen_pendente": False, "djen_consultado_em": agora_utc()}
         )
 
     def buscar_processo(
@@ -1301,7 +1302,7 @@ class DJENService:
                     cid,
                     dict(
                         situacao="descartada",
-                        data_situacao=datetime.now(),
+                        data_situacao=agora_utc(),
                         id_vinculado_por=user.id,
                     ),
                 )

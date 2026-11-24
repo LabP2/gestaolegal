@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, insert, or_, select
@@ -7,6 +6,7 @@ from sqlalchemy import update as sql_update
 from gestaolegal.database.tables import plataforma_admins, tenants
 from gestaolegal.models.plataforma import PlataformaAdmin, Tenant
 from gestaolegal.repositories.repository import BaseRepository
+from gestaolegal.utils.tempo import agora_utc
 
 
 class TenantRepository(BaseRepository):
@@ -160,7 +160,7 @@ class PlataformaAdminRepository(BaseRepository):
                 email=email,
                 senha=senha_hash,
                 ativo=True,
-                criado_em=datetime.now(),
+                criado_em=agora_utc(),
             )
         )
         self.session.flush()
@@ -171,5 +171,5 @@ class PlataformaAdminRepository(BaseRepository):
         self.session.execute(
             sql_update(plataforma_admins)
             .where(plataforma_admins.c.id == admin_id)
-            .values(ultimo_login_em=datetime.now())
+            .values(ultimo_login_em=agora_utc())
         )
