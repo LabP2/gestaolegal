@@ -13,7 +13,13 @@ from gestaolegal.models.user import UserInfo
 from gestaolegal.repositories.plantao_repository import PlantaoRepository
 from gestaolegal.repositories.presenca_repository import PresencaRepository
 from gestaolegal.utils.request_context import RequestContext
-from gestaolegal.utils.tempo import agora_brasilia, dia_util_anterior, hoje_brasilia
+from gestaolegal.utils.tempo import (
+    agora_brasilia,
+    brasilia_para_utc,
+    dia_util_anterior,
+    hoje_brasilia,
+    utc_para_brasilia,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +47,7 @@ class PresencaService:
         aberto = self.repository.find_aberto_do_usuario(
             id_usuario, unidade_id=self._unidade()
         )
-        if not aberto or aberto.data_entrada.date() >= hoje_brasilia():
+        if not aberto or utc_para_brasilia(aberto.data_entrada).date() >= hoje_brasilia():
             return
 
         logger.info(
@@ -77,7 +83,9 @@ class PresencaService:
         self._fechar_registros_vencidos(user.id)
 
         horas, minutos = (int(parte) for parte in dados.hora.split(":"))
-        momento = datetime.combine(hoje_brasilia(), time(horas, minutos))
+        # A hora é digitada em Brasília; o banco guarda o instante em UTC.
+        local = datetime.combine(hoje_brasilia(), time(horas, minutos))
+        momento = brasilia_para_utc(local)
 
         aberto = self.repository.find_aberto_do_usuario(
             user.id, unidade_id=self._unidade()
@@ -87,13 +95,15 @@ class PresencaService:
                 aberto.id, {"data_saida": momento, "status": False}
             )
             acao = StatusPresenca.SAIDA
-            logger.info(f"Saída registrada para o usuário {user.id} às {momento}")
+            logger.info(f"Saída registrada para o usuário {user.id} às {local}")
         else:
             self.repository.create(
                 {
                     "data_entrada": momento,
                     # Provisório até a saída ser registrada (coluna NOT NULL).
-                    "data_saida": datetime.combine(momento.date(), time(23, 59, 59)),
+                    "data_saida": brasilia_para_utc(
+                        datetime.combine(local.date(), time(23, 59, 59))
+                    ),
                     "id_usuario": user.id,
                     "status": True,
                     "confirmacao": Confirmacao.ABERTO,
@@ -101,7 +111,7 @@ class PresencaService:
                 }
             )
             acao = StatusPresenca.ENTRADA
-            logger.info(f"Entrada registrada para o usuário {user.id} às {momento}")
+            logger.info(f"Entrada registrada para o usuário {user.id} às {local}")
 
         return {"acao": acao, **self.get_estado(user)}
 

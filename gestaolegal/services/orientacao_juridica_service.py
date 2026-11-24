@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import cast
 
 from gestaolegal.common import PageParams, PaginatedResult
@@ -28,6 +27,7 @@ from gestaolegal.repositories.repository import (
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existentes
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +232,7 @@ class OrientacaoJuridicaService:
             orientacao_data = orientacao_input.model_dump(exclude={"atendidos_ids"})
             orientacao_data["id_usuario"] = id_usuario
             orientacao_data["status"] = 1
-            orientacao_data["data_criacao"] = datetime.now()
+            orientacao_data["data_criacao"] = agora_utc()
             orientacao_data["unidade_id"] = RequestContext.get_unidade_ativa()
 
             orientacao_id = self.repository.create(orientacao_data)

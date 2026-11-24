@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, time
+from datetime import date
 from typing import Any
 
 from sqlalchemy import insert, select
@@ -9,6 +9,7 @@ from gestaolegal.database.tables import registro_entrada, usuarios
 from gestaolegal.models.presenca import RegistroEntrada
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.utils.dataclass_utils import from_dict
+from gestaolegal.utils.tempo import intervalo_utc_do_dia
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +70,8 @@ class PresencaRepository(BaseRepository):
     def list_para_confirmacao(
         self, dia: date, unidade_id: int | None = None
     ) -> list[dict[str, Any]]:
-        """Registros fechados do dia que ainda não passaram pela conferência."""
-        inicio = datetime.combine(dia, time.min)
-        fim = datetime.combine(dia, time.max)
+        """Registros fechados do dia (de Brasília) ainda não conferidos."""
+        inicio, fim = intervalo_utc_do_dia(dia)
         stmt = (
             select(
                 registro_entrada.c.id,
@@ -87,7 +87,7 @@ class PresencaRepository(BaseRepository):
                 registro_entrada.c.status.is_(False),
                 registro_entrada.c.confirmacao == "aberto",
                 registro_entrada.c.data_entrada >= inicio,
-                registro_entrada.c.data_entrada <= fim,
+                registro_entrada.c.data_entrada < fim,
                 usuarios.c.status.is_(True),
             )
             .order_by(usuarios.c.nome)

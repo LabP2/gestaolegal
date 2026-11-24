@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 from typing import Final, cast
 
 from flask import current_app
@@ -27,6 +26,7 @@ from gestaolegal.repositories.evento_repository import EventoRepository
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existente
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ class EventoService:
             self._validar_anexo(file)
         data = evento_input.model_dump()
         data.update(id_caso=caso_id, unidade_id=caso.unidade_id,
-                    data_criacao=datetime.now(), id_criado_por=criado_por_id,
+                    data_criacao=agora_utc(), id_criado_por=criado_por_id,
                     num_evento=self.repository.count_by_caso_id(caso_id) + 1)
         refs: list[str] = []
         try:

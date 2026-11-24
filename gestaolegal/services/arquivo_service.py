@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 from typing import Any, cast
 
 from flask import current_app
@@ -12,6 +11,7 @@ from gestaolegal.exceptions import NotFoundException, ValidationException
 from gestaolegal.models.arquivo import Arquivo
 from gestaolegal.repositories.arquivo_repository import ArquivoRepository
 from gestaolegal.services import private_file_storage
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class ArquivoService:
                         "descricao": descricao,
                         "nome": cast(str, file.filename),
                         "caminho": ref,
-                        "data_criacao": datetime.now(),
+                        "data_criacao": agora_utc(),
                         "id_criado_por": criado_por,
                     }
                 )

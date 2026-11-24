@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import cast
 
 from gestaolegal.database.session import transaction
@@ -17,6 +16,7 @@ from gestaolegal.repositories.repository import GetParams, WhereClause
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existente
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class LembreteService:
                     "id_do_criador": criador_id,
                     "id_caso": caso_id,
                     "id_usuario": data.id_usuario,
-                    "data_criacao": datetime.now(),
+                    "data_criacao": agora_utc(),
                     "data_lembrete": data.data_lembrete,
                     "descricao": data.descricao,
                     "status": True,

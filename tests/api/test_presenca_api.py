@@ -44,13 +44,17 @@ def _inserir_registro(
 
     from gestaolegal.database.session import get_session
     from gestaolegal.database.tables import registro_entrada
+    from gestaolegal.utils.tempo import brasilia_para_utc
 
     with app.app_context(), sem_tenant("teste: acesso direto ao banco"):
         session = get_session()
         result = session.execute(
             insert(registro_entrada).values(tenant_id=1, 
-                data_entrada=entrada,
-                data_saida=saida or datetime.combine(entrada.date(), time(23, 59, 59)),
+                # Horários dos testes em Brasília; o banco guarda UTC.
+                data_entrada=brasilia_para_utc(entrada),
+                data_saida=brasilia_para_utc(
+                    saida or datetime.combine(entrada.date(), time(23, 59, 59))
+                ),
                 id_usuario=id_usuario,
                 status=status,
                 confirmacao=confirmacao,
@@ -99,6 +103,7 @@ class TestRegistroDePonto:
 
         from gestaolegal.database.session import get_session
         from gestaolegal.database.tables import registro_entrada
+        from gestaolegal.utils.tempo import utc_para_brasilia
 
         _registrar(client, auth_headers, "09:00")
         _registrar(client, auth_headers, "12:30")
@@ -107,9 +112,24 @@ class TestRegistroDePonto:
             session = get_session()
             row = session.execute(select(registro_entrada)).first()
 
-        assert row.data_entrada.strftime("%H:%M") == "09:00"
-        assert row.data_saida.strftime("%H:%M") == "12:30"
+        # O banco guarda o instante em UTC (Brasília + 3h).
+        assert row.data_entrada.strftime("%H:%M") == "12:00"
+        assert row.data_saida.strftime("%H:%M") == "15:30"
+        assert utc_para_brasilia(row.data_entrada).strftime("%H:%M") == "09:00"
+        assert utc_para_brasilia(row.data_saida).strftime("%H:%M") == "12:30"
         assert row.status is False
+
+    def test_horario_aberto_sai_como_instante_utc(self, client, auth_headers):
+        # Regressão: o JSON trazia o horário de Brasília marcado como GMT, e a
+        # tela mostrava três horas a menos.
+        from email.utils import parsedate_to_datetime
+
+        from gestaolegal.utils.tempo import FUSO_BRASILIA
+
+        _registrar(client, auth_headers, "15:30")
+        entrada = _estado(client, auth_headers)["registro_aberto"]["data_entrada"]
+        instante = parsedate_to_datetime(entrada).astimezone(FUSO_BRASILIA)
+        assert instante.strftime("%H:%M") == "15:30"
 
     @pytest.mark.parametrize("payload", [{"hora": "25:00"}, {"hora": "9h"}, {}])
     def test_hora_invalida_e_recusada(self, client, auth_headers, payload):

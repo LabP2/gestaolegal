@@ -8,6 +8,7 @@ from gestaolegal.database.tables import password_reset_tokens
 from gestaolegal.models.password_reset import PasswordResetToken
 from gestaolegal.repositories.repository import BaseRepository
 from gestaolegal.utils.dataclass_utils import from_dict
+from gestaolegal.utils.tempo import agora_utc
 
 
 class PasswordResetRepository(BaseRepository):
@@ -24,7 +25,7 @@ class PasswordResetRepository(BaseRepository):
                         "usuario_id": usuario_id,
                         "token_hash": token_hash,
                         "expira_em": expira_em,
-                        "criado_em": datetime.now(),
+                        "criado_em": agora_utc(),
                     }
                 )
             )
@@ -43,7 +44,7 @@ class PasswordResetRepository(BaseRepository):
             select(password_reset_tokens)
             .where(password_reset_tokens.c.token_hash == token_hash)
             .where(password_reset_tokens.c.usado_em.is_(None))
-            .where(password_reset_tokens.c.expira_em > datetime.now())
+            .where(password_reset_tokens.c.expira_em > agora_utc())
         )
         row = self.session.execute(stmt).one_or_none()
         return from_dict(PasswordResetToken, dict(row._mapping)) if row else None
@@ -55,7 +56,7 @@ class PasswordResetRepository(BaseRepository):
                     password_reset_tokens.c.id == id
                 ),
                 password_reset_tokens,
-            ).values(usado_em=datetime.now())
+            ).values(usado_em=agora_utc())
         )
 
     def invalidate_for_user(self, usuario_id: int) -> int:
@@ -65,7 +66,7 @@ class PasswordResetRepository(BaseRepository):
             .where(password_reset_tokens.c.usuario_id == usuario_id)
             .where(password_reset_tokens.c.usado_em.is_(None)),
             password_reset_tokens,
-        ).values(usado_em=datetime.now())
+        ).values(usado_em=agora_utc())
         return self.session.execute(stmt).rowcount
 
     def contar_desde(self, usuario_id: int, desde: datetime) -> int:

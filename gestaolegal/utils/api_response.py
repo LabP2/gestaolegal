@@ -5,10 +5,10 @@ This module provides consistent response wrappers for all API endpoints,
 ensuring a uniform structure for both successful and error responses.
 """
 
-from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 from flask import Response, make_response
+from gestaolegal.utils.tempo import agora_utc_iso
 
 T = TypeVar("T")
 
@@ -82,7 +82,7 @@ def success_response(
     """
     metadata = None
     if include_metadata:
-        metadata = {"timestamp": datetime.utcnow().isoformat()}
+        metadata = {"timestamp": agora_utc_iso()}
 
     response = ApiResponse(success=True, data=data, message=message, metadata=metadata)
     return make_response(response.to_dict(), status_code)

@@ -2,6 +2,7 @@
 
 from gestaolegal.exceptions import ValidationException
 from gestaolegal.repositories.djen_contexto_repository import DjenContextoRepository
+from gestaolegal.utils.tempo import agora_utc
 
 
 class DjenContextoService(DjenContextoRepository):
@@ -121,8 +122,7 @@ class DjenContextoService(DjenContextoRepository):
             self.concluir_treino(cid, token)
         mid = self.salvar_modelo(cid, artefato, metricas)
         if token is not None:
-            from datetime import datetime
-            self.atualizar_execucao(cid, token, 'Concluído', 7, f'Modelo #{mid} salvo. As sugestões serão atualizadas pelo worker.', status='concluido', finalizado_em=datetime.now(), modelo_id=mid, metricas=metricas)
+            self.atualizar_execucao(cid, token, 'Concluído', 7, f'Modelo #{mid} salvo. As sugestões serão atualizadas pelo worker.', status='concluido', finalizado_em=agora_utc(), modelo_id=mid, metricas=metricas)
         self.session.commit()
         return {"id": mid, "metricas": metricas}
 

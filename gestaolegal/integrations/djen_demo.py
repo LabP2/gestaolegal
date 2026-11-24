@@ -25,6 +25,7 @@ import zlib
 from datetime import date, timedelta
 
 from gestaolegal.integrations.djen_client import RespostaHTTP
+from gestaolegal.utils.tempo import hoje_brasilia
 
 # Faixa alta, longe dos ids reais do DJEN.
 BASE_ID = 9_000_000_000_000
@@ -93,7 +94,7 @@ def _id(chave: str, indice: int) -> int:
 def _cnj_da_oab(numero_oab: str) -> str:
     """Processo fictício, não cadastrado, de onde vêm as publicações da OAB."""
     sequencial = f"{zlib.crc32(numero_oab.encode()) % 10_000_000:07d}"
-    ano = str(date.today().year)
+    ano = str(hoje_brasilia().year)
     base = int(f"{sequencial}{ano}0130001")
     digito = 98 - (base * 100) % 97
     return f"{sequencial}{digito:02d}{ano}0130001"
@@ -144,7 +145,7 @@ def _item(
 def publicacoes_do_processo(numero: str, hoje: date | None = None) -> list[dict]:
     if not cnj_de_demonstracao(numero):
         return []
-    hoje = hoje or date.today()
+    hoje = hoje or hoje_brasilia()
     audiencia = (hoje + timedelta(days=20)).strftime("%d/%m/%Y")
     return [
         _item(
@@ -165,7 +166,7 @@ def publicacoes_da_oab(
 ) -> list[dict]:
     if not numero_oab.startswith(PREFIXO_OAB_DEMO):
         return []
-    fim = fim or date.today()
+    fim = fim or hoje_brasilia()
     numero = _cnj_da_oab(numero_oab)
     itens = []
     for i, (dias, tipo_doc, texto) in enumerate(PUBLICACOES_OAB):

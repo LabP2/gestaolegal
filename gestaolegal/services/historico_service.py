@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import cast
 
 from gestaolegal.common import PageParams, PaginatedResult
@@ -16,6 +15,7 @@ from gestaolegal.repositories.repository import (
 )
 from gestaolegal.repositories.user_repository import UserRepository
 from gestaolegal.utils.request_context import RequestContext
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class HistoricoService:
             {
                 "id_caso": id_caso,
                 "id_usuario": id_usuario,
-                "data": datetime.now(),
+                "data": agora_utc(),
                 "acao": acao,
                 "descricao": descricao,
             }

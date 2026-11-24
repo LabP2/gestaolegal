@@ -26,6 +26,7 @@ from gestaolegal.services.djen_service import (
 from gestaolegal.utils.api_decorators import authorized
 from gestaolegal.utils.api_response import success_response
 from gestaolegal.utils.request_context import RequestContext, contexto_tenant
+from gestaolegal.utils.tempo import hoje_brasilia
 
 djen_controller = Blueprint("djen_api", __name__)
 
@@ -316,7 +317,7 @@ def exportar_exemplos():
                     return
             yield linha
 
-    nome = f"djen-exemplos-{date.today().isoformat()}.jsonl"
+    nome = f"djen-exemplos-{hoje_brasilia().isoformat()}.jsonl"
     return Response(
         stream_with_context(linhas()),
         mimetype="application/x-ndjson",

@@ -9,7 +9,6 @@ unidade nascem dentro do tenant novo, em `contexto_tenant(novo_id)`.
 import logging
 import re
 from dataclasses import asdict
-from datetime import datetime
 from typing import Any
 
 import bcrypt
@@ -27,6 +26,7 @@ from gestaolegal.repositories.unidade_repository import UnidadeRepository
 from gestaolegal.services.password_reset_service import PasswordResetService
 from gestaolegal.services.usuario_service import UsuarioService
 from gestaolegal.utils.request_context import contexto_tenant, sem_tenant
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class PlataformaService:
                         "slug": slug,
                         "instituicao": instituicao,
                         "ativo": True,
-                        "criado_em": datetime.now(),
+                        "criado_em": agora_utc(),
                         "id_criado_por": admin_id,
                     }
                 )
@@ -189,7 +189,7 @@ class PlataformaService:
                         "nome": unidade_nome,
                         "sigla": unidade_sigla,
                         "ativa": True,
-                        "criado": datetime.now(),
+                        "criado": agora_utc(),
                     }
                 )
                 try:

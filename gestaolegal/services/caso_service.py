@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 
 from flask import current_app
 from werkzeug.datastructures import FileStorage
@@ -35,6 +34,7 @@ from gestaolegal.services.historico_service import HistoricoService
 from gestaolegal.services.notificacao_service import NotificacaoService
 from gestaolegal.utils.request_context import RequestContext
 from gestaolegal.services.referencias import exigir_existente, exigir_existentes
+from gestaolegal.utils.tempo import agora_utc
 
 logger = logging.getLogger(__name__)
 
@@ -206,8 +206,8 @@ class CasoService:
         with transaction():
             caso_data = caso_input.model_dump(exclude={"ids_clientes"})
 
-            caso_data["data_criacao"] = datetime.now()
-            caso_data["data_modificacao"] = datetime.now()
+            caso_data["data_criacao"] = agora_utc()
+            caso_data["data_modificacao"] = agora_utc()
             caso_data["id_criado_por"] = criado_por_id
             caso_data["id_modificado_por"] = criado_por_id
             caso_data["numero_ultimo_processo"] = None
@@ -259,7 +259,7 @@ class CasoService:
                 exclude_none=True, exclude={"ids_clientes"}
             )
 
-            caso_data["data_modificacao"] = datetime.now()
+            caso_data["data_modificacao"] = agora_utc()
             caso_data["id_modificado_por"] = modificado_por_id
 
             self.repository.update(caso_id, caso_data)
@@ -314,7 +314,7 @@ class CasoService:
             # the rest of the system (filters, status badges) expects.
             "situacao_deferimento": "ativo",
             "justif_indeferimento": None,
-            "data_modificacao": datetime.now(),
+            "data_modificacao": agora_utc(),
             "id_modificado_por": modificado_por_id,
         }
 
@@ -343,7 +343,7 @@ class CasoService:
         caso_data = {
             "situacao_deferimento": "indeferido",
             "justif_indeferimento": justificativa,
-            "data_modificacao": datetime.now(),
+            "data_modificacao": agora_utc(),
             "id_modificado_por": modificado_por_id,
         }
 
