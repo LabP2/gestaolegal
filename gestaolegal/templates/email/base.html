@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{ assunto }}</title>
+</head>
+{#- Layout de tabelas e estilos inline: é o que Gmail, Outlook e Apple Mail
+    renderizam de forma igual. As imagens vão anexadas inline (cid:), sem
+    depender de URL pública nem do "exibir imagens" do cliente. -#}
+<body style="margin:0;padding:0;background-color:#f4efe8;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ previa }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4efe8;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;">
+
+        <tr>
+          <td style="background-color:#1b2a4a;padding:18px 28px;border-bottom:4px solid #f07c1e;">
+            <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">Gestão Legal</span>
+            <span style="font-size:12px;color:#c7d0e0;padding-left:8px;">Assistência Judiciária · FD/UFMG</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:28px 28px 4px 28px;">
+            <img src="cid:{{ cid_capivara }}" width="140" height="140" alt="Capivara do Gestão Legal" style="display:block;border:0;width:140px;height:140px;">
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:8px 36px 0 36px;">
+            <h1 style="margin:0 0 16px 0;font-size:22px;line-height:1.3;font-weight:700;color:#1b2a4a;text-align:center;">{{ titulo }}</h1>
+            {% for paragrafo in paragrafos %}
+            <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;">{{ paragrafo }}</p>
+            {% endfor %}
+          </td>
+        </tr>
+
+        {% if botao %}
+        <tr>
+          <td align="center" style="padding:10px 36px 6px 36px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" bgcolor="#f07c1e" style="border-radius:8px;">
+                  <a href="{{ botao.url }}" target="_blank" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">{{ botao.texto }}</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:10px 36px 0 36px;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#6b7280;">Se o botão não funcionar, copie e cole este endereço no navegador:<br>
+            <a href="{{ botao.url }}" target="_blank" style="color:#1b2a4a;word-break:break-all;">{{ botao.url }}</a></p>
+          </td>
+        </tr>
+        {% endif %}
+
+        {% if nota %}
+        <tr>
+          <td style="padding:18px 36px 0 36px;">
+            <p style="margin:0;padding:12px 14px;font-size:13px;line-height:1.5;color:#4b5563;background-color:#fdf3e8;border-left:3px solid #f5b21b;border-radius:4px;">{{ nota }}</p>
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr>
+          <td style="padding:24px 36px 28px 36px;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;">Mensagem automática do Gestão Legal. Não responda a este e-mail.</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background-color:#1b2a4a;padding:22px 28px;" align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                {% for inst in instituicoes %}
+                <td style="padding:0 12px;" valign="middle">
+                  <a href="{{ inst.url }}" target="_blank" title="{{ inst.nome }}"><img src="cid:{{ inst.cid }}" height="{{ inst.altura }}" alt="{{ inst.sigla }}" style="display:block;border:0;height:{{ inst.altura }}px;width:auto;"></a>
+                </td>
+                {% endfor %}
+              </tr>
+            </table>
+            <p style="margin:16px 0 0 0;font-size:12px;line-height:1.6;color:#c7d0e0;">
+              Desenvolvido pelo <a href="{{ instituicoes[0].url }}" target="_blank" style="color:#ffffff;font-weight:700;text-decoration:none;">LabP²</a>
+              · Laboratório de Tecnologias Públicas para o Setor Público<br>
+              <a href="{{ instituicoes[1].url }}" target="_blank" style="color:#ffffff;text-decoration:underline;">Faculdade de Direito da UFMG</a>
+              · <a href="{{ instituicoes[2].url }}" target="_blank" style="color:#ffffff;text-decoration:underline;">Universidade Federal de Minas Gerais</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

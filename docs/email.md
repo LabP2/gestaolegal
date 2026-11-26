@@ -96,6 +96,20 @@ para que um problema de reputação não afete o e-mail institucional.
 O volume `mail_dkim` guarda a chave privada e precisa sobreviver a
 `docker compose down -v`: perdê-la obriga a gerar outra e republicar o TXT.
 
+## Layout das mensagens
+
+Todo e-mail sai em HTML e em texto puro, com o mesmo conteúdo, pelo layout
+`gestaolegal/templates/email/base.html`. O HTML traz a capivara no topo e, no
+rodapé, os logos e links do LabP², da Faculdade de Direito e da UFMG. A versão
+em texto repete os mesmos links. As imagens vão anexadas inline
+(`multipart/related`, `cid:`), sem depender de URL pública nem de o cliente
+liberar imagens externas.
+
+Para um e-mail novo, monte um `ConteudoEmail` (título, parágrafos, botão
+opcional e nota opcional) e chame `enviar_email`. O conteúdo é texto puro: o
+template escapa o HTML. As imagens ficam em `gestaolegal/templates/email/img/`
+(capivara com 280 px, exibida com 140 px).
+
 ## Recuperação de senha
 
 - Pedido em `/esqueci-a-senha`, redefinição em `/redefinir-senha/<token>`.
